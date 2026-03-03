@@ -1,0 +1,6 @@
+@CartolaOptimization.Api_HostAddress = http://localhost:5286
+
+GET {{CartolaOptimization.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
