@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -8,6 +8,12 @@
 
   <ItemGroup>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CartolaOptimization.Application\CartolaOptimization.Application.csproj" />
+    <ProjectReference Include="..\CartolaOptimization.Domain\CartolaOptimization.Domain.csproj" />
+    <ProjectReference Include="..\CartolaOptimization.Infrastructure\CartolaOptimization.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

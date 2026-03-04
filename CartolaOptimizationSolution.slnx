@@ -1,3 +1,8 @@
 <Solution>
   <Project Path="CartolaOptimization.Api/CartolaOptimization.Api.csproj" />
+  <Project Path="CartolaOptimization.Application/CartolaOptimization.Application.csproj" />
+  <Project Path="CartolaOptimization.Domain/CartolaOptimization.Domain.csproj" />
+  <Project Path="CartolaOptimization.Infrastructure/CartolaOptimization.Infrastructure.csproj" />
+  <Project Path="CartolaOptimization.ML/CartolaOptimization.ML.csproj" />
+  <Project Path="CartolaOptimization.Tests/CartolaOptimization.Tests.csproj" />
 </Solution>
