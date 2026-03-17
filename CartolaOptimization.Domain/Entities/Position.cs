@@ -46,6 +46,6 @@
         /// <summary>
         /// Gets or sets the AthleteRounds
         /// </summary>
-        public ICollection<AthleteRound> AthleteRounds { get; set; }
+        public ICollection<AthleteRound> AthleteRounds { get; set; } = new List<AthleteRound>();
     }
 }
