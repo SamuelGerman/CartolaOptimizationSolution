@@ -1,13 +1,20 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace CartolaOptimization.Domain.Entities
+﻿namespace CartolaOptimization.Domain.Entities
 {
+    using System;
+    using System.Collections.Generic;
+
+    /// <summary>
+    /// Defines the <see cref="Position" />
+    /// </summary>
     public class Position
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Position"/> class.
+        /// </summary>
+        /// <param name="id">The id<see cref="int"/></param>
+        /// <param name="cartolaId">The cartolaId<see cref="int"/></param>
+        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="abrevivation">The abrevivation<see cref="string"/></param>
         public Position(int id, int cartolaId, string name, string abrevivation)
         {
             Id = id;
@@ -16,11 +23,29 @@ namespace CartolaOptimization.Domain.Entities
             Abreviation = abrevivation ?? throw new ArgumentNullException(nameof(abrevivation));
         }
 
+        /// <summary>
+        /// Gets or sets the Id
+        /// </summary>
         public int Id { get; set; }
+
+        /// <summary>
+        /// Gets or sets the CartolaId
+        /// </summary>
         public int CartolaId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the Name
+        /// </summary>
         public string Name { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the Abreviation
+        /// </summary>
         public string Abreviation { get; set; } = string.Empty;
 
-        public ICollection<Athlete> Athletes { get; set; } = new List<Athlete>();
+        /// <summary>
+        /// Gets or sets the AthleteRounds
+        /// </summary>
+        public ICollection<AthleteRound> AthleteRounds { get; set; } = new List<AthleteRound>();
     }
 }
