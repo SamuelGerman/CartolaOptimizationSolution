@@ -1,5 +1,6 @@
 using CartolaOptimization.Infrastructure;
 using CartolaOptimization.Infrastructure.Context;
+using CartolaOptimization.Api.Middleware;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
@@ -7,7 +8,7 @@ using System.Reflection;
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddDbContext<AppDbContext>(options =>
+Action<DbContextOptionsBuilder> configureDbContext = options =>
 {
     options.UseMySql(
         connectionString,
@@ -16,7 +17,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         {
             mysqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
         });
-});
+};
+
+builder.Services.AddDbContext<AppDbContext>(
+    configureDbContext,
+    contextLifetime: ServiceLifetime.Scoped,
+    optionsLifetime: ServiceLifetime.Singleton);
+builder.Services.AddDbContextFactory<AppDbContext>(configureDbContext);
 
 builder.Services.AddControllers();
 builder.Services.AddInfrastructureServices();
@@ -58,6 +65,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseMiddleware<ApiExceptionHandlingMiddleware>();
 app.UseHttpsRedirection();
 
 app.UseAuthorization();

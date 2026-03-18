@@ -19,6 +19,7 @@ public sealed class CartolaSyncController(ICartolaSyncService cartolaSyncService
     /// <returns>A summary describing the synchronized entities and rows.</returns>
     [HttpPost("current")]
     [ProducesResponseType(typeof(CartolaSyncResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> SyncCurrent(CancellationToken cancellationToken)
     {
         var result = await cartolaSyncService.SyncAsync(cancellationToken: cancellationToken);
@@ -33,6 +34,7 @@ public sealed class CartolaSyncController(ICartolaSyncService cartolaSyncService
     /// <returns>A summary describing the synchronized entities and rows.</returns>
     [HttpPost("matches/{round:int}")]
     [ProducesResponseType(typeof(CartolaSyncResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> SyncMatchesRound(int round, CancellationToken cancellationToken)
     {
         var result = await cartolaSyncService.SyncAsync(round, cancellationToken);

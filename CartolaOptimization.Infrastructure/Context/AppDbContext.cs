@@ -23,6 +23,8 @@ namespace CartolaOptimization.Infrastructure.Context
 
         public DbSet<ClubRoundPosition> ClubRoundPositions => Set<ClubRoundPosition>();
 
+        public DbSet<IntegrationFailureLog> IntegrationFailureLogs => Set<IntegrationFailureLog>();
+
         public DbSet<Match> Matches => Set<Match>();
 
         public DbSet<Position> Positions => Set<Position>();

@@ -21,6 +21,7 @@ public sealed class GatoMestreSyncController(IGatoMestreSyncService gatoMestreSy
     /// <returns>A summary describing the synchronized entities and rows.</returns>
     [HttpPost("season/{season:int}/round/{round:int}")]
     [ProducesResponseType(typeof(GatoMestreSyncResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> SyncRound(int season, int round, CancellationToken cancellationToken)
     {
         var result = await gatoMestreSyncService.SyncRoundAsync(season, round, cancellationToken);

@@ -8,8 +8,8 @@ namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 public sealed class GatoMestrePriceSnapshotResponse
 {
     [JsonPropertyName("num")]
-    public decimal Num { get; init; }
+    public decimal? Num { get; init; }
 
     [JsonPropertyName("variacao")]
-    public decimal Variation { get; init; }
+    public decimal? Variation { get; init; }
 }

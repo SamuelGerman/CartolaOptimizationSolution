@@ -1,4 +1,5 @@
 using CartolaOptimization.Application.Interfaces;
+using CartolaOptimization.Infrastructure.Diagnostics;
 using CartolaOptimization.Infrastructure.Integrations.Cartola;
 using CartolaOptimization.Infrastructure.Integrations.GatoMestre;
 using CartolaOptimization.Infrastructure.Services;
@@ -24,6 +25,7 @@ public static class DependencyInjection
 
         services.AddScoped<ICartolaSyncService, CartolaSyncService>();
         services.AddScoped<IGatoMestreSyncService, GatoMestreSyncService>();
+        services.AddScoped<IIntegrationFailureLogService, IntegrationFailureLogService>();
 
         return services;
     }

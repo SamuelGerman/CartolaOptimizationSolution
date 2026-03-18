@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CartolaOptimization.Domain.Entities;
 using CartolaOptimization.Infrastructure.Context;
+using CartolaOptimization.Infrastructure.Diagnostics;
 using CartolaOptimization.Infrastructure.Integrations.GatoMestre;
 using CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 using CartolaOptimization.Infrastructure.Services;
@@ -15,6 +16,7 @@ public sealed class GatoMestreSyncServiceTests
     public async Task SyncRoundAsync_CreatesClubRoundAndPositionStats_WhenConfrontationDataMatchesRequestedRound()
     {
         await using var dbContext = CreateDbContext();
+        var failureLogService = new FakeIntegrationFailureLogService();
         var service = new GatoMestreSyncService(dbContext, new FakeGatoMestreApiClient
         {
             Teams = new Dictionary<int, GatoMestreTeamResponse>
@@ -38,7 +40,7 @@ public sealed class GatoMestreSyncServiceTests
                     Away = CreateClubBlock(287, "visitante", 43.06m, 30.36m, 84.81m, 47.18m, 47.18m, [(1, 1.90m, 4.05m), (5, 2.10m, 6.45m)]),
                 },
             },
-        });
+        }, failureLogService);
 
         var result = await service.SyncRoundAsync(2026, 7);
 
@@ -55,6 +57,7 @@ public sealed class GatoMestreSyncServiceTests
     public async Task SyncRoundAsync_CreatesAthleteRoundFromDetailFallback_WhenRoundRowDoesNotExist()
     {
         await using var dbContext = CreateDbContext();
+        var failureLogService = new FakeIntegrationFailureLogService();
         var service = new GatoMestreSyncService(dbContext, new FakeGatoMestreApiClient
         {
             Teams = new Dictionary<int, GatoMestreTeamResponse>
@@ -132,7 +135,7 @@ public sealed class GatoMestreSyncServiceTests
                     Away = CreateClubBlock(262, "visitante", 40m, 30m, 40m, 52m, 49m, []),
                 },
             },
-        });
+        }, failureLogService);
 
         var result = await service.SyncRoundAsync(2026, 4);
 
@@ -153,6 +156,106 @@ public sealed class GatoMestreSyncServiceTests
         Assert.Equal(0.8m, athleteRound.ScoreNum);
         Assert.Equal(5.3m, athleteRound.PriceNum);
         Assert.Equal(2, athleteRound.Scouts.Count);
+    }
+
+    [Fact]
+    public async Task SyncRoundAsync_LogsWarningAndContinues_WhenAthleteDetailRequestFailsButPreviousRoundCanBeUsedAsFallback()
+    {
+        await using var dbContext = CreateDbContext();
+        var failureLogService = new FakeIntegrationFailureLogService();
+
+        var club = new Club(0, 293, "CAP", "atletico-pr", "Athletico-PR", "https://example.com/293.png");
+        var position = new Position(0, 3, "Zagueiro", "zag");
+        var status = new AthleteStatus(0, 7, "Provavel");
+        var athlete = new Athlete(0, 37457, "Atleta 37457", "Atleta 37457");
+
+        dbContext.Clubs.Add(club);
+        dbContext.Positions.Add(position);
+        dbContext.AthleteStatuses.Add(status);
+        dbContext.Athletes.Add(athlete);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.AthleteRounds.Add(new AthleteRound(
+            0,
+            5,
+            athlete.Id,
+            club.Id,
+            position.Id,
+            status.Id,
+            2,
+            1,
+            1,
+            1.9m,
+            2.63m,
+            2.63m,
+            2.96m,
+            2.3m,
+            -0.10m,
+            5.10m,
+            true)
+        {
+            Scouts = [],
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = new GatoMestreSyncService(dbContext, new FakeGatoMestreApiClient
+        {
+            Teams = new Dictionary<int, GatoMestreTeamResponse>
+            {
+                [293] = CreateTeam(293, "CAP", "atletico-pr", "Athletico-PR"),
+            },
+            AthletesRound = new GatoMestreAthletesRoundResponse
+            {
+                Result =
+                [
+                    new GatoMestreAthleteRoundSummaryResponse
+                    {
+                        AthleteId = 37457,
+                        Points = JsonDocument.Parse("""{"num":2.3,"variacao":0}""").RootElement.Clone(),
+                        Scouts = JsonDocument.Parse("""{"rodada":{"DS":0,"CA":0}}""").RootElement.Clone(),
+                        Games = JsonDocument.Parse("""{"geral":3,"mandante":1,"visitante":2}""").RootElement.Clone(),
+                        Averages = JsonDocument.Parse("""{"geral":{"movel":{"num":4.33},"total":{"num":4.33}}}""").RootElement.Clone(),
+                    }
+                ],
+            },
+            ClubConfrontations = new Dictionary<int, GatoMestreClubConfrontationResponse>
+            {
+                [293] = new()
+                {
+                    Round = 6,
+                    Home = CreateClubBlock(293, "mandante", 40m, 30m, 60m, 50m, 48m, []),
+                    Away = CreateClubBlock(262, "visitante", 40m, 30m, 40m, 52m, 49m, []),
+                },
+            },
+            ThrowAthleteDetail = new ExternalApiException(
+                sourceSystem: "GatoMestre",
+                errorLocation: "GatoMestreApiClient.GetRequiredAsync",
+                requestMethod: "GET",
+                requestUrl: "https://api.gatomestre.globo.com/api/v2/atletas/37457?a=true",
+                requestHeadersJson: """{"User-Agent":"CartolaOptimization/1.0"}""",
+                requestPayload: string.Empty,
+                responseStatusCode: 200,
+                responseReasonPhrase: "OK",
+                responseHeadersJson: """{"Content-Type":"application/json"}""",
+                responsePayload: """{"error":true,"message":"Atleta não encontrado"}""",
+                message: "The Gato Mestre API returned an application error for the athlete detail endpoint."),
+        }, failureLogService);
+
+        var result = await service.SyncRoundAsync(2026, 6);
+        var athleteRound = await dbContext.AthleteRounds.SingleAsync(item => item.RoundId == 6 && item.AthleteId == athlete.Id);
+
+        Assert.Equal(1, result.AthleteRoundsUpserted);
+        Assert.Equal(0, result.AthleteRoundsSkipped);
+        Assert.Equal(1, result.AthleteFailuresLogged);
+        Assert.True(result.IsPartialSync);
+        Assert.Single(failureLogService.Entries);
+        Assert.Contains("37457", failureLogService.Entries[0].RequestUrl);
+        Assert.Contains("Atleta não encontrado", failureLogService.Entries[0].ResponsePayload);
+        Assert.Contains("athleteCartolaId", failureLogService.Entries[0].ContextJson);
+        Assert.Equal(position.Id, athleteRound.PositionId);
+        Assert.Equal(status.Id, athleteRound.StatusId);
+        Assert.Equal(club.Id, athleteRound.ClubId);
+        Assert.Equal(2.3m, athleteRound.ScoreNum);
     }
 
     private static AppDbContext CreateDbContext()
@@ -230,6 +333,8 @@ public sealed class GatoMestreSyncServiceTests
 
         public Dictionary<int, GatoMestreClubConfrontationResponse> ClubConfrontations { get; init; } = [];
 
+        public ExternalApiException? ThrowAthleteDetail { get; init; }
+
         public Task<Dictionary<int, GatoMestreTeamResponse>> GetTeamsAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(Teams);
 
@@ -237,9 +342,29 @@ public sealed class GatoMestreSyncServiceTests
             => Task.FromResult(AthletesRound);
 
         public Task<GatoMestreAthleteDetailResponse> GetAthleteDetailAsync(int athleteId, CancellationToken cancellationToken = default)
-            => Task.FromResult(AthleteDetails[athleteId]);
+        {
+            if (ThrowAthleteDetail is not null)
+            {
+                throw ThrowAthleteDetail;
+            }
+
+            return Task.FromResult(AthleteDetails[athleteId]);
+        }
 
         public Task<GatoMestreClubConfrontationResponse> GetClubConfrontationAsync(int clubId, CancellationToken cancellationToken = default)
-            => Task.FromResult(ClubConfrontations[clubId]);
+            => Task.FromResult(ClubConfrontations.TryGetValue(clubId, out var confrontation)
+                ? confrontation
+                : new GatoMestreClubConfrontationResponse());
+    }
+
+    private sealed class FakeIntegrationFailureLogService : IIntegrationFailureLogService
+    {
+        public List<IntegrationFailureLogEntry> Entries { get; } = [];
+
+        public Task<int?> TryLogAsync(IntegrationFailureLogEntry entry, CancellationToken cancellationToken = default)
+        {
+            Entries.Add(entry);
+            return Task.FromResult<int?>(9001);
+        }
     }
 }

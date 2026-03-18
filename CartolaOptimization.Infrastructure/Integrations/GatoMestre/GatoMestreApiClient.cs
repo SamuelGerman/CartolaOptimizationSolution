@@ -1,5 +1,6 @@
-using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using System.Text.Json;
+using CartolaOptimization.Infrastructure.Diagnostics;
 using CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre;
@@ -28,10 +29,123 @@ public sealed class GatoMestreApiClient(HttpClient httpClient) : IGatoMestreApiC
 
     private async Task<T> GetRequiredAsync<T>(string endpoint, CancellationToken cancellationToken)
     {
-        using var response = await httpClient.GetAsync(endpoint, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        var requestUrl = ResolveRequestUrl(endpoint);
+        var requestHeadersJson = SerializeHeaders(httpClient.DefaultRequestHeaders);
+        var responsePayload = string.Empty;
+        var responseHeadersJson = string.Empty;
+        int? responseStatusCode = null;
+        string responseReasonPhrase = string.Empty;
 
-        var payload = await response.Content.ReadFromJsonAsync<T>(SerializerOptions, cancellationToken);
-        return payload ?? throw new InvalidOperationException($"The Gato Mestre API returned an empty payload for '{endpoint}'.");
+        try
+        {
+            using var response = await httpClient.GetAsync(endpoint, cancellationToken);
+            responseStatusCode = (int)response.StatusCode;
+            responseReasonPhrase = response.ReasonPhrase ?? string.Empty;
+            responsePayload = await response.Content.ReadAsStringAsync(cancellationToken);
+            responseHeadersJson = SerializeHeaders(response.Headers, response.Content.Headers);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new ExternalApiException(
+                    sourceSystem: "GatoMestre",
+                    errorLocation: "GatoMestreApiClient.GetRequiredAsync",
+                    requestMethod: HttpMethod.Get.Method,
+                    requestUrl: requestUrl,
+                    requestHeadersJson: requestHeadersJson,
+                    requestPayload: string.Empty,
+                    responseStatusCode: responseStatusCode,
+                    responseReasonPhrase: responseReasonPhrase,
+                    responseHeadersJson: responseHeadersJson,
+                    responsePayload: responsePayload,
+                    message: $"The Gato Mestre API returned status code {(int)response.StatusCode} for '{endpoint}'.");
+            }
+
+            using var responseDocument = JsonDocument.Parse(responsePayload);
+            if (responseDocument.RootElement.ValueKind == JsonValueKind.Object &&
+                responseDocument.RootElement.TryGetProperty("error", out var errorProperty) &&
+                errorProperty.ValueKind == JsonValueKind.True)
+            {
+                var apiMessage = responseDocument.RootElement.TryGetProperty("message", out var messageProperty) && messageProperty.ValueKind == JsonValueKind.String
+                    ? messageProperty.GetString()
+                    : "Unknown application error.";
+
+                throw new ExternalApiException(
+                    sourceSystem: "GatoMestre",
+                    errorLocation: "GatoMestreApiClient.GetRequiredAsync",
+                    requestMethod: HttpMethod.Get.Method,
+                    requestUrl: requestUrl,
+                    requestHeadersJson: requestHeadersJson,
+                    requestPayload: string.Empty,
+                    responseStatusCode: responseStatusCode,
+                    responseReasonPhrase: responseReasonPhrase,
+                    responseHeadersJson: responseHeadersJson,
+                    responsePayload: responsePayload,
+                    message: $"The Gato Mestre API returned an application error for '{endpoint}': {apiMessage}");
+            }
+
+            var payload = JsonSerializer.Deserialize<T>(responsePayload, SerializerOptions);
+            return payload ?? throw new ExternalApiException(
+                sourceSystem: "GatoMestre",
+                errorLocation: "GatoMestreApiClient.GetRequiredAsync",
+                requestMethod: HttpMethod.Get.Method,
+                requestUrl: requestUrl,
+                requestHeadersJson: requestHeadersJson,
+                requestPayload: string.Empty,
+                responseStatusCode: responseStatusCode,
+                responseReasonPhrase: responseReasonPhrase,
+                responseHeadersJson: responseHeadersJson,
+                responsePayload: responsePayload,
+                message: $"The Gato Mestre API returned an empty payload for '{endpoint}'.");
+        }
+        catch (JsonException exception)
+        {
+            throw new ExternalApiException(
+                sourceSystem: "GatoMestre",
+                errorLocation: "GatoMestreApiClient.GetRequiredAsync",
+                requestMethod: HttpMethod.Get.Method,
+                requestUrl: requestUrl,
+                requestHeadersJson: requestHeadersJson,
+                requestPayload: string.Empty,
+                responseStatusCode: responseStatusCode,
+                responseReasonPhrase: responseReasonPhrase,
+                responseHeadersJson: responseHeadersJson,
+                responsePayload: responsePayload,
+                message: $"The Gato Mestre API payload for '{endpoint}' could not be deserialized.",
+                innerException: exception);
+        }
+        catch (HttpRequestException exception)
+        {
+            throw new ExternalApiException(
+                sourceSystem: "GatoMestre",
+                errorLocation: "GatoMestreApiClient.GetRequiredAsync",
+                requestMethod: HttpMethod.Get.Method,
+                requestUrl: requestUrl,
+                requestHeadersJson: requestHeadersJson,
+                requestPayload: string.Empty,
+                responseStatusCode: null,
+                responseReasonPhrase: string.Empty,
+                responseHeadersJson: string.Empty,
+                responsePayload: string.Empty,
+                message: $"The Gato Mestre API request to '{endpoint}' failed before a valid response was received.",
+                innerException: exception);
+        }
+    }
+
+    private string ResolveRequestUrl(string endpoint)
+        => httpClient.BaseAddress is null ? endpoint : new Uri(httpClient.BaseAddress, endpoint).ToString();
+
+    private static string SerializeHeaders(params HttpHeaders[] headers)
+    {
+        var dictionary = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var headerGroup in headers)
+        {
+            foreach (var header in headerGroup)
+            {
+                dictionary[header.Key] = string.Join(", ", header.Value);
+            }
+        }
+
+        return JsonSerializer.Serialize(dictionary);
     }
 }

@@ -3,58 +3,123 @@ using CartolaOptimization.Application.Interfaces;
 using CartolaOptimization.Application.Models;
 using CartolaOptimization.Domain.Entities;
 using CartolaOptimization.Infrastructure.Context;
+using CartolaOptimization.Infrastructure.Diagnostics;
 using CartolaOptimization.Infrastructure.Integrations.Cartola;
 using CartolaOptimization.Infrastructure.Integrations.Cartola.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CartolaOptimization.Infrastructure.Services;
 
 public sealed class CartolaSyncService(
     AppDbContext dbContext,
-    ICartolaApiClient cartolaApiClient) : ICartolaSyncService
+    ICartolaApiClient cartolaApiClient,
+    IIntegrationFailureLogService integrationFailureLogService) : ICartolaSyncService
 {
     public async Task<CartolaSyncResult> SyncAsync(int? matchesRound = null, CancellationToken cancellationToken = default)
     {
-        var marketStatus = await cartolaApiClient.GetMarketStatusAsync(cancellationToken);
-        var clubsPayload = await cartolaApiClient.GetClubsAsync(cancellationToken);
-        var athletesMarketPayload = await cartolaApiClient.GetAthletesMarketAsync(cancellationToken);
-        var matchesPayload = await cartolaApiClient.GetMatchesAsync(matchesRound ?? marketStatus.CurrentRound, cancellationToken);
+        var executionContext = new SyncExecutionContext("Cartola", "CartolaSyncService.SyncAsync");
+        executionContext.SetContext("requestedMatchesRound", matchesRound);
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        IDbContextTransaction? transaction = null;
 
-        var clubs = await UpsertClubsAsync(clubsPayload, athletesMarketPayload.Clubs, matchesPayload.Clubs, cancellationToken);
-        var positions = await UpsertPositionsAsync(athletesMarketPayload.Positions, cancellationToken);
-        var statuses = await UpsertStatusesAsync(athletesMarketPayload.Statuses, cancellationToken);
-        var athletes = await UpsertAthletesAsync(athletesMarketPayload.Athletes, cancellationToken);
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        var matchesUpserted = await UpsertMatchesAsync(matchesPayload, clubs, cancellationToken);
-        var athleteRoundResult = await UpsertAthleteRoundsAsync(
-            athletesMarketPayload.Athletes,
-            athletes,
-            clubs,
-            positions,
-            statuses,
-            cancellationToken);
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-
-        return new CartolaSyncResult
+        try
         {
-            Season = marketStatus.Season,
-            CurrentRound = marketStatus.CurrentRound,
-            MatchesRound = matchesPayload.Round,
-            AthleteRounds = athleteRoundResult.RoundIds,
-            ClubsUpserted = clubs.Count,
-            PositionsUpserted = positions.Count,
-            StatusesUpserted = statuses.Count,
-            AthletesUpserted = athletes.Count,
-            MatchesUpserted = matchesUpserted,
-            AthleteRoundsUpserted = athleteRoundResult.AthleteRoundsUpserted,
-            ScoutsUpserted = athleteRoundResult.ScoutsUpserted,
-        };
+            executionContext.MarkStep("Load market status payload");
+            var marketStatus = await cartolaApiClient.GetMarketStatusAsync(cancellationToken);
+            executionContext.SetContext("season", marketStatus.Season);
+            executionContext.SetContext("currentRound", marketStatus.CurrentRound);
+
+            executionContext.MarkStep("Load clubs payload");
+            var clubsPayload = await cartolaApiClient.GetClubsAsync(cancellationToken);
+
+            executionContext.MarkStep("Load athlete market payload");
+            var athletesMarketPayload = await cartolaApiClient.GetAthletesMarketAsync(cancellationToken);
+
+            var resolvedMatchesRound = matchesRound ?? marketStatus.CurrentRound;
+            executionContext.SetContext("matchesRound", resolvedMatchesRound);
+
+            executionContext.MarkStep("Load matches payload");
+            var matchesPayload = await cartolaApiClient.GetMatchesAsync(resolvedMatchesRound, cancellationToken);
+
+            executionContext.MarkStep("Begin database transaction");
+            transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+            executionContext.MarkStep("Upsert clubs");
+            var clubs = await UpsertClubsAsync(clubsPayload, athletesMarketPayload.Clubs, matchesPayload.Clubs, cancellationToken);
+
+            executionContext.MarkStep("Upsert positions");
+            var positions = await UpsertPositionsAsync(athletesMarketPayload.Positions, cancellationToken);
+
+            executionContext.MarkStep("Upsert statuses");
+            var statuses = await UpsertStatusesAsync(athletesMarketPayload.Statuses, cancellationToken);
+
+            executionContext.MarkStep("Upsert athletes");
+            var athletes = await UpsertAthletesAsync(athletesMarketPayload.Athletes, cancellationToken);
+
+            executionContext.MarkStep("Persist catalog changes");
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            executionContext.MarkStep("Upsert matches");
+            var matchesUpserted = await UpsertMatchesAsync(matchesPayload, clubs, cancellationToken);
+
+            executionContext.MarkStep("Upsert athlete rounds");
+            var athleteRoundResult = await UpsertAthleteRoundsAsync(
+                athleteResponses: athletesMarketPayload.Athletes,
+                athletes: athletes,
+                clubs: clubs,
+                positions: positions,
+                statuses: statuses,
+                cancellationToken: cancellationToken);
+
+            executionContext.MarkStep("Persist round changes");
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            executionContext.MarkStep("Commit database transaction");
+            await transaction.CommitAsync(cancellationToken);
+
+            return new CartolaSyncResult
+            {
+                Season = marketStatus.Season,
+                CurrentRound = marketStatus.CurrentRound,
+                MatchesRound = matchesPayload.Round,
+                AthleteRounds = athleteRoundResult.RoundIds,
+                ClubsUpserted = clubs.Count,
+                PositionsUpserted = positions.Count,
+                StatusesUpserted = statuses.Count,
+                AthletesUpserted = athletes.Count,
+                MatchesUpserted = matchesUpserted,
+                AthleteRoundsUpserted = athleteRoundResult.AthleteRoundsUpserted,
+                ScoutsUpserted = athleteRoundResult.ScoutsUpserted,
+            };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            var transactionRolledBack = await RollbackTransactionAsync(transaction, cancellationToken);
+            var errorLogId = await integrationFailureLogService.TryLogAsync(
+                BuildFailureLogEntry(executionContext, exception, transactionRolledBack),
+                cancellationToken);
+
+            throw new DataCollectionProcessException(
+                sourceSystem: executionContext.SourceSystem,
+                processName: executionContext.ProcessName,
+                stepName: executionContext.CurrentStep,
+                correlationId: executionContext.CorrelationId,
+                errorLogId: errorLogId,
+                message: $"Cartola synchronization failed at step '{executionContext.CurrentStep}'. Review IntegrationFailureLogs using correlation '{executionContext.CorrelationId}'.",
+                innerException: exception);
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
     }
 
     private async Task<Dictionary<int, Club>> UpsertClubsAsync(
@@ -203,7 +268,18 @@ public sealed class CartolaSyncService(
             if (!clubs.TryGetValue(matchResponse.HomeClubId, out var homeClub) ||
                 !clubs.TryGetValue(matchResponse.AwayClubId, out var awayClub))
             {
-                continue;
+                throw new DataCollectionIntegrityException(
+                    sourceSystem: "Cartola",
+                    stepName: "Upsert matches",
+                    errorLocation: "CartolaSyncService.UpsertMatchesAsync",
+                    message: $"Match '{matchResponse.MatchId}' references clubs that were not loaded into the local catalog.",
+                    contextData: new Dictionary<string, object?>
+                    {
+                        ["matchId"] = matchResponse.MatchId,
+                        ["round"] = matchesResponse.Round,
+                        ["homeClubCartolaId"] = matchResponse.HomeClubId,
+                        ["awayClubCartolaId"] = matchResponse.AwayClubId,
+                    });
             }
 
             if (!existingMatches.TryGetValue(matchResponse.MatchId, out var match))
@@ -277,7 +353,19 @@ public sealed class CartolaSyncService(
                 !positions.TryGetValue(athleteResponse.PositionId, out var position) ||
                 !statuses.TryGetValue(athleteResponse.StatusId, out var status))
             {
-                continue;
+                throw new DataCollectionIntegrityException(
+                    sourceSystem: "Cartola",
+                    stepName: "Upsert athlete rounds",
+                    errorLocation: "CartolaSyncService.UpsertAthleteRoundsAsync",
+                    message: $"Athlete round '{athleteResponse.RoundId}/{athleteResponse.AthleteId}' references catalog data that was not loaded.",
+                    contextData: new Dictionary<string, object?>
+                    {
+                        ["roundId"] = athleteResponse.RoundId,
+                        ["athleteCartolaId"] = athleteResponse.AthleteId,
+                        ["clubCartolaId"] = athleteResponse.ClubId,
+                        ["positionCartolaId"] = athleteResponse.PositionId,
+                        ["statusCartolaId"] = athleteResponse.StatusId,
+                    });
             }
 
             var key = (athleteResponse.RoundId, athlete.Id);
@@ -343,7 +431,6 @@ public sealed class CartolaSyncService(
                 };
 
                 athleteRound.Scouts.Add(scoutEntity);
-
                 scoutsUpserted++;
             }
 
@@ -351,6 +438,92 @@ public sealed class CartolaSyncService(
         }
 
         return (roundsUpserted, scoutsUpserted, roundIds);
+    }
+
+    private static async Task<bool> RollbackTransactionAsync(IDbContextTransaction? transaction, CancellationToken cancellationToken)
+    {
+        if (transaction is null)
+        {
+            return false;
+        }
+
+        await transaction.RollbackAsync(cancellationToken);
+        return true;
+    }
+
+    private static IntegrationFailureLogEntry BuildFailureLogEntry(
+        SyncExecutionContext executionContext,
+        Exception exception,
+        bool transactionRolledBack)
+    {
+        var sourceSystem = executionContext.SourceSystem;
+        var stepName = executionContext.CurrentStep;
+        var errorLocation = executionContext.ProcessName;
+        var requestMethod = string.Empty;
+        var requestUrl = string.Empty;
+        var requestHeadersJson = string.Empty;
+        var requestPayload = string.Empty;
+        int? responseStatusCode = null;
+        var responseReasonPhrase = string.Empty;
+        var responseHeadersJson = string.Empty;
+        var responsePayload = string.Empty;
+        IReadOnlyDictionary<string, object?>? extraContext = null;
+
+        if (exception is ExternalApiException externalApiException)
+        {
+            sourceSystem = externalApiException.SourceSystem;
+            errorLocation = externalApiException.ErrorLocation;
+            requestMethod = externalApiException.RequestMethod;
+            requestUrl = externalApiException.RequestUrl;
+            requestHeadersJson = externalApiException.RequestHeadersJson;
+            requestPayload = externalApiException.RequestPayload;
+            responseStatusCode = externalApiException.ResponseStatusCode;
+            responseReasonPhrase = externalApiException.ResponseReasonPhrase;
+            responseHeadersJson = externalApiException.ResponseHeadersJson;
+            responsePayload = externalApiException.ResponsePayload;
+        }
+        else if (exception is DataCollectionIntegrityException integrityException)
+        {
+            sourceSystem = integrityException.SourceSystem;
+            stepName = integrityException.StepName;
+            errorLocation = integrityException.ErrorLocation;
+            extraContext = integrityException.ContextData;
+        }
+
+        return new IntegrationFailureLogEntry
+        {
+            OccurredAtUtc = DateTime.UtcNow,
+            CorrelationId = executionContext.CorrelationId,
+            SourceSystem = sourceSystem,
+            ProcessName = executionContext.ProcessName,
+            StepName = stepName,
+            ErrorLocation = errorLocation,
+            RequestMethod = requestMethod,
+            RequestUrl = requestUrl,
+            RequestHeadersJson = requestHeadersJson,
+            RequestPayload = requestPayload,
+            ResponseStatusCode = responseStatusCode,
+            ResponseReasonPhrase = responseReasonPhrase,
+            ResponseHeadersJson = responseHeadersJson,
+            ResponsePayload = responsePayload,
+            ExecutedStepsJson = executionContext.ToExecutedStepsJson(),
+            ContextJson = executionContext.ToContextJson(extraContext),
+            ExceptionType = Truncate(exception.GetType().FullName ?? exception.GetType().Name, 300),
+            ExceptionMessage = Truncate(exception.Message, 4000),
+            InnerExceptionMessage = Truncate(exception.InnerException?.Message, 4000),
+            StackTrace = exception.ToString(),
+            TransactionRolledBack = transactionRolledBack,
+        };
+    }
+
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Length <= maxLength ? value : value[..maxLength];
     }
 
     private static void MergeClubs(

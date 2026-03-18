@@ -1,11 +1,15 @@
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using CartolaOptimization.Application.Interfaces;
 using CartolaOptimization.Application.Models;
 using CartolaOptimization.Domain.Entities;
 using CartolaOptimization.Infrastructure.Context;
+using CartolaOptimization.Infrastructure.Diagnostics;
 using CartolaOptimization.Infrastructure.Integrations.GatoMestre;
 using CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace CartolaOptimization.Infrastructure.Services;
 
@@ -14,7 +18,8 @@ namespace CartolaOptimization.Infrastructure.Services;
 /// </summary>
 public sealed class GatoMestreSyncService(
     AppDbContext dbContext,
-    IGatoMestreApiClient gatoMestreApiClient) : IGatoMestreSyncService
+    IGatoMestreApiClient gatoMestreApiClient,
+    IIntegrationFailureLogService integrationFailureLogService) : IGatoMestreSyncService
 {
     private static readonly IReadOnlyDictionary<string, int> PositionMacroToCartolaId = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
     {
@@ -28,46 +33,100 @@ public sealed class GatoMestreSyncService(
 
     private static readonly IReadOnlyDictionary<string, int> KnownStatuses = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
     {
-        ["DÚVIDA"] = 2,
         ["DUVIDA"] = 2,
         ["SUSPENSO"] = 3,
         ["CONTUNDIDO"] = 5,
         ["NULO"] = 6,
-        ["PROVÁVEL"] = 7,
         ["PROVAVEL"] = 7,
     };
 
     public async Task<GatoMestreSyncResult> SyncRoundAsync(int season, int round, CancellationToken cancellationToken = default)
     {
-        var teamsPayload = await gatoMestreApiClient.GetTeamsAsync(cancellationToken);
-        var athletesRoundPayload = await gatoMestreApiClient.GetAthletesRoundAsync(season, round, cancellationToken);
+        var executionContext = new SyncExecutionContext("GatoMestre", "GatoMestreSyncService.SyncRoundAsync");
+        executionContext.SetContext("season", season);
+        executionContext.SetContext("round", round);
 
-        await EnsureKnownPositionsAsync(cancellationToken);
-        await EnsureKnownStatusesAsync(cancellationToken);
+        IDbContextTransaction? transaction = null;
 
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-
-        var clubs = await UpsertClubsAsync(teamsPayload, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        var clubRoundResult = await UpsertClubRoundsAsync(round, clubs, cancellationToken);
-        var athleteRoundResult = await UpsertAthleteRoundsAsync(round, athletesRoundPayload.Result, clubs, cancellationToken);
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-
-        return new GatoMestreSyncResult
+        try
         {
-            Season = season,
-            Round = round,
-            ClubsUpserted = clubs.Count,
-            ClubRoundsUpserted = clubRoundResult.ClubRoundsUpserted,
-            ClubRoundPositionsUpserted = clubRoundResult.PositionStatsUpserted,
-            AthleteRoundsUpserted = athleteRoundResult.AthleteRoundsUpserted,
-            AthleteDetailsFetched = athleteRoundResult.AthleteDetailsFetched,
-            ClubRoundDataAvailable = clubRoundResult.DataAvailable,
-            Notes = clubRoundResult.Note,
-        };
+            executionContext.MarkStep("Load teams payload");
+            var teamsPayload = await gatoMestreApiClient.GetTeamsAsync(cancellationToken);
+
+            executionContext.MarkStep("Load athletes round payload");
+            var athletesRoundPayload = await gatoMestreApiClient.GetAthletesRoundAsync(season, round, cancellationToken);
+
+            executionContext.MarkStep("Begin database transaction");
+            transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+            executionContext.MarkStep("Ensure known positions");
+            await EnsureKnownPositionsAsync(cancellationToken);
+
+            executionContext.MarkStep("Ensure known statuses");
+            await EnsureKnownStatusesAsync(cancellationToken);
+
+            executionContext.MarkStep("Upsert clubs");
+            var clubs = await UpsertClubsAsync(teamsPayload, cancellationToken);
+
+            executionContext.MarkStep("Persist catalog changes");
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            executionContext.MarkStep("Upsert club rounds");
+            var clubRoundResult = await UpsertClubRoundsAsync(round, clubs, executionContext, cancellationToken);
+
+            executionContext.MarkStep("Upsert athlete rounds");
+            var athleteRoundResult = await UpsertAthleteRoundsAsync(round, athletesRoundPayload.Result, clubs, executionContext, cancellationToken);
+
+            executionContext.MarkStep("Persist enriched round changes");
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            executionContext.MarkStep("Commit database transaction");
+            await transaction.CommitAsync(cancellationToken);
+
+            return new GatoMestreSyncResult
+            {
+                Season = season,
+                Round = round,
+                ClubsUpserted = clubs.Count,
+                ClubRoundsUpserted = clubRoundResult.ClubRoundsUpserted,
+                ClubRoundPositionsUpserted = clubRoundResult.PositionStatsUpserted,
+                AthleteRoundsUpserted = athleteRoundResult.AthleteRoundsUpserted,
+                AthleteRoundsSkipped = athleteRoundResult.AthleteRoundsSkipped,
+                AthleteDetailsFetched = athleteRoundResult.AthleteDetailsFetched,
+                AthleteFailuresLogged = athleteRoundResult.AthleteFailuresLogged,
+                AthleteCoverageRate = athleteRoundResult.AthleteCoverageRate,
+                ClubRoundDataAvailable = clubRoundResult.DataAvailable,
+                IsPartialSync = athleteRoundResult.AthleteRoundsSkipped > 0 || !clubRoundResult.DataAvailable,
+                Notes = BuildNotes(clubRoundResult.Note, athleteRoundResult),
+            };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            var transactionRolledBack = await RollbackTransactionAsync(transaction, cancellationToken);
+            var errorLogId = await integrationFailureLogService.TryLogAsync(
+                BuildFailureLogEntry(executionContext, exception, transactionRolledBack),
+                cancellationToken);
+
+            throw new DataCollectionProcessException(
+                sourceSystem: executionContext.SourceSystem,
+                processName: executionContext.ProcessName,
+                stepName: executionContext.CurrentStep,
+                correlationId: executionContext.CorrelationId,
+                errorLogId: errorLogId,
+                message: $"Gato Mestre synchronization failed at step '{executionContext.CurrentStep}'. Review IntegrationFailureLogs using correlation '{executionContext.CorrelationId}'.",
+                innerException: exception);
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
     }
 
     private async Task EnsureKnownPositionsAsync(CancellationToken cancellationToken)
@@ -80,7 +139,7 @@ public sealed class GatoMestreSyncService(
             new Position(0, 3, "Zagueiro", "zag"),
             new Position(0, 4, "Meia", "mei"),
             new Position(0, 5, "Atacante", "ata"),
-            new Position(0, 6, "Técnico", "tec"),
+            new Position(0, 6, "Tecnico", "tec"),
         };
 
         foreach (var position in defaults)
@@ -98,11 +157,11 @@ public sealed class GatoMestreSyncService(
         var existingStatuses = await dbContext.AthleteStatuses.ToDictionaryAsync(status => status.CartolaId, cancellationToken);
         var defaults = new[]
         {
-            new AthleteStatus(0, 2, "Dúvida"),
+            new AthleteStatus(0, 2, "Duvida"),
             new AthleteStatus(0, 3, "Suspenso"),
             new AthleteStatus(0, 5, "Contundido"),
             new AthleteStatus(0, 6, "Nulo"),
-            new AthleteStatus(0, 7, "Provável"),
+            new AthleteStatus(0, 7, "Provavel"),
         };
 
         foreach (var status in defaults)
@@ -131,7 +190,7 @@ public sealed class GatoMestreSyncService(
                     ToRequiredValue(team.Acronym, team.Name, 10),
                     ToOptionalValue(team.Slug, 100),
                     ToRequiredValue(string.IsNullOrWhiteSpace(team.PopularName) ? team.Nickname : team.PopularName, team.Name, 100),
-                    ToOptionalValue(team.Shields.Size60, 255));
+                    ToOptionalValue(team.Shields?.Size60, 255));
 
                 dbContext.Clubs.Add(club);
                 existingClubs.Add(team.TeamId, club);
@@ -141,7 +200,7 @@ public sealed class GatoMestreSyncService(
             club.Abreviation = ToRequiredValue(team.Acronym, team.Name, 10);
             club.Slug = ToOptionalValue(team.Slug, 100);
             club.Nickname = ToRequiredValue(string.IsNullOrWhiteSpace(team.PopularName) ? team.Nickname : team.PopularName, team.Name, 100);
-            club.LogoUrl = ToOptionalValue(team.Shields.Size60, 255);
+            club.LogoUrl = ToOptionalValue(team.Shields?.Size60, 255);
         }
 
         return existingClubs;
@@ -150,6 +209,7 @@ public sealed class GatoMestreSyncService(
     private async Task<(int ClubRoundsUpserted, int PositionStatsUpserted, bool DataAvailable, string Note)> UpsertClubRoundsAsync(
         int requestedRound,
         IReadOnlyDictionary<int, Club> clubs,
+        SyncExecutionContext executionContext,
         CancellationToken cancellationToken)
     {
         var positions = await dbContext.Positions.ToDictionaryAsync(position => position.CartolaId, cancellationToken);
@@ -160,6 +220,9 @@ public sealed class GatoMestreSyncService(
 
         foreach (var club in clubs.Values.OrderBy(club => club.CartolaId))
         {
+            executionContext.SetContext("clubCartolaId", club.CartolaId);
+            executionContext.MarkStep($"Load confrontation payload for club {club.CartolaId}");
+
             var confrontation = await gatoMestreApiClient.GetClubConfrontationAsync(club.CartolaId, cancellationToken);
 
             if (confrontation.Round != requestedRound)
@@ -172,7 +235,17 @@ public sealed class GatoMestreSyncService(
             var clubBlock = ResolveClubBlock(confrontation, club.CartolaId);
             if (clubBlock is null)
             {
-                continue;
+                throw new DataCollectionIntegrityException(
+                    sourceSystem: "GatoMestre",
+                    stepName: "Upsert club rounds",
+                    errorLocation: "GatoMestreSyncService.UpsertClubRoundsAsync",
+                    message: $"The confrontation payload for club '{club.CartolaId}' does not contain a block for the requested club.",
+                    contextData: new Dictionary<string, object?>
+                    {
+                        ["clubCartolaId"] = club.CartolaId,
+                        ["requestedRound"] = requestedRound,
+                        ["payloadRound"] = confrontation.Round,
+                    });
             }
 
             var existingClubRound = await dbContext.ClubRounds
@@ -215,7 +288,17 @@ public sealed class GatoMestreSyncService(
             {
                 if (!positions.TryGetValue(positionStat.PositionId, out var position))
                 {
-                    continue;
+                    throw new DataCollectionIntegrityException(
+                        sourceSystem: "GatoMestre",
+                        stepName: "Upsert club round positions",
+                        errorLocation: "GatoMestreSyncService.UpsertClubRoundsAsync",
+                        message: $"Club round position data references position '{positionStat.PositionId}', but the local catalog does not contain it.",
+                        contextData: new Dictionary<string, object?>
+                        {
+                            ["clubCartolaId"] = club.CartolaId,
+                            ["requestedRound"] = requestedRound,
+                            ["positionCartolaId"] = positionStat.PositionId,
+                        });
                 }
 
                 existingClubRound.PositionStats.Add(new ClubRoundPosition(
@@ -238,10 +321,11 @@ public sealed class GatoMestreSyncService(
         return (processedClubRounds, processedPositionStats, dataAvailable, note);
     }
 
-    private async Task<(int AthleteRoundsUpserted, int AthleteDetailsFetched)> UpsertAthleteRoundsAsync(
+    private async Task<(int AthleteRoundsUpserted, int AthleteRoundsSkipped, int AthleteDetailsFetched, int AthleteFailuresLogged, decimal AthleteCoverageRate)> UpsertAthleteRoundsAsync(
         int round,
         IReadOnlyCollection<GatoMestreAthleteRoundSummaryResponse> summaries,
         IReadOnlyDictionary<int, Club> clubs,
+        SyncExecutionContext executionContext,
         CancellationToken cancellationToken)
     {
         var athletesByCartolaId = await dbContext.Athletes.ToDictionaryAsync(athlete => athlete.CartolaId, cancellationToken);
@@ -254,38 +338,103 @@ public sealed class GatoMestreSyncService(
             .Where(roundEntity => roundEntity.RoundId == round && athleteIds.Contains(roundEntity.AthleteId))
             .ToDictionaryAsync(roundEntity => roundEntity.AthleteId, cancellationToken);
 
+        var latestKnownRounds = await dbContext.AthleteRounds
+            .Where(roundEntity => athleteIds.Contains(roundEntity.AthleteId))
+            .OrderByDescending(roundEntity => roundEntity.RoundId)
+            .ToListAsync(cancellationToken);
+
+        var latestKnownRoundByAthleteId = latestKnownRounds
+            .GroupBy(roundEntity => roundEntity.AthleteId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.FirstOrDefault(roundEntity => roundEntity.ClubId != 0 && roundEntity.PositionId != 0 && roundEntity.StatusId != 0) ?? group.First());
+
         var upserted = 0;
+        var skipped = 0;
         var athleteDetailsFetched = 0;
+        var athleteFailuresLogged = 0;
 
         foreach (var summary in summaries.OrderBy(item => item.AthleteId))
         {
+            executionContext.SetContext("athleteCartolaId", summary.AthleteId);
+
             athletesByCartolaId.TryGetValue(summary.AthleteId, out var athlete);
             existingRounds.TryGetValue(athlete?.Id ?? 0, out var athleteRound);
+            latestKnownRoundByAthleteId.TryGetValue(athlete?.Id ?? 0, out var latestKnownRound);
 
             GatoMestreAthleteDetailResponse? athleteDetail = null;
             GatoMestreAthleteRoundDetailResponse? detailRound = null;
+            ExternalApiException? athleteDetailFailure = null;
 
             if (athlete is null || athleteRound is null || athleteRound.StatusId == 0 || athleteRound.PositionId == 0 || athleteRound.ClubId == 0)
             {
-                athleteDetail = await gatoMestreApiClient.GetAthleteDetailAsync(summary.AthleteId, cancellationToken);
-                detailRound = athleteDetail.Rounds.FirstOrDefault(item => item.Round == round);
-                athleteDetailsFetched++;
+                try
+                {
+                    executionContext.MarkStep($"Load athlete detail payload for athlete {summary.AthleteId}");
+                    athleteDetail = await gatoMestreApiClient.GetAthleteDetailAsync(summary.AthleteId, cancellationToken);
+                    detailRound = athleteDetail.Rounds.FirstOrDefault(item => item.Round == round);
+                    athleteDetailsFetched++;
 
-                athlete = await EnsureAthleteAsync(athletesByCartolaId, athleteDetail, cancellationToken);
-                existingRounds.TryGetValue(athlete.Id, out athleteRound);
+                    if (athleteDetail.Athlete.AthleteId != summary.AthleteId)
+                    {
+                        throw new DataCollectionIntegrityException(
+                            sourceSystem: "GatoMestre",
+                            stepName: "Load athlete detail payload",
+                            errorLocation: "GatoMestreSyncService.UpsertAthleteRoundsAsync",
+                            message: $"The athlete detail payload returned inconsistent identifiers for athlete '{summary.AthleteId}'.",
+                            contextData: new Dictionary<string, object?>
+                            {
+                                ["athleteCartolaId"] = summary.AthleteId,
+                                ["payloadAthleteId"] = athleteDetail.Athlete.AthleteId,
+                            });
+                    }
+
+                    executionContext.MarkStep($"Upsert athlete catalog fallback for athlete {summary.AthleteId}");
+                    athlete = await EnsureAthleteAsync(athletesByCartolaId, athleteDetail);
+                    existingRounds.TryGetValue(athlete.Id, out athleteRound);
+                    latestKnownRoundByAthleteId.TryGetValue(athlete.Id, out latestKnownRound);
+                }
+                catch (ExternalApiException exception)
+                {
+                    athleteDetailFailure = exception;
+                    athleteFailuresLogged += await TryLogNonFatalAthleteFailureAsync(executionContext, exception, cancellationToken);
+                }
+                catch (DataCollectionIntegrityException exception)
+                {
+                    athleteFailuresLogged += await TryLogNonFatalAthleteFailureAsync(executionContext, exception, cancellationToken);
+                }
             }
 
-            var club = ResolveClub(clubs, athleteDetail?.Team.TeamId ?? 0, athleteRound?.ClubId);
-            var position = ResolvePosition(positionsByCartolaId, athleteDetail?.Athlete.Position);
-            var status = ResolveStatus(statusesByName, detailRound?.StatusName);
+            var club = ResolveClub(clubs, athleteDetail?.Team.TeamId ?? 0, athleteRound?.ClubId, latestKnownRound?.ClubId);
+            var position = ResolvePosition(positionsByCartolaId, athleteDetail?.Athlete.Position, athleteRound?.PositionId, latestKnownRound?.PositionId);
+            var status = ResolveStatus(statusesByName, detailRound?.StatusName, athleteRound?.StatusId, latestKnownRound?.StatusId);
+
+            if (athlete is null || club is null || position is null || status is null)
+            {
+                var mappingException = new DataCollectionIntegrityException(
+                    sourceSystem: "GatoMestre",
+                    stepName: "Upsert athlete rounds",
+                    errorLocation: "GatoMestreSyncService.UpsertAthleteRoundsAsync",
+                    message: $"Athlete '{summary.AthleteId}' could not be mapped to all required local references.",
+                    contextData: new Dictionary<string, object?>
+                    {
+                        ["athleteCartolaId"] = summary.AthleteId,
+                        ["round"] = round,
+                        ["athleteResolved"] = athlete is not null,
+                        ["clubResolved"] = club is not null,
+                        ["positionResolved"] = position is not null,
+                        ["statusResolved"] = status is not null,
+                        ["detailRoundFound"] = detailRound is not null,
+                        ["detailRequestFailed"] = athleteDetailFailure is not null,
+                    });
+
+                athleteFailuresLogged += await TryLogNonFatalAthleteFailureAsync(executionContext, mappingException, cancellationToken);
+                skipped++;
+                continue;
+            }
 
             if (athleteRound is null)
             {
-                if (club is null || position is null || status is null)
-                {
-                    continue;
-                }
-
                 athleteRound = new AthleteRound(
                     0,
                     round,
@@ -296,13 +445,13 @@ public sealed class GatoMestreSyncService(
                     ReadGames(summary.Games, "geral") ?? detailRound?.GamesCount ?? 0,
                     ReadGames(summary.Games, "mandante") ?? 0,
                     ReadGames(summary.Games, "visitante") ?? 0,
-                    detailRound?.Points?.Num ?? 0,
+                    ReadSnapshotDecimal(summary.Points, "num") ?? detailRound?.Points?.Num ?? 0,
                     ReadAverage(summary.Averages, "geral", "movel") ?? detailRound?.Averages.Overall.Moving?.Num ?? 0,
                     ReadAverage(summary.Averages, "geral", "total") ?? detailRound?.Averages.Overall.Total?.Num ?? 0,
                     ReadAverage(summary.Averages, "mandante", "total") ?? detailRound?.Averages.Home.Total?.Num ?? 0,
                     ReadAverage(summary.Averages, "visitante", "total") ?? detailRound?.Averages.Away.Total?.Num ?? 0,
-                    detailRound?.Price?.Variation ?? 0,
-                    detailRound?.Price?.Num ?? 0,
+                    ReadSummaryPriceVariation(summary.Price) ?? detailRound?.Price?.Variation ?? 0,
+                    ReadSummaryPriceValue(summary.Price) ?? detailRound?.Price?.Num ?? 0,
                     detailRound?.WasInGame ?? false)
                 {
                     Scouts = [],
@@ -312,21 +461,9 @@ public sealed class GatoMestreSyncService(
                 existingRounds[athlete.Id] = athleteRound;
             }
 
-            if (club is not null)
-            {
-                athleteRound.ClubId = club.Id;
-            }
-
-            if (position is not null)
-            {
-                athleteRound.PositionId = position.Id;
-            }
-
-            if (status is not null)
-            {
-                athleteRound.StatusId = status.Id;
-            }
-
+            athleteRound.ClubId = club.Id;
+            athleteRound.PositionId = position.Id;
+            athleteRound.StatusId = status.Id;
             athleteRound.RoundId = round;
             athleteRound.AthleteId = athlete.Id;
             athleteRound.GamesNum = ReadGames(summary.Games, "geral") ?? detailRound?.GamesCount ?? athleteRound.GamesNum;
@@ -336,12 +473,12 @@ public sealed class GatoMestreSyncService(
             athleteRound.AverageScoreNum = ReadAverage(summary.Averages, "geral", "total") ?? detailRound?.Averages.Overall.Total?.Num ?? athleteRound.AverageScoreNum;
             athleteRound.HomeAverageScore = ReadAverage(summary.Averages, "mandante", "total") ?? detailRound?.Averages.Home.Total?.Num ?? athleteRound.HomeAverageScore;
             athleteRound.AwayAverageScore = ReadAverage(summary.Averages, "visitante", "total") ?? detailRound?.Averages.Away.Total?.Num ?? athleteRound.AwayAverageScore;
-            athleteRound.ScoreNum = athleteRound.ScoreNum == 0 && detailRound?.Points is not null ? detailRound.Points.Num : athleteRound.ScoreNum;
-            athleteRound.VariationNum = athleteRound.VariationNum == 0 && detailRound?.Price is not null ? detailRound.Price.Variation : athleteRound.VariationNum;
-            athleteRound.PriceNum = athleteRound.PriceNum == 0 && detailRound?.Price is not null ? detailRound.Price.Num : athleteRound.PriceNum;
+            athleteRound.ScoreNum = ReadSnapshotDecimal(summary.Points, "num") ?? detailRound?.Points?.Num ?? athleteRound.ScoreNum;
+            athleteRound.VariationNum = ReadSummaryPriceVariation(summary.Price) ?? detailRound?.Price?.Variation ?? athleteRound.VariationNum;
+            athleteRound.PriceNum = ReadSummaryPriceValue(summary.Price) ?? detailRound?.Price?.Num ?? athleteRound.PriceNum;
             athleteRound.WasInGame = detailRound?.WasInGame ?? athleteRound.WasInGame;
 
-            if (detailRound is not null && detailRound.Scouts.Count > 0 && (athleteRound.Scouts is null || athleteRound.Scouts.Count == 0))
+            if (detailRound is not null && detailRound.Scouts.Count > 0)
             {
                 athleteRound.Scouts ??= [];
                 dbContext.AthleteRoundScouts.RemoveRange(athleteRound.Scouts);
@@ -355,23 +492,44 @@ public sealed class GatoMestreSyncService(
                     });
                 }
             }
+            else
+            {
+                var roundScouts = ReadRoundScouts(summary.Scouts);
+                if (roundScouts.Count > 0)
+                {
+                    athleteRound.Scouts ??= [];
+                    dbContext.AthleteRoundScouts.RemoveRange(athleteRound.Scouts);
+                    athleteRound.Scouts.Clear();
+
+                    foreach (var scout in roundScouts.OrderBy(item => item.Key))
+                    {
+                        athleteRound.Scouts.Add(new AthleteRoundScouts(0, athleteRound.Id, scout.Key, scout.Value)
+                        {
+                            AthleteRound = athleteRound,
+                        });
+                    }
+                }
+            }
 
             upserted++;
         }
 
-        return (upserted, athleteDetailsFetched);
+        var athleteCoverageRate = summaries.Count == 0
+            ? 100m
+            : Math.Round((decimal)upserted / summaries.Count * 100m, 2);
+
+        return (upserted, skipped, athleteDetailsFetched, athleteFailuresLogged, athleteCoverageRate);
     }
 
-    private async Task<Athlete> EnsureAthleteAsync(
+    private Task<Athlete> EnsureAthleteAsync(
         IDictionary<int, Athlete> athletesByCartolaId,
-        GatoMestreAthleteDetailResponse athleteDetail,
-        CancellationToken cancellationToken)
+        GatoMestreAthleteDetailResponse athleteDetail)
     {
         if (athletesByCartolaId.TryGetValue(athleteDetail.Athlete.AthleteId, out var athlete))
         {
             athlete.Name = ToRequiredValue(athleteDetail.Athlete.Name, athleteDetail.Athlete.PopularName, 150);
             athlete.Nickname = ToRequiredValue(athleteDetail.Athlete.PopularName, athleteDetail.Athlete.Nickname, 100);
-            return athlete;
+            return Task.FromResult(athlete);
         }
 
         athlete = new Athlete(
@@ -381,48 +539,184 @@ public sealed class GatoMestreSyncService(
             ToRequiredValue(athleteDetail.Athlete.PopularName, athleteDetail.Athlete.Nickname, 100));
 
         dbContext.Athletes.Add(athlete);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
         athletesByCartolaId.Add(athlete.CartolaId, athlete);
-        return athlete;
+        return Task.FromResult(athlete);
+    }
+
+    private static async Task<bool> RollbackTransactionAsync(IDbContextTransaction? transaction, CancellationToken cancellationToken)
+    {
+        if (transaction is null)
+        {
+            return false;
+        }
+
+        await transaction.RollbackAsync(cancellationToken);
+        return true;
+    }
+
+    private static IntegrationFailureLogEntry BuildFailureLogEntry(
+        SyncExecutionContext executionContext,
+        Exception exception,
+        bool transactionRolledBack)
+    {
+        var sourceSystem = executionContext.SourceSystem;
+        var stepName = executionContext.CurrentStep;
+        var errorLocation = executionContext.ProcessName;
+        var requestMethod = string.Empty;
+        var requestUrl = string.Empty;
+        var requestHeadersJson = string.Empty;
+        var requestPayload = string.Empty;
+        int? responseStatusCode = null;
+        var responseReasonPhrase = string.Empty;
+        var responseHeadersJson = string.Empty;
+        var responsePayload = string.Empty;
+        IReadOnlyDictionary<string, object?>? extraContext = null;
+
+        if (exception is ExternalApiException externalApiException)
+        {
+            sourceSystem = externalApiException.SourceSystem;
+            errorLocation = externalApiException.ErrorLocation;
+            requestMethod = externalApiException.RequestMethod;
+            requestUrl = externalApiException.RequestUrl;
+            requestHeadersJson = externalApiException.RequestHeadersJson;
+            requestPayload = externalApiException.RequestPayload;
+            responseStatusCode = externalApiException.ResponseStatusCode;
+            responseReasonPhrase = externalApiException.ResponseReasonPhrase;
+            responseHeadersJson = externalApiException.ResponseHeadersJson;
+            responsePayload = externalApiException.ResponsePayload;
+        }
+        else if (exception is DataCollectionIntegrityException integrityException)
+        {
+            sourceSystem = integrityException.SourceSystem;
+            stepName = integrityException.StepName;
+            errorLocation = integrityException.ErrorLocation;
+            extraContext = integrityException.ContextData;
+        }
+
+        return new IntegrationFailureLogEntry
+        {
+            OccurredAtUtc = DateTime.UtcNow,
+            CorrelationId = executionContext.CorrelationId,
+            SourceSystem = sourceSystem,
+            ProcessName = executionContext.ProcessName,
+            StepName = stepName,
+            ErrorLocation = errorLocation,
+            RequestMethod = requestMethod,
+            RequestUrl = requestUrl,
+            RequestHeadersJson = requestHeadersJson,
+            RequestPayload = requestPayload,
+            ResponseStatusCode = responseStatusCode,
+            ResponseReasonPhrase = responseReasonPhrase,
+            ResponseHeadersJson = responseHeadersJson,
+            ResponsePayload = responsePayload,
+            ExecutedStepsJson = executionContext.ToExecutedStepsJson(),
+            ContextJson = executionContext.ToContextJson(extraContext),
+            ExceptionType = Truncate(exception.GetType().FullName ?? exception.GetType().Name, 300),
+            ExceptionMessage = Truncate(exception.Message, 4000),
+            InnerExceptionMessage = Truncate(exception.InnerException?.Message, 4000),
+            StackTrace = exception.ToString(),
+            TransactionRolledBack = transactionRolledBack,
+        };
+    }
+
+    private async Task<int> TryLogNonFatalAthleteFailureAsync(
+        SyncExecutionContext executionContext,
+        Exception exception,
+        CancellationToken cancellationToken)
+    {
+        var errorLogId = await integrationFailureLogService.TryLogAsync(
+            BuildFailureLogEntry(executionContext, exception, transactionRolledBack: false),
+            cancellationToken);
+
+        return errorLogId.HasValue ? 1 : 0;
+    }
+
+    private static string BuildNotes(
+        string clubRoundNote,
+        (int AthleteRoundsUpserted, int AthleteRoundsSkipped, int AthleteDetailsFetched, int AthleteFailuresLogged, decimal AthleteCoverageRate) athleteRoundResult)
+    {
+        var notes = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(clubRoundNote))
+        {
+            notes.Add(clubRoundNote);
+        }
+
+        if (athleteRoundResult.AthleteRoundsSkipped > 0)
+        {
+            notes.Add($"Skipped {athleteRoundResult.AthleteRoundsSkipped} athletes due to incomplete or inconsistent enrichment payloads.");
+        }
+
+        if (athleteRoundResult.AthleteFailuresLogged > 0)
+        {
+            notes.Add($"Persisted {athleteRoundResult.AthleteFailuresLogged} non-fatal athlete warning logs.");
+        }
+
+        return string.Join(" ", notes);
     }
 
     private static Club? ResolveClub(
         IReadOnlyDictionary<int, Club> clubs,
         int cartolaClubId,
-        int? existingClubId)
+        int? existingClubId,
+        int? latestKnownClubId)
     {
         if (cartolaClubId != 0 && clubs.TryGetValue(cartolaClubId, out var club))
         {
             return club;
         }
 
-        return existingClubId.HasValue
-            ? clubs.Values.FirstOrDefault(clubEntity => clubEntity.Id == existingClubId.Value)
+        if (existingClubId.HasValue)
+        {
+            return clubs.Values.FirstOrDefault(clubEntity => clubEntity.Id == existingClubId.Value);
+        }
+
+        return latestKnownClubId.HasValue
+            ? clubs.Values.FirstOrDefault(clubEntity => clubEntity.Id == latestKnownClubId.Value)
             : null;
     }
 
     private static Position? ResolvePosition(
         IReadOnlyDictionary<int, Position> positionsByCartolaId,
-        GatoMestrePositionDescriptorResponse? descriptor)
+        GatoMestrePositionDescriptorResponse? descriptor,
+        int? existingPositionId,
+        int? latestKnownPositionId)
     {
-        if (descriptor is null)
+        if (descriptor is not null &&
+            PositionMacroToCartolaId.TryGetValue(descriptor.Macro, out var positionId) &&
+            positionsByCartolaId.TryGetValue(positionId, out var position))
         {
-            return null;
+            return position;
         }
 
-        return PositionMacroToCartolaId.TryGetValue(descriptor.Macro, out var positionId) &&
-               positionsByCartolaId.TryGetValue(positionId, out var position)
-            ? position
+        if (existingPositionId.HasValue)
+        {
+            return positionsByCartolaId.Values.FirstOrDefault(positionEntity => positionEntity.Id == existingPositionId.Value);
+        }
+
+        return latestKnownPositionId.HasValue
+            ? positionsByCartolaId.Values.FirstOrDefault(positionEntity => positionEntity.Id == latestKnownPositionId.Value)
             : null;
     }
 
     private static AthleteStatus? ResolveStatus(
         IReadOnlyDictionary<string, AthleteStatus> statusesByName,
-        string? statusName)
+        string? statusName,
+        int? existingStatusId,
+        int? latestKnownStatusId)
     {
         if (string.IsNullOrWhiteSpace(statusName))
         {
+            if (existingStatusId.HasValue)
+            {
+                return statusesByName.Values.FirstOrDefault(item => item.Id == existingStatusId.Value);
+            }
+
+            if (latestKnownStatusId.HasValue)
+            {
+                return statusesByName.Values.FirstOrDefault(item => item.Id == latestKnownStatusId.Value);
+            }
+
             return statusesByName.GetValueOrDefault(Normalize("Nulo"));
         }
 
@@ -508,15 +802,89 @@ public sealed class GatoMestreSyncService(
 
         return metric.ValueKind switch
         {
-            JsonValueKind.Object when metric.TryGetProperty("num", out var num) && num.TryGetDecimal(out var value) => value,
+            JsonValueKind.Object when metric.TryGetProperty("num", out var num) && num.ValueKind == JsonValueKind.Number && num.TryGetDecimal(out var value) => value,
+            JsonValueKind.Object when metric.TryGetProperty("num", out var nestedNum) && nestedNum.ValueKind == JsonValueKind.Null => 0,
             JsonValueKind.Number when metric.TryGetDecimal(out var scalar) => scalar,
             JsonValueKind.Null => 0,
             _ => null,
         };
     }
 
+    private static decimal? ReadSnapshotDecimal(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(propertyName, out var property))
+        {
+            return null;
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.Number when property.TryGetDecimal(out var value) => value,
+            JsonValueKind.Null => 0,
+            _ => null,
+        };
+    }
+
+    private static decimal? ReadSummaryPriceVariation(JsonElement priceElement)
+    {
+        return ReadSnapshotDecimal(priceElement, "variacao") ??
+               ReadSnapshotDecimal(priceElement, "valorizacao");
+    }
+
+    private static decimal? ReadSummaryPriceValue(JsonElement priceElement)
+    {
+        return ReadSnapshotDecimal(priceElement, "num") ??
+               ReadSnapshotDecimal(priceElement, "valor");
+    }
+
+    private static Dictionary<string, decimal> ReadRoundScouts(JsonElement scoutsElement)
+    {
+        var scouts = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+
+        if (scoutsElement.ValueKind != JsonValueKind.Object ||
+            !scoutsElement.TryGetProperty("rodada", out var roundScouts) ||
+            roundScouts.ValueKind != JsonValueKind.Object)
+        {
+            return scouts;
+        }
+
+        foreach (var scout in roundScouts.EnumerateObject())
+        {
+            if (scout.Value.ValueKind == JsonValueKind.Number && scout.Value.TryGetDecimal(out var value) && value != 0)
+            {
+                scouts[scout.Name] = value;
+            }
+        }
+
+        return scouts;
+    }
+
     private static string Normalize(string value)
-        => value.Trim().ToUpperInvariant();
+    {
+        var normalized = value.Trim().Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(normalized.Length);
+
+        foreach (var character in normalized)
+        {
+            var category = CharUnicodeInfo.GetUnicodeCategory(character);
+            if (category != UnicodeCategory.NonSpacingMark)
+            {
+                builder.Append(character);
+            }
+        }
+
+        return builder.ToString().Normalize(NormalizationForm.FormC).ToUpperInvariant();
+    }
+
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Length <= maxLength ? value : value[..maxLength];
+    }
 
     private static string ToRequiredValue(string? value, string? fallback, int maxLength)
     {
