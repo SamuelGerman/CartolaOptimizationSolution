@@ -81,6 +81,21 @@
         /// </summary>
         public decimal ExpectedPoints { get; set; }
 
+        /// <summary>
+        /// Gets or sets the readiness classification of the row for model training.
+        /// </summary>
+        public string TrainingReadinessStatus { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the reason associated with the training readiness classification.
+        /// </summary>
+        public string TrainingReadinessReason { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the row is currently eligible to be used by the training dataset.
+        /// </summary>
+        public bool IsTrainingEligible { get; set; }
+
         // Navegação
 
         /// <summary>

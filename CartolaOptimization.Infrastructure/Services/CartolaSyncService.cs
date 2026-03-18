@@ -86,6 +86,7 @@ public sealed class CartolaSyncService(
                 clubs: clubs,
                 positions: positions,
                 statuses: statuses,
+                currentRound: marketStatus.CurrentRound,
                 cancellationToken: cancellationToken);
 
             executionContext.MarkStep("Persist round changes");
@@ -426,6 +427,7 @@ public sealed class CartolaSyncService(
         IReadOnlyDictionary<int, Club> clubs,
         IReadOnlyDictionary<int, Position> positions,
         IReadOnlyDictionary<int, AthleteStatus> statuses,
+        int currentRound,
         CancellationToken cancellationToken)
     {
         var roundIds = athleteResponses
@@ -438,6 +440,13 @@ public sealed class CartolaSyncService(
             .Include(round => round.Scouts)
             .Where(round => roundIds.Contains(round.RoundId))
             .ToDictionaryAsync(round => (round.RoundId, round.AthleteId), cancellationToken);
+        var clubRoundKeys = await dbContext.ClubRounds
+            .Where(round => roundIds.Contains(round.Round))
+            .Select(round => new { round.Round, round.ClubId })
+            .ToListAsync(cancellationToken);
+        var clubRoundKeySet = clubRoundKeys
+            .Select(item => (item.Round, item.ClubId))
+            .ToHashSet();
 
         var roundsUpserted = 0;
         var scoutsUpserted = 0;
@@ -510,6 +519,10 @@ public sealed class CartolaSyncService(
             athleteRound.VariationNum = athleteResponse.PriceVariation;
             athleteRound.PriceNum = athleteResponse.Price;
             athleteRound.WasInGame = athleteResponse.WasInGame;
+            TrainingReadinessEvaluator.ApplyCartolaBaseline(
+                athleteRound,
+                currentRound,
+                clubRoundKeySet.Contains((athleteRound.RoundId, athleteRound.ClubId)));
 
             athleteRound.Scouts ??= [];
             dbContext.AthleteRoundScouts.RemoveRange(athleteRound.Scouts);

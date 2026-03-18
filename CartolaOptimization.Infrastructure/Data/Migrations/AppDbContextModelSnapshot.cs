@@ -69,6 +69,11 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                     b.Property<int>("ClubId")
                         .HasColumnType("int");
 
+                    b.Property<string>("DataPhase")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
                     b.Property<int>("GamesNum")
                         .HasColumnType("int");
 
@@ -78,6 +83,9 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
 
                     b.Property<int>("HomeGamesNum")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsTrainingEligible")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<decimal>("MovingAverage")
                         .HasPrecision(10, 2)
@@ -100,6 +108,16 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                     b.Property<int>("StatusId")
                         .HasColumnType("int");
 
+                    b.Property<string>("TrainingReadinessReason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("TrainingReadinessStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
                     b.Property<decimal>("VariationNum")
                         .HasPrecision(10, 2)
                         .HasColumnType("decimal(10,2)");
@@ -117,8 +135,12 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
 
                     b.HasIndex("StatusId");
 
+                    b.HasIndex("TrainingReadinessStatus");
+
                     b.HasIndex("RoundId", "AthleteId")
                         .IsUnique();
+
+                    b.HasIndex("RoundId", "IsTrainingEligible");
 
                     b.ToTable("AthleteRounds", (string)null);
                 });
@@ -225,6 +247,9 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                         .HasPrecision(10, 2)
                         .HasColumnType("decimal(10,2)");
 
+                    b.Property<bool>("IsTrainingEligible")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<decimal>("LoseProbability")
                         .HasPrecision(10, 4)
                         .HasColumnType("decimal(10,4)");
@@ -240,6 +265,16 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                     b.Property<int>("Round")
                         .HasColumnType("int");
 
+                    b.Property<string>("TrainingReadinessReason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("TrainingReadinessStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
                     b.Property<decimal>("WinProbability")
                         .HasPrecision(10, 4)
                         .HasColumnType("decimal(10,4)");
@@ -248,8 +283,12 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
 
                     b.HasIndex("ClubId");
 
+                    b.HasIndex("TrainingReadinessStatus");
+
                     b.HasIndex("Round", "ClubId")
                         .IsUnique();
+
+                    b.HasIndex("Round", "IsTrainingEligible");
 
                     b.ToTable("ClubRounds", (string)null);
                 });

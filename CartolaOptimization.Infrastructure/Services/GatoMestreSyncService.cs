@@ -95,7 +95,7 @@ public sealed class GatoMestreSyncService(
             var clubRoundResult = await UpsertClubRoundsAsync(round, clubs, executionContext, cancellationToken);
 
             executionContext.MarkStep("Upsert athlete rounds");
-            var athleteRoundResult = await UpsertAthleteRoundsAsync(round, athletesRoundPayload.Result, clubs, executionContext, cancellationToken);
+            var athleteRoundResult = await UpsertAthleteRoundsAsync(round, athletesRoundPayload.Result, clubs, clubRoundResult.AvailableClubIds, executionContext, cancellationToken);
 
             executionContext.MarkStep("Persist enriched round changes");
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -327,7 +327,7 @@ public sealed class GatoMestreSyncService(
         return existingClubs;
     }
 
-    private async Task<(int ClubRoundsUpserted, int PositionStatsUpserted, bool DataAvailable, string Note, int WarningLogsCount)> UpsertClubRoundsAsync(
+    private async Task<(int ClubRoundsUpserted, int PositionStatsUpserted, bool DataAvailable, string Note, int WarningLogsCount, IReadOnlyCollection<int> AvailableClubIds)> UpsertClubRoundsAsync(
         int requestedRound,
         IReadOnlyDictionary<int, Club> clubs,
         SyncExecutionContext executionContext,
@@ -340,6 +340,7 @@ public sealed class GatoMestreSyncService(
         var note = string.Empty;
         var warningLogsCount = 0;
         var mismatchWarningLogged = false;
+        var availableClubIds = new HashSet<int>();
 
         foreach (var club in clubs.Values.OrderBy(club => club.CartolaId))
         {
@@ -457,16 +458,19 @@ public sealed class GatoMestreSyncService(
                 processedPositionStats++;
             }
 
+            TrainingReadinessEvaluator.ApplyClubRoundReadiness(existingClubRound);
+            availableClubIds.Add(existingClubRound.ClubId);
             processedClubRounds++;
         }
 
-        return (processedClubRounds, processedPositionStats, dataAvailable, note, warningLogsCount);
+        return (processedClubRounds, processedPositionStats, dataAvailable, note, warningLogsCount, availableClubIds.ToArray());
     }
 
     private async Task<(int AthleteRoundsUpserted, int AthleteRoundsSkipped, int AthleteDetailsFetched, int AthleteFailuresLogged, decimal AthleteCoverageRate)> UpsertAthleteRoundsAsync(
         int round,
         IReadOnlyCollection<GatoMestreAthleteRoundSummaryResponse> summaries,
         IReadOnlyDictionary<int, Club> clubs,
+        IReadOnlyCollection<int> availableClubIds,
         SyncExecutionContext executionContext,
         CancellationToken cancellationToken)
     {
@@ -495,6 +499,7 @@ public sealed class GatoMestreSyncService(
         var skipped = 0;
         var athleteDetailsFetched = 0;
         var athleteFailuresLogged = 0;
+        var availableClubIdSet = availableClubIds.ToHashSet();
 
         foreach (var summary in summaries.OrderBy(item => item.AthleteId))
         {
@@ -619,6 +624,9 @@ public sealed class GatoMestreSyncService(
             athleteRound.VariationNum = ReadSummaryPriceVariation(summary.Price) ?? detailRound?.Price?.Variation ?? athleteRound.VariationNum;
             athleteRound.PriceNum = ReadSummaryPriceValue(summary.Price) ?? detailRound?.Price?.Num ?? athleteRound.PriceNum;
             athleteRound.WasInGame = detailRound?.WasInGame ?? athleteRound.WasInGame;
+            TrainingReadinessEvaluator.ApplyAthleteEnrichment(
+                athleteRound,
+                availableClubIdSet.Contains(athleteRound.ClubId));
 
             if (detailRound is not null && detailRound.Scouts.Count > 0)
             {

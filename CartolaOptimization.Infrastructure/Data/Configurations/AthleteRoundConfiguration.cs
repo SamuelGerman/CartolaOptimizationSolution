@@ -11,6 +11,8 @@ public class AthleteRoundConfiguration : IEntityTypeConfiguration<AthleteRound>
         builder.ToTable("AthleteRounds");
         builder.HasKey(ar => ar.Id);
         builder.HasIndex(ar => new { ar.RoundId, ar.AthleteId }).IsUnique();
+        builder.HasIndex(ar => new { ar.RoundId, ar.IsTrainingEligible });
+        builder.HasIndex(ar => ar.TrainingReadinessStatus);
 
         builder.Property(ar => ar.ScoreNum).HasPrecision(10, 2);
         builder.Property(ar => ar.MovingAverage).HasPrecision(10, 2);
@@ -19,6 +21,9 @@ public class AthleteRoundConfiguration : IEntityTypeConfiguration<AthleteRound>
         builder.Property(ar => ar.AwayAverageScore).HasPrecision(10, 2);
         builder.Property(ar => ar.VariationNum).HasPrecision(10, 2);
         builder.Property(ar => ar.PriceNum).HasPrecision(10, 2);
+        builder.Property(ar => ar.DataPhase).IsRequired().HasMaxLength(30);
+        builder.Property(ar => ar.TrainingReadinessStatus).IsRequired().HasMaxLength(30);
+        builder.Property(ar => ar.TrainingReadinessReason).IsRequired().HasMaxLength(500);
 
         builder.HasOne(ar => ar.Club)
                .WithMany(club => club.AthleteRounds)

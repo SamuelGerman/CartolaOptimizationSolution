@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<ICartolaSyncService, CartolaSyncService>();
         services.AddScoped<IGatoMestreSyncService, GatoMestreSyncService>();
         services.AddScoped<ISyncDiagnosticsService, SyncDiagnosticsService>();
+        services.AddScoped<ITrainingDatasetPreparationService, TrainingDatasetPreparationService>();
         services.AddScoped<IIntegrationFailureLogService, IntegrationFailureLogService>();
         services.AddScoped<ISyncExecutionLogService, SyncExecutionLogService>();
 
