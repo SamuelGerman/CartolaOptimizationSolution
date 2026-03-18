@@ -14,11 +14,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         ServerVersion.AutoDetect(connectionString),
         mysqlOptions =>
         {
-            mysqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 3,
-                maxRetryDelay: TimeSpan.FromSeconds(5),
-                errorNumbersToAdd: null);
-
             mysqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
         });
 });
