@@ -1,5 +1,6 @@
 using CartolaOptimization.Application.Interfaces;
 using CartolaOptimization.Infrastructure.Integrations.Cartola;
+using CartolaOptimization.Infrastructure.Integrations.GatoMestre;
 using CartolaOptimization.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,7 +16,14 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.UserAgent.ParseAdd("CartolaOptimization/1.0");
         });
 
+        services.AddHttpClient<IGatoMestreApiClient, GatoMestreApiClient>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.gatomestre.globo.com/");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("CartolaOptimization/1.0");
+        });
+
         services.AddScoped<ICartolaSyncService, CartolaSyncService>();
+        services.AddScoped<IGatoMestreSyncService, GatoMestreSyncService>();
 
         return services;
     }

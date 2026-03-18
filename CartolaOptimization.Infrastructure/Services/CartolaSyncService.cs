@@ -113,7 +113,7 @@ public sealed class CartolaSyncService(
                     id: 0,
                     cartolaId: positionResponse.Id,
                     name: ToRequiredValue(positionResponse.Name, $"Position {positionResponse.Id}", 50),
-                    abrevivation: ToRequiredValue(positionResponse.Abbreviation, $"P{positionResponse.Id}", 5));
+                    abreviation: ToRequiredValue(positionResponse.Abbreviation, $"P{positionResponse.Id}", 5));
 
                 dbContext.Positions.Add(position);
                 existingPositions.Add(positionResponse.Id, position);

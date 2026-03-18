@@ -19,11 +19,11 @@
         /// <param name="homeClubId">The homeClubId<see cref="int"/></param>
         /// <param name="homeClubPosition">The homeClubPosition<see cref="int"/></param>
         /// <param name="homeForm">The homeForm<see cref="string"/></param>
-        /// <param name="homeScore">The homeScore<see cref="int?"/></param>
+        /// <param name="homeScore">The homeScore<see cref="Nullable{Int32}"/></param>
         /// <param name="awayClubId">The awayClubId<see cref="int"/></param>
         /// <param name="awayClubPosition">The awayClubPosition<see cref="int"/></param>
         /// <param name="awayForm">The awayForm<see cref="string"/></param>
-        /// <param name="awayScore">The awayScore<see cref="int?"/></param>
+        /// <param name="awayScore">The awayScore<see cref="Nullable{Int32}"/></param>
         public Match(int id, int cartolaId, int round, DateTime matchDate, string location, bool validForCartola, int homeClubId, int homeClubPosition, string homeForm, int? homeScore, int awayClubId, int awayClubPosition, string awayForm, int? awayScore)
         {
             Id = id;

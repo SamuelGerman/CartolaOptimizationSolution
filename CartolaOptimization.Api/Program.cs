@@ -1,6 +1,8 @@
 using CartolaOptimization.Infrastructure;
 using CartolaOptimization.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
+using System.Reflection;
     
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,7 +27,32 @@ builder.Services.AddControllers();
 builder.Services.AddInfrastructureServices();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Cartola Optimization API",
+        Version = "v1",
+        Description = "Administrative endpoints used to synchronize external football datasets and feed the optimization pipeline.",
+    });
+
+    var xmlFiles = new[]
+    {
+        $"{Assembly.GetExecutingAssembly().GetName().Name}.xml",
+        "CartolaOptimization.Application.xml",
+        "CartolaOptimization.Domain.xml",
+        "CartolaOptimization.Infrastructure.xml",
+    };
+
+    foreach (var xmlFile in xmlFiles)
+    {
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+        if (File.Exists(xmlPath))
+        {
+            options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+        }
+    }
+});
 
 var app = builder.Build();
 

@@ -14,13 +14,13 @@
         /// <param name="id">The id<see cref="int"/></param>
         /// <param name="cartolaId">The cartolaId<see cref="int"/></param>
         /// <param name="name">The name<see cref="string"/></param>
-        /// <param name="abrevivation">The abrevivation<see cref="string"/></param>
-        public Position(int id, int cartolaId, string name, string abrevivation)
+        /// <param name="abreviation">The abreviation<see cref="string"/></param>
+        public Position(int id, int cartolaId, string name, string abreviation)
         {
             Id = id;
             CartolaId = cartolaId;
             Name = name ?? throw new ArgumentNullException(nameof(name));
-            Abreviation = abrevivation ?? throw new ArgumentNullException(nameof(abrevivation));
+            Abreviation = abreviation ?? throw new ArgumentNullException(nameof(abreviation));
         }
 
         /// <summary>
