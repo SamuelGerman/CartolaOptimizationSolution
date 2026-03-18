@@ -91,6 +91,16 @@ namespace CartolaOptimization.Domain.Entities
         public string ContextJson { get; set; } = string.Empty;
 
         /// <summary>
+        /// Gets or sets the normalized business error code associated with the failure.
+        /// </summary>
+        public string ErrorCode { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the severity assigned to the failure entry, such as Warning or Error.
+        /// </summary>
+        public string Severity { get; set; } = string.Empty;
+
+        /// <summary>
         /// Gets or sets the type of the exception raised by the process.
         /// </summary>
         public string ExceptionType { get; set; } = string.Empty;

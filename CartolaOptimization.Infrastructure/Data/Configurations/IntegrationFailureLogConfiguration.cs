@@ -14,6 +14,7 @@ public sealed class IntegrationFailureLogConfiguration : IEntityTypeConfiguratio
 
         builder.HasIndex(log => log.OccurredAtUtc);
         builder.HasIndex(log => log.CorrelationId);
+        builder.HasIndex(log => log.ErrorCode);
         builder.HasIndex(log => new { log.SourceSystem, log.ProcessName, log.OccurredAtUtc });
 
         builder.Property(log => log.CorrelationId).IsRequired().HasMaxLength(50);
@@ -24,6 +25,8 @@ public sealed class IntegrationFailureLogConfiguration : IEntityTypeConfiguratio
         builder.Property(log => log.RequestMethod).IsRequired().HasMaxLength(10);
         builder.Property(log => log.RequestUrl).IsRequired().HasMaxLength(500);
         builder.Property(log => log.ResponseReasonPhrase).IsRequired().HasMaxLength(100);
+        builder.Property(log => log.ErrorCode).IsRequired().HasMaxLength(100);
+        builder.Property(log => log.Severity).IsRequired().HasMaxLength(20);
         builder.Property(log => log.ExceptionType).IsRequired().HasMaxLength(300);
         builder.Property(log => log.ExceptionMessage).IsRequired().HasMaxLength(4000);
         builder.Property(log => log.InnerExceptionMessage).IsRequired().HasMaxLength(4000);

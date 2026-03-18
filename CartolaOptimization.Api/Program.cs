@@ -6,13 +6,17 @@ using Microsoft.OpenApi.Models;
 using System.Reflection;
     
 var builder = WebApplication.CreateBuilder(args);
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var mySqlServerVersion = new MySqlServerVersion(new Version(8, 0, 36));
 Action<DbContextOptionsBuilder> configureDbContext = options =>
 {
     options.UseMySql(
         connectionString,
-        ServerVersion.AutoDetect(connectionString),
+        mySqlServerVersion,
         mysqlOptions =>
         {
             mysqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
@@ -72,4 +76,4 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.Run();
+await app.RunAsync();

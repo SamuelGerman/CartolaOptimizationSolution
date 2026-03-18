@@ -19,8 +19,13 @@ namespace CartolaOptimization.Infrastructure.Services;
 public sealed class GatoMestreSyncService(
     AppDbContext dbContext,
     IGatoMestreApiClient gatoMestreApiClient,
-    IIntegrationFailureLogService integrationFailureLogService) : IGatoMestreSyncService
+    IIntegrationFailureLogService integrationFailureLogService,
+    ISyncExecutionLogService syncExecutionLogService) : IGatoMestreSyncService
 {
+    private const decimal MinimumHealthyCoverageRate = 95m;
+    private const decimal MaximumHealthySkippedRate = 5m;
+    private const string QualityCriteriaDescription = "Healthy Gato Mestre synchronization requires athlete coverage >= 95% and skipped athletes <= 5% of processed athletes.";
+
     private static readonly IReadOnlyDictionary<string, int> PositionMacroToCartolaId = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
     {
         ["GOL"] = 1,
@@ -45,6 +50,21 @@ public sealed class GatoMestreSyncService(
         var executionContext = new SyncExecutionContext("GatoMestre", "GatoMestreSyncService.SyncRoundAsync");
         executionContext.SetContext("season", season);
         executionContext.SetContext("round", round);
+        var startedAtUtc = DateTime.UtcNow;
+        var syncExecutionId = await syncExecutionLogService.StartAsync(
+            new SyncExecutionLogEntry
+            {
+                CorrelationId = executionContext.CorrelationId,
+                SourceSystem = executionContext.SourceSystem,
+                ProcessName = executionContext.ProcessName,
+                StartedAtUtc = startedAtUtc,
+                Status = SyncExecutionStatus.Running,
+                LastStepName = executionContext.CurrentStep,
+                Season = season,
+                Round = round,
+                ContextJson = executionContext.ToContextJson(),
+            },
+            cancellationToken);
 
         IDbContextTransaction? transaction = null;
 
@@ -83,8 +103,77 @@ public sealed class GatoMestreSyncService(
             executionContext.MarkStep("Commit database transaction");
             await transaction.CommitAsync(cancellationToken);
 
+            var finishedAtUtc = DateTime.UtcNow;
+            var durationMs = (long)(finishedAtUtc - startedAtUtc).TotalMilliseconds;
+            var athleteSkippedRate = CalculateSkippedRate(
+                athleteRoundResult.AthleteRoundsUpserted,
+                athleteRoundResult.AthleteRoundsSkipped);
+            var qualityCriteriaSatisfied =
+                athleteRoundResult.AthleteCoverageRate >= MinimumHealthyCoverageRate &&
+                athleteSkippedRate <= MaximumHealthySkippedRate;
+            var isPartialSync =
+                athleteRoundResult.AthleteRoundsSkipped > 0 ||
+                !clubRoundResult.DataAvailable ||
+                clubRoundResult.WarningLogsCount > 0 ||
+                athleteRoundResult.AthleteFailuresLogged > 0;
+            var executionStatus = isPartialSync ? SyncExecutionStatus.Partial : SyncExecutionStatus.Success;
+            var notes = BuildNotes(clubRoundResult.Note, clubRoundResult.WarningLogsCount, athleteRoundResult);
+            var metricsJson = JsonSerializer.Serialize(new
+            {
+                ClubsUpserted = clubs.Count,
+                ClubRoundsUpserted = clubRoundResult.ClubRoundsUpserted,
+                ClubRoundPositionsUpserted = clubRoundResult.PositionStatsUpserted,
+                AthleteRoundsUpserted = athleteRoundResult.AthleteRoundsUpserted,
+                AthleteRoundsSkipped = athleteRoundResult.AthleteRoundsSkipped,
+                AthleteDetailsFetched = athleteRoundResult.AthleteDetailsFetched,
+                AthleteFailuresLogged = athleteRoundResult.AthleteFailuresLogged,
+                AthleteCoverageRate = athleteRoundResult.AthleteCoverageRate,
+                AthleteSkippedRate = athleteSkippedRate,
+                ClubRoundDataAvailable = clubRoundResult.DataAvailable,
+            });
+
+            if (syncExecutionId.HasValue)
+            {
+                await syncExecutionLogService.UpdateAsync(
+                    syncExecutionId.Value,
+                    new SyncExecutionLogEntry
+                    {
+                        CorrelationId = executionContext.CorrelationId,
+                        SourceSystem = executionContext.SourceSystem,
+                        ProcessName = executionContext.ProcessName,
+                        StartedAtUtc = startedAtUtc,
+                        FinishedAtUtc = finishedAtUtc,
+                        DurationMs = durationMs,
+                        Status = executionStatus,
+                        LastStepName = executionContext.CurrentStep,
+                        Season = season,
+                        Round = round,
+                        Notes = notes,
+                        MetricsJson = metricsJson,
+                        ContextJson = executionContext.ToContextJson(),
+                        QualityCriteriaJson = JsonSerializer.Serialize(new
+                        {
+                            MinimumCoverageRate = MinimumHealthyCoverageRate,
+                            MaximumSkippedRate = MaximumHealthySkippedRate,
+                            QualityCriteriaDescription,
+                            QualityCriteriaSatisfied = qualityCriteriaSatisfied,
+                        }),
+                        CoverageRate = athleteRoundResult.AthleteCoverageRate,
+                        SkippedRate = athleteSkippedRate,
+                        QualityCriteriaSatisfied = qualityCriteriaSatisfied,
+                        WarningLogsCount = clubRoundResult.WarningLogsCount + athleteRoundResult.AthleteFailuresLogged,
+                    },
+                    cancellationToken);
+            }
+
             return new GatoMestreSyncResult
             {
+                SyncExecutionId = syncExecutionId,
+                CorrelationId = executionContext.CorrelationId,
+                Status = executionStatus,
+                StartedAtUtc = startedAtUtc,
+                FinishedAtUtc = finishedAtUtc,
+                DurationMs = durationMs,
                 Season = season,
                 Round = round,
                 ClubsUpserted = clubs.Count,
@@ -95,9 +184,14 @@ public sealed class GatoMestreSyncService(
                 AthleteDetailsFetched = athleteRoundResult.AthleteDetailsFetched,
                 AthleteFailuresLogged = athleteRoundResult.AthleteFailuresLogged,
                 AthleteCoverageRate = athleteRoundResult.AthleteCoverageRate,
+                AthleteSkippedRate = athleteSkippedRate,
+                MinimumCoverageRate = MinimumHealthyCoverageRate,
+                MaximumSkippedRate = MaximumHealthySkippedRate,
+                QualityCriteriaSatisfied = qualityCriteriaSatisfied,
+                QualityCriteriaDescription = QualityCriteriaDescription,
                 ClubRoundDataAvailable = clubRoundResult.DataAvailable,
-                IsPartialSync = athleteRoundResult.AthleteRoundsSkipped > 0 || !clubRoundResult.DataAvailable,
-                Notes = BuildNotes(clubRoundResult.Note, athleteRoundResult),
+                IsPartialSync = isPartialSync,
+                Notes = notes,
             };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -108,8 +202,35 @@ public sealed class GatoMestreSyncService(
         {
             var transactionRolledBack = await RollbackTransactionAsync(transaction, cancellationToken);
             var errorLogId = await integrationFailureLogService.TryLogAsync(
-                BuildFailureLogEntry(executionContext, exception, transactionRolledBack),
+                BuildFailureLogEntry(executionContext, exception, transactionRolledBack, IntegrationLogSeverity.Error),
                 cancellationToken);
+
+            if (syncExecutionId.HasValue)
+            {
+                var finishedAtUtc = DateTime.UtcNow;
+                var durationMs = (long)(finishedAtUtc - startedAtUtc).TotalMilliseconds;
+
+                await syncExecutionLogService.UpdateAsync(
+                    syncExecutionId.Value,
+                    new SyncExecutionLogEntry
+                    {
+                        CorrelationId = executionContext.CorrelationId,
+                        SourceSystem = executionContext.SourceSystem,
+                        ProcessName = executionContext.ProcessName,
+                        StartedAtUtc = startedAtUtc,
+                        FinishedAtUtc = finishedAtUtc,
+                        DurationMs = durationMs,
+                        Status = SyncExecutionStatus.Failed,
+                        LastStepName = executionContext.CurrentStep,
+                        Season = season,
+                        Round = round,
+                        ErrorCode = IntegrationErrorClassifier.Classify(exception),
+                        Notes = exception.Message,
+                        ContextJson = executionContext.ToContextJson(),
+                        ErrorLogsCount = errorLogId.HasValue ? 1 : 0,
+                    },
+                    cancellationToken);
+            }
 
             throw new DataCollectionProcessException(
                 sourceSystem: executionContext.SourceSystem,
@@ -206,7 +327,7 @@ public sealed class GatoMestreSyncService(
         return existingClubs;
     }
 
-    private async Task<(int ClubRoundsUpserted, int PositionStatsUpserted, bool DataAvailable, string Note)> UpsertClubRoundsAsync(
+    private async Task<(int ClubRoundsUpserted, int PositionStatsUpserted, bool DataAvailable, string Note, int WarningLogsCount)> UpsertClubRoundsAsync(
         int requestedRound,
         IReadOnlyDictionary<int, Club> clubs,
         SyncExecutionContext executionContext,
@@ -217,6 +338,8 @@ public sealed class GatoMestreSyncService(
         var processedPositionStats = 0;
         var dataAvailable = true;
         var note = string.Empty;
+        var warningLogsCount = 0;
+        var mismatchWarningLogged = false;
 
         foreach (var club in clubs.Values.OrderBy(club => club.CartolaId))
         {
@@ -229,6 +352,25 @@ public sealed class GatoMestreSyncService(
             {
                 dataAvailable = false;
                 note = $"The confrontation endpoint currently exposes round {confrontation.Round}, so club round data was not synchronized for requested round {requestedRound}.";
+
+                if (!mismatchWarningLogged)
+                {
+                    var mismatchException = new DataCollectionIntegrityException(
+                        sourceSystem: "GatoMestre",
+                        stepName: "Upsert club rounds",
+                        errorLocation: "GatoMestreSyncService.UpsertClubRoundsAsync",
+                        message: $"The confrontation payload returned round '{confrontation.Round}' while the synchronization requested round '{requestedRound}'.",
+                        contextData: new Dictionary<string, object?>
+                        {
+                            ["clubCartolaId"] = club.CartolaId,
+                            ["requestedRound"] = requestedRound,
+                            ["payloadRound"] = confrontation.Round,
+                        });
+
+                    warningLogsCount += await TryLogNonFatalWarningAsync(executionContext, mismatchException, cancellationToken);
+                    mismatchWarningLogged = true;
+                }
+
                 continue;
             }
 
@@ -318,7 +460,7 @@ public sealed class GatoMestreSyncService(
             processedClubRounds++;
         }
 
-        return (processedClubRounds, processedPositionStats, dataAvailable, note);
+        return (processedClubRounds, processedPositionStats, dataAvailable, note, warningLogsCount);
     }
 
     private async Task<(int AthleteRoundsUpserted, int AthleteRoundsSkipped, int AthleteDetailsFetched, int AthleteFailuresLogged, decimal AthleteCoverageRate)> UpsertAthleteRoundsAsync(
@@ -397,11 +539,11 @@ public sealed class GatoMestreSyncService(
                 catch (ExternalApiException exception)
                 {
                     athleteDetailFailure = exception;
-                    athleteFailuresLogged += await TryLogNonFatalAthleteFailureAsync(executionContext, exception, cancellationToken);
+                    athleteFailuresLogged += await TryLogNonFatalWarningAsync(executionContext, exception, cancellationToken);
                 }
                 catch (DataCollectionIntegrityException exception)
                 {
-                    athleteFailuresLogged += await TryLogNonFatalAthleteFailureAsync(executionContext, exception, cancellationToken);
+                    athleteFailuresLogged += await TryLogNonFatalWarningAsync(executionContext, exception, cancellationToken);
                 }
             }
 
@@ -428,7 +570,7 @@ public sealed class GatoMestreSyncService(
                         ["detailRequestFailed"] = athleteDetailFailure is not null,
                     });
 
-                athleteFailuresLogged += await TryLogNonFatalAthleteFailureAsync(executionContext, mappingException, cancellationToken);
+                athleteFailuresLogged += await TryLogNonFatalWarningAsync(executionContext, mappingException, cancellationToken);
                 skipped++;
                 continue;
             }
@@ -557,7 +699,8 @@ public sealed class GatoMestreSyncService(
     private static IntegrationFailureLogEntry BuildFailureLogEntry(
         SyncExecutionContext executionContext,
         Exception exception,
-        bool transactionRolledBack)
+        bool transactionRolledBack,
+        string severity)
     {
         var sourceSystem = executionContext.SourceSystem;
         var stepName = executionContext.CurrentStep;
@@ -611,6 +754,8 @@ public sealed class GatoMestreSyncService(
             ResponsePayload = responsePayload,
             ExecutedStepsJson = executionContext.ToExecutedStepsJson(),
             ContextJson = executionContext.ToContextJson(extraContext),
+            ErrorCode = IntegrationErrorClassifier.Classify(exception),
+            Severity = severity,
             ExceptionType = Truncate(exception.GetType().FullName ?? exception.GetType().Name, 300),
             ExceptionMessage = Truncate(exception.Message, 4000),
             InnerExceptionMessage = Truncate(exception.InnerException?.Message, 4000),
@@ -619,13 +764,13 @@ public sealed class GatoMestreSyncService(
         };
     }
 
-    private async Task<int> TryLogNonFatalAthleteFailureAsync(
+    private async Task<int> TryLogNonFatalWarningAsync(
         SyncExecutionContext executionContext,
         Exception exception,
         CancellationToken cancellationToken)
     {
         var errorLogId = await integrationFailureLogService.TryLogAsync(
-            BuildFailureLogEntry(executionContext, exception, transactionRolledBack: false),
+            BuildFailureLogEntry(executionContext, exception, transactionRolledBack: false, IntegrationLogSeverity.Warning),
             cancellationToken);
 
         return errorLogId.HasValue ? 1 : 0;
@@ -633,6 +778,7 @@ public sealed class GatoMestreSyncService(
 
     private static string BuildNotes(
         string clubRoundNote,
+        int clubRoundWarningLogsCount,
         (int AthleteRoundsUpserted, int AthleteRoundsSkipped, int AthleteDetailsFetched, int AthleteFailuresLogged, decimal AthleteCoverageRate) athleteRoundResult)
     {
         var notes = new List<string>();
@@ -640,6 +786,11 @@ public sealed class GatoMestreSyncService(
         if (!string.IsNullOrWhiteSpace(clubRoundNote))
         {
             notes.Add(clubRoundNote);
+        }
+
+        if (clubRoundWarningLogsCount > 0)
+        {
+            notes.Add($"Persisted {clubRoundWarningLogsCount} non-fatal club warning logs.");
         }
 
         if (athleteRoundResult.AthleteRoundsSkipped > 0)
@@ -653,6 +804,12 @@ public sealed class GatoMestreSyncService(
         }
 
         return string.Join(" ", notes);
+    }
+
+    private static decimal CalculateSkippedRate(int upserted, int skipped)
+    {
+        var total = upserted + skipped;
+        return total == 0 ? 0m : Math.Round((decimal)skipped / total * 100m, 2);
     }
 
     private static Club? ResolveClub(

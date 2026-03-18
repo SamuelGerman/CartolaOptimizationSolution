@@ -29,6 +29,8 @@ namespace CartolaOptimization.Infrastructure.Context
 
         public DbSet<Position> Positions => Set<Position>();
 
+        public DbSet<SyncExecution> SyncExecutions => Set<SyncExecution>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

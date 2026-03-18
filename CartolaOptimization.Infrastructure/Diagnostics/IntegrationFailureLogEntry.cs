@@ -37,6 +37,10 @@ public sealed class IntegrationFailureLogEntry
 
     public string ContextJson { get; init; } = string.Empty;
 
+    public string ErrorCode { get; init; } = string.Empty;
+
+    public string Severity { get; init; } = string.Empty;
+
     public string ExceptionType { get; init; } = string.Empty;
 
     public string ExceptionMessage { get; init; } = string.Empty;

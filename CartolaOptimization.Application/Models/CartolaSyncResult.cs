@@ -6,6 +6,46 @@ namespace CartolaOptimization.Application.Models;
 public sealed class CartolaSyncResult
 {
     /// <summary>
+    /// Gets the persisted synchronization execution identifier.
+    /// </summary>
+    public int? SyncExecutionId { get; init; }
+
+    /// <summary>
+    /// Gets the correlation id shared with diagnostics emitted during the execution.
+    /// </summary>
+    public string CorrelationId { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the final synchronization execution status.
+    /// </summary>
+    public string Status { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the UTC timestamp in which the synchronization started.
+    /// </summary>
+    public DateTime StartedAtUtc { get; init; }
+
+    /// <summary>
+    /// Gets the UTC timestamp in which the synchronization finished.
+    /// </summary>
+    public DateTime FinishedAtUtc { get; init; }
+
+    /// <summary>
+    /// Gets the total synchronization duration in milliseconds.
+    /// </summary>
+    public long DurationMs { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the execution satisfied its quality criteria.
+    /// </summary>
+    public bool QualityCriteriaSatisfied { get; init; }
+
+    /// <summary>
+    /// Gets the human-readable quality criteria applied to the execution.
+    /// </summary>
+    public string QualityCriteriaDescription { get; init; } = string.Empty;
+
+    /// <summary>
     /// Gets the season reported by the Cartola market status endpoint.
     /// </summary>
     public int Season { get; init; }

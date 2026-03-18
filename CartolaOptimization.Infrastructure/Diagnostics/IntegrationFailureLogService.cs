@@ -33,6 +33,8 @@ public sealed class IntegrationFailureLogService(IDbContextFactory<AppDbContext>
                 ResponsePayload = entry.ResponsePayload,
                 ExecutedStepsJson = entry.ExecutedStepsJson,
                 ContextJson = entry.ContextJson,
+                ErrorCode = entry.ErrorCode,
+                Severity = entry.Severity,
                 ExceptionType = entry.ExceptionType,
                 ExceptionMessage = entry.ExceptionMessage,
                 InnerExceptionMessage = entry.InnerExceptionMessage,

@@ -6,6 +6,36 @@ namespace CartolaOptimization.Application.Models;
 public sealed class GatoMestreSyncResult
 {
     /// <summary>
+    /// Gets the persisted synchronization execution identifier.
+    /// </summary>
+    public int? SyncExecutionId { get; init; }
+
+    /// <summary>
+    /// Gets the correlation id shared with diagnostics emitted during the execution.
+    /// </summary>
+    public string CorrelationId { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the final synchronization execution status.
+    /// </summary>
+    public string Status { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the UTC timestamp in which the synchronization started.
+    /// </summary>
+    public DateTime StartedAtUtc { get; init; }
+
+    /// <summary>
+    /// Gets the UTC timestamp in which the synchronization finished.
+    /// </summary>
+    public DateTime FinishedAtUtc { get; init; }
+
+    /// <summary>
+    /// Gets the total synchronization duration in milliseconds.
+    /// </summary>
+    public long DurationMs { get; init; }
+
+    /// <summary>
     /// Gets the synchronized season.
     /// </summary>
     public int Season { get; init; }
@@ -54,6 +84,31 @@ public sealed class GatoMestreSyncResult
     /// Gets the athlete coverage percentage achieved during the synchronization.
     /// </summary>
     public decimal AthleteCoverageRate { get; init; }
+
+    /// <summary>
+    /// Gets the skipped athlete percentage achieved during the synchronization.
+    /// </summary>
+    public decimal AthleteSkippedRate { get; init; }
+
+    /// <summary>
+    /// Gets the minimum coverage rate required for the execution to be considered healthy.
+    /// </summary>
+    public decimal MinimumCoverageRate { get; init; }
+
+    /// <summary>
+    /// Gets the maximum skipped athlete percentage allowed for the execution to be considered healthy.
+    /// </summary>
+    public decimal MaximumSkippedRate { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the execution satisfied its quality criteria.
+    /// </summary>
+    public bool QualityCriteriaSatisfied { get; init; }
+
+    /// <summary>
+    /// Gets the human-readable quality criteria applied to the execution.
+    /// </summary>
+    public string QualityCriteriaDescription { get; init; } = string.Empty;
 
     /// <summary>
     /// Gets a value indicating whether the team confrontation data was available for the requested round.

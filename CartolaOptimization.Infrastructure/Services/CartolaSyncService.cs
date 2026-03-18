@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Globalization;
 using CartolaOptimization.Application.Interfaces;
 using CartolaOptimization.Application.Models;
@@ -14,12 +15,27 @@ namespace CartolaOptimization.Infrastructure.Services;
 public sealed class CartolaSyncService(
     AppDbContext dbContext,
     ICartolaApiClient cartolaApiClient,
-    IIntegrationFailureLogService integrationFailureLogService) : ICartolaSyncService
+    IIntegrationFailureLogService integrationFailureLogService,
+    ISyncExecutionLogService syncExecutionLogService) : ICartolaSyncService
 {
     public async Task<CartolaSyncResult> SyncAsync(int? matchesRound = null, CancellationToken cancellationToken = default)
     {
         var executionContext = new SyncExecutionContext("Cartola", "CartolaSyncService.SyncAsync");
         executionContext.SetContext("requestedMatchesRound", matchesRound);
+        var startedAtUtc = DateTime.UtcNow;
+        var syncExecutionId = await syncExecutionLogService.StartAsync(
+            new SyncExecutionLogEntry
+            {
+                CorrelationId = executionContext.CorrelationId,
+                SourceSystem = executionContext.SourceSystem,
+                ProcessName = executionContext.ProcessName,
+                StartedAtUtc = startedAtUtc,
+                Status = SyncExecutionStatus.Running,
+                LastStepName = executionContext.CurrentStep,
+                Round = matchesRound,
+                ContextJson = executionContext.ToContextJson(),
+            },
+            cancellationToken);
 
         IDbContextTransaction? transaction = null;
 
@@ -78,8 +94,61 @@ public sealed class CartolaSyncService(
             executionContext.MarkStep("Commit database transaction");
             await transaction.CommitAsync(cancellationToken);
 
+            var finishedAtUtc = DateTime.UtcNow;
+            var durationMs = (long)(finishedAtUtc - startedAtUtc).TotalMilliseconds;
+            const string qualityCriteriaDescription = "Cartola synchronization is healthy when the execution completes without fatal collection or persistence errors.";
+            var metricsJson = JsonSerializer.Serialize(new
+            {
+                marketStatus.Season,
+                marketStatus.CurrentRound,
+                MatchesRound = matchesPayload.Round,
+                ClubsUpserted = clubs.Count,
+                PositionsUpserted = positions.Count,
+                StatusesUpserted = statuses.Count,
+                AthletesUpserted = athletes.Count,
+                MatchesUpserted = matchesUpserted,
+                AthleteRoundsUpserted = athleteRoundResult.AthleteRoundsUpserted,
+                ScoutsUpserted = athleteRoundResult.ScoutsUpserted,
+            });
+
+            if (syncExecutionId.HasValue)
+            {
+                await syncExecutionLogService.UpdateAsync(
+                    syncExecutionId.Value,
+                    new SyncExecutionLogEntry
+                    {
+                        CorrelationId = executionContext.CorrelationId,
+                        SourceSystem = executionContext.SourceSystem,
+                        ProcessName = executionContext.ProcessName,
+                        StartedAtUtc = startedAtUtc,
+                        FinishedAtUtc = finishedAtUtc,
+                        DurationMs = durationMs,
+                        Status = SyncExecutionStatus.Success,
+                        LastStepName = executionContext.CurrentStep,
+                        Season = marketStatus.Season,
+                        Round = matchesPayload.Round,
+                        MetricsJson = metricsJson,
+                        ContextJson = executionContext.ToContextJson(),
+                        QualityCriteriaJson = JsonSerializer.Serialize(new
+                        {
+                            Description = qualityCriteriaDescription,
+                            QualityCriteriaSatisfied = true,
+                        }),
+                        QualityCriteriaSatisfied = true,
+                    },
+                    cancellationToken);
+            }
+
             return new CartolaSyncResult
             {
+                SyncExecutionId = syncExecutionId,
+                CorrelationId = executionContext.CorrelationId,
+                Status = SyncExecutionStatus.Success,
+                StartedAtUtc = startedAtUtc,
+                FinishedAtUtc = finishedAtUtc,
+                DurationMs = durationMs,
+                QualityCriteriaSatisfied = true,
+                QualityCriteriaDescription = qualityCriteriaDescription,
                 Season = marketStatus.Season,
                 CurrentRound = marketStatus.CurrentRound,
                 MatchesRound = matchesPayload.Round,
@@ -101,8 +170,35 @@ public sealed class CartolaSyncService(
         {
             var transactionRolledBack = await RollbackTransactionAsync(transaction, cancellationToken);
             var errorLogId = await integrationFailureLogService.TryLogAsync(
-                BuildFailureLogEntry(executionContext, exception, transactionRolledBack),
+                BuildFailureLogEntry(executionContext, exception, transactionRolledBack, IntegrationLogSeverity.Error),
                 cancellationToken);
+
+            if (syncExecutionId.HasValue)
+            {
+                var finishedAtUtc = DateTime.UtcNow;
+                var durationMs = (long)(finishedAtUtc - startedAtUtc).TotalMilliseconds;
+
+                await syncExecutionLogService.UpdateAsync(
+                    syncExecutionId.Value,
+                    new SyncExecutionLogEntry
+                    {
+                        CorrelationId = executionContext.CorrelationId,
+                        SourceSystem = executionContext.SourceSystem,
+                        ProcessName = executionContext.ProcessName,
+                        StartedAtUtc = startedAtUtc,
+                        FinishedAtUtc = finishedAtUtc,
+                        DurationMs = durationMs,
+                        Status = SyncExecutionStatus.Failed,
+                        LastStepName = executionContext.CurrentStep,
+                        Season = TryGetIntContext(executionContext, "season"),
+                        Round = TryGetIntContext(executionContext, "matchesRound") ?? matchesRound,
+                        ErrorCode = IntegrationErrorClassifier.Classify(exception),
+                        Notes = exception.Message,
+                        ContextJson = executionContext.ToContextJson(),
+                        ErrorLogsCount = errorLogId.HasValue ? 1 : 0,
+                    },
+                    cancellationToken);
+            }
 
             throw new DataCollectionProcessException(
                 sourceSystem: executionContext.SourceSystem,
@@ -454,7 +550,8 @@ public sealed class CartolaSyncService(
     private static IntegrationFailureLogEntry BuildFailureLogEntry(
         SyncExecutionContext executionContext,
         Exception exception,
-        bool transactionRolledBack)
+        bool transactionRolledBack,
+        string severity)
     {
         var sourceSystem = executionContext.SourceSystem;
         var stepName = executionContext.CurrentStep;
@@ -508,12 +605,29 @@ public sealed class CartolaSyncService(
             ResponsePayload = responsePayload,
             ExecutedStepsJson = executionContext.ToExecutedStepsJson(),
             ContextJson = executionContext.ToContextJson(extraContext),
+            ErrorCode = IntegrationErrorClassifier.Classify(exception),
+            Severity = severity,
             ExceptionType = Truncate(exception.GetType().FullName ?? exception.GetType().Name, 300),
             ExceptionMessage = Truncate(exception.Message, 4000),
             InnerExceptionMessage = Truncate(exception.InnerException?.Message, 4000),
             StackTrace = exception.ToString(),
             TransactionRolledBack = transactionRolledBack,
         };
+    }
+
+    private static int? TryGetIntContext(SyncExecutionContext executionContext, string key)
+    {
+        if (executionContext.GetContextData().TryGetValue(key, out var value))
+        {
+            return value switch
+            {
+                int intValue => intValue,
+                long longValue => (int)longValue,
+                _ => null,
+            };
+        }
+
+        return null;
     }
 
     private static string Truncate(string? value, int maxLength)

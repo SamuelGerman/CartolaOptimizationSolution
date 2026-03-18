@@ -21,12 +21,12 @@ public class AthleteRoundConfiguration : IEntityTypeConfiguration<AthleteRound>
         builder.Property(ar => ar.PriceNum).HasPrecision(10, 2);
 
         builder.HasOne(ar => ar.Club)
-               .WithMany()
+               .WithMany(club => club.AthleteRounds)
                .HasForeignKey(ar => ar.ClubId)
                .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(ar => ar.Position)
-               .WithMany()
+               .WithMany(position => position.AthleteRounds)
                .HasForeignKey(ar => ar.PositionId)
                .OnDelete(DeleteBehavior.Restrict);
 

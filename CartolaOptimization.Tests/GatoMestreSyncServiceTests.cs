@@ -17,6 +17,7 @@ public sealed class GatoMestreSyncServiceTests
     {
         await using var dbContext = CreateDbContext();
         var failureLogService = new FakeIntegrationFailureLogService();
+        var syncExecutionLogService = new FakeSyncExecutionLogService();
         var service = new GatoMestreSyncService(dbContext, new FakeGatoMestreApiClient
         {
             Teams = new Dictionary<int, GatoMestreTeamResponse>
@@ -40,7 +41,7 @@ public sealed class GatoMestreSyncServiceTests
                     Away = CreateClubBlock(287, "visitante", 43.06m, 30.36m, 84.81m, 47.18m, 47.18m, [(1, 1.90m, 4.05m), (5, 2.10m, 6.45m)]),
                 },
             },
-        }, failureLogService);
+        }, failureLogService, syncExecutionLogService);
 
         var result = await service.SyncRoundAsync(2026, 7);
 
@@ -58,6 +59,7 @@ public sealed class GatoMestreSyncServiceTests
     {
         await using var dbContext = CreateDbContext();
         var failureLogService = new FakeIntegrationFailureLogService();
+        var syncExecutionLogService = new FakeSyncExecutionLogService();
         var service = new GatoMestreSyncService(dbContext, new FakeGatoMestreApiClient
         {
             Teams = new Dictionary<int, GatoMestreTeamResponse>
@@ -135,7 +137,7 @@ public sealed class GatoMestreSyncServiceTests
                     Away = CreateClubBlock(262, "visitante", 40m, 30m, 40m, 52m, 49m, []),
                 },
             },
-        }, failureLogService);
+        }, failureLogService, syncExecutionLogService);
 
         var result = await service.SyncRoundAsync(2026, 4);
 
@@ -163,6 +165,7 @@ public sealed class GatoMestreSyncServiceTests
     {
         await using var dbContext = CreateDbContext();
         var failureLogService = new FakeIntegrationFailureLogService();
+        var syncExecutionLogService = new FakeSyncExecutionLogService();
 
         var club = new Club(0, 293, "CAP", "atletico-pr", "Athletico-PR", "https://example.com/293.png");
         var position = new Position(0, 3, "Zagueiro", "zag");
@@ -239,7 +242,7 @@ public sealed class GatoMestreSyncServiceTests
                 responseHeadersJson: """{"Content-Type":"application/json"}""",
                 responsePayload: """{"error":true,"message":"Atleta não encontrado"}""",
                 message: "The Gato Mestre API returned an application error for the athlete detail endpoint."),
-        }, failureLogService);
+        }, failureLogService, syncExecutionLogService);
 
         var result = await service.SyncRoundAsync(2026, 6);
         var athleteRound = await dbContext.AthleteRounds.SingleAsync(item => item.RoundId == 6 && item.AthleteId == athlete.Id);
@@ -365,6 +368,25 @@ public sealed class GatoMestreSyncServiceTests
         {
             Entries.Add(entry);
             return Task.FromResult<int?>(9001);
+        }
+    }
+
+    private sealed class FakeSyncExecutionLogService : ISyncExecutionLogService
+    {
+        public List<SyncExecutionLogEntry> StartedEntries { get; } = [];
+
+        public List<(int ExecutionId, SyncExecutionLogEntry Entry)> UpdatedEntries { get; } = [];
+
+        public Task<int?> StartAsync(SyncExecutionLogEntry entry, CancellationToken cancellationToken = default)
+        {
+            StartedEntries.Add(entry);
+            return Task.FromResult<int?>(7001);
+        }
+
+        public Task UpdateAsync(int executionId, SyncExecutionLogEntry entry, CancellationToken cancellationToken = default)
+        {
+            UpdatedEntries.Add((executionId, entry));
+            return Task.CompletedTask;
         }
     }
 }

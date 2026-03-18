@@ -69,9 +69,6 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                     b.Property<int>("ClubId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("ClubId1")
-                        .HasColumnType("int");
-
                     b.Property<int>("GamesNum")
                         .HasColumnType("int");
 
@@ -87,9 +84,6 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                         .HasColumnType("decimal(10,2)");
 
                     b.Property<int>("PositionId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("PositionId1")
                         .HasColumnType("int");
 
                     b.Property<decimal>("PriceNum")
@@ -119,11 +113,7 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
 
                     b.HasIndex("ClubId");
 
-                    b.HasIndex("ClubId1");
-
                     b.HasIndex("PositionId");
-
-                    b.HasIndex("PositionId1");
 
                     b.HasIndex("StatusId");
 
@@ -309,6 +299,11 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("varchar(50)");
 
+                    b.Property<string>("ErrorCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
                     b.Property<string>("ErrorLocation")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -375,6 +370,11 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                     b.Property<int?>("ResponseStatusCode")
                         .HasColumnType("int");
 
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
                     b.Property<string>("SourceSystem")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -395,6 +395,8 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CorrelationId");
+
+                    b.HasIndex("ErrorCode");
 
                     b.HasIndex("OccurredAtUtc");
 
@@ -493,6 +495,103 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                     b.ToTable("Positions", (string)null);
                 });
 
+            modelBuilder.Entity("CartolaOptimization.Domain.Entities.SyncExecution", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContextJson")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<decimal?>("CoverageRate")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<long?>("DurationMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ErrorCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("ErrorLogsCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("FinishedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("LastStepName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("MetricsJson")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("varchar(4000)");
+
+                    b.Property<string>("ProcessName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<string>("QualityCriteriaJson")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<bool?>("QualityCriteriaSatisfied")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int?>("Round")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("Season")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("SkippedRate")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("SourceSystem")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.Property<int>("WarningLogsCount")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrelationId")
+                        .IsUnique();
+
+                    b.HasIndex("StartedAtUtc");
+
+                    b.HasIndex("SourceSystem", "Status", "StartedAtUtc");
+
+                    b.ToTable("SyncExecutions", (string)null);
+                });
+
             modelBuilder.Entity("CartolaOptimization.Domain.Entities.AthleteRound", b =>
                 {
                     b.HasOne("CartolaOptimization.Domain.Entities.Athlete", "Athlete")
@@ -502,24 +601,16 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.HasOne("CartolaOptimization.Domain.Entities.Club", "Club")
-                        .WithMany()
+                        .WithMany("AthleteRounds")
                         .HasForeignKey("ClubId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("CartolaOptimization.Domain.Entities.Club", null)
-                        .WithMany("AthleteRounds")
-                        .HasForeignKey("ClubId1");
-
                     b.HasOne("CartolaOptimization.Domain.Entities.Position", "Position")
-                        .WithMany()
+                        .WithMany("AthleteRounds")
                         .HasForeignKey("PositionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("CartolaOptimization.Domain.Entities.Position", null)
-                        .WithMany("AthleteRounds")
-                        .HasForeignKey("PositionId1");
 
                     b.HasOne("CartolaOptimization.Domain.Entities.AthleteStatus", "Status")
                         .WithMany("AthleteRounds")
