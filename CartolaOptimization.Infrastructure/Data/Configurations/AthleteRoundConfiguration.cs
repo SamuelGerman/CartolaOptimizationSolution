@@ -10,6 +10,7 @@ public class AthleteRoundConfiguration : IEntityTypeConfiguration<AthleteRound>
     {
         builder.ToTable("AthleteRounds");
         builder.HasKey(ar => ar.Id);
+        builder.HasIndex(ar => new { ar.RoundId, ar.AthleteId }).IsUnique();
 
         builder.Property(ar => ar.ScoreNum).HasPrecision(10, 2);
         builder.Property(ar => ar.MovingAverage).HasPrecision(10, 2);

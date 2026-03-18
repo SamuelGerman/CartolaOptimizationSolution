@@ -8,7 +8,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CartolaOptimization.Domain\CartolaOptimization.Domain.csproj" />
-    <ProjectReference Include="..\CartolaOptimization.Infrastructure\CartolaOptimization.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

@@ -31,7 +31,7 @@
         /// <summary>
         /// Gets or sets the CartolaId
         /// </summary>
-        public required int CartolaId { get; set; }
+        public int CartolaId { get; set; }
 
         /// <summary>
         /// Gets or sets the Name

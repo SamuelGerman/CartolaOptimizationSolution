@@ -50,32 +50,32 @@
         /// <summary>
         /// Gets or sets the CartolaId
         /// </summary>
-        public required int CartolaId { get; set; }
+        public int CartolaId { get; set; }
 
         /// <summary>
         /// Gets or sets the Round
         /// </summary>
-        public required int Round { get; set; }
+        public int Round { get; set; }
 
         /// <summary>
         /// Gets or sets the MatchDate
         /// </summary>
-        public required DateTime MatchDate { get; set; }
+        public DateTime MatchDate { get; set; }
 
         /// <summary>
         /// Gets or sets the Location
         /// </summary>
-        public required string Location { get; set; }
+        public string Location { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether ValidForCartola
         /// </summary>
-        public required bool ValidForCartola { get; set; }
+        public bool ValidForCartola { get; set; }
 
         /// <summary>
         /// Gets or sets the HomeClubId
         /// </summary>
-        public required int HomeClubId { get; set; }
+        public int HomeClubId { get; set; }
 
         /// <summary>
         /// Gets or sets the HomeClub
@@ -100,7 +100,7 @@
         /// <summary>
         /// Gets or sets the AwayClubId
         /// </summary>
-        public required int AwayClubId { get; set; }
+        public int AwayClubId { get; set; }
 
         /// <summary>
         /// Gets or sets the AwayClub

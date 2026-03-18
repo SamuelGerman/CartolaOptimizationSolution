@@ -10,6 +10,7 @@ public class ClubRoundConfiguration : IEntityTypeConfiguration<ClubRound>
     {
         builder.ToTable("ClubRounds");
         builder.HasKey(cr => cr.Id);
+        builder.HasIndex(cr => new { cr.Round, cr.ClubId }).IsUnique();
 
         builder.Property(cr => cr.WinProbability).HasPrecision(10, 4);
         builder.Property(cr => cr.DrawProbability).HasPrecision(10, 4);

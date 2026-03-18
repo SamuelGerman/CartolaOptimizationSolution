@@ -1,0 +1,14 @@
+using CartolaOptimization.Infrastructure.Integrations.Cartola.Models;
+
+namespace CartolaOptimization.Infrastructure.Integrations.Cartola;
+
+public interface ICartolaApiClient
+{
+    Task<CartolaMarketStatusResponse> GetMarketStatusAsync(CancellationToken cancellationToken = default);
+
+    Task<Dictionary<int, CartolaClubResponse>> GetClubsAsync(CancellationToken cancellationToken = default);
+
+    Task<CartolaAthletesMarketResponse> GetAthletesMarketAsync(CancellationToken cancellationToken = default);
+
+    Task<CartolaMatchesResponse> GetMatchesAsync(int? round = null, CancellationToken cancellationToken = default);
+}

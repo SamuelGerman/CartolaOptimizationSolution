@@ -58,27 +58,27 @@
         /// <summary>
         /// Gets or sets the RoundId
         /// </summary>
-        public required int RoundId { get; set; }
+        public int RoundId { get; set; }
 
         /// <summary>
         /// Gets or sets the AthleteId
         /// </summary>
-        public required int AthleteId { get; set; }
+        public int AthleteId { get; set; }
 
         /// <summary>
         /// Gets or sets the ClubId
         /// </summary>
-        public required int ClubId { get; set; }
+        public int ClubId { get; set; }
 
         /// <summary>
         /// Gets or sets the PositionId
         /// </summary>
-        public required int PositionId { get; set; }
+        public int PositionId { get; set; }
 
         /// <summary>
         /// Gets or sets the StatusId
         /// </summary>
-        public required int StatusId { get; set; }
+        public int StatusId { get; set; }
 
         // Jogos disputados (Recorte Casa/Fora)
 

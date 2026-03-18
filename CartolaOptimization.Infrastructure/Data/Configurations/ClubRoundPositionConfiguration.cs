@@ -10,6 +10,7 @@ public class ClubRoundPositionConfiguration : IEntityTypeConfiguration<ClubRound
     {
         builder.ToTable("ClubRoundPositions");
         builder.HasKey(crp => crp.Id);
+        builder.HasIndex(crp => new { crp.ClubRoundId, crp.PositionId }).IsUnique();
 
         builder.Property(crp => crp.PointsConcededAverage).HasPrecision(10, 2);
         builder.Property(crp => crp.PointsConqueredAverage).HasPrecision(10, 2);

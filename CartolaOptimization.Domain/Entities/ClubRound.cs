@@ -40,12 +40,12 @@
         /// <summary>
         /// Gets or sets the Round
         /// </summary>
-        public required int Round { get; set; }
+        public int Round { get; set; }
 
         /// <summary>
         /// Gets or sets the ClubId
         /// </summary>
-        public required int ClubId { get; set; }
+        public int ClubId { get; set; }
 
         // Probabilidade de Vitória e Empate (%) - Essencial para prever SG (Saldo de Gols)
 

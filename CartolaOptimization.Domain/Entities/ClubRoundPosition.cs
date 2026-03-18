@@ -30,12 +30,12 @@
         /// <summary>
         /// Gets or sets the ClubRoundId
         /// </summary>
-        public required long ClubRoundId { get; set; }
+        public long ClubRoundId { get; set; }
 
         /// <summary>
         /// Gets or sets the PositionId
         /// </summary>
-        public required int PositionId { get; set; }
+        public int PositionId { get; set; }
 
         // Representa o quão fácil/difícil é para um adversário pontuar contra este time nesta posição
 

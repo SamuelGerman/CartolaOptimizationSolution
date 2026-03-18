@@ -10,6 +10,7 @@ public class AthleteRoundScoutsConfiguration : IEntityTypeConfiguration<AthleteR
     {
         builder.ToTable("AthleteRoundScouts");
         builder.HasKey(s => s.Id);
+        builder.HasIndex(s => new { s.AthleteRoundId, s.ScoutKey }).IsUnique();
 
         builder.Property(s => s.ScoutKey).IsRequired().HasMaxLength(5); // Ex: "G", "A", "DS"
         builder.Property(s => s.Valor).HasPrecision(10, 2);
