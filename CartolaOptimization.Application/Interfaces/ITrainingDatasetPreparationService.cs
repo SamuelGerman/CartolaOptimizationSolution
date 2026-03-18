@@ -12,6 +12,11 @@ public interface ITrainingDatasetPreparationService
         int toRound,
         CancellationToken cancellationToken = default);
 
+    Task<CartolaBackfillResult> BackfillCartolaResultsAsync(
+        int fromRound,
+        int toRound,
+        CancellationToken cancellationToken = default);
+
     Task<GatoMestreBackfillResult> BackfillGatoMestreAsync(
         int season,
         int fromRound,

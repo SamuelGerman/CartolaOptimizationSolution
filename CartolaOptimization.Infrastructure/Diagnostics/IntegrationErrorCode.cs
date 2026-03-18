@@ -13,4 +13,5 @@ public static class IntegrationErrorCode
     public const string AthleteDetailNotFound = "AthleteDetailNotFound";
     public const string AthleteMappingFallbackFailed = "AthleteMappingFallbackFailed";
     public const string ConfrontationRoundMismatch = "ConfrontationRoundMismatch";
+    public const string IncompleteHistoricalBaseline = "IncompleteHistoricalBaseline";
 }

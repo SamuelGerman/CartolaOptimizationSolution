@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Globalization;
 using CartolaOptimization.Application.Interfaces;
 using CartolaOptimization.Application.Models;
+using CartolaOptimization.Domain.Constants;
 using CartolaOptimization.Domain.Entities;
 using CartolaOptimization.Infrastructure.Context;
 using CartolaOptimization.Infrastructure.Diagnostics;
@@ -18,6 +19,8 @@ public sealed class CartolaSyncService(
     IIntegrationFailureLogService integrationFailureLogService,
     ISyncExecutionLogService syncExecutionLogService) : ICartolaSyncService
 {
+    private static readonly Dictionary<int, CartolaClubResponse> EmptyClubPayload = [];
+
     public async Task<CartolaSyncResult> SyncAsync(int? matchesRound = null, CancellationToken cancellationToken = default)
     {
         var executionContext = new SyncExecutionContext("Cartola", "CartolaSyncService.SyncAsync");
@@ -208,6 +211,219 @@ public sealed class CartolaSyncService(
                 correlationId: executionContext.CorrelationId,
                 errorLogId: errorLogId,
                 message: $"Cartola synchronization failed at step '{executionContext.CurrentStep}'. Review IntegrationFailureLogs using correlation '{executionContext.CorrelationId}'.",
+                innerException: exception);
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
+    }
+
+    public async Task<CartolaSyncResult> SyncClosedRoundAsync(int round, CancellationToken cancellationToken = default)
+    {
+        if (round <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(round), "Round numbers must be greater than zero.");
+        }
+
+        var executionContext = new SyncExecutionContext("Cartola", "CartolaSyncService.SyncClosedRoundAsync");
+        executionContext.SetContext("requestedClosedRound", round);
+        var startedAtUtc = DateTime.UtcNow;
+        var syncExecutionId = await syncExecutionLogService.StartAsync(
+            new SyncExecutionLogEntry
+            {
+                CorrelationId = executionContext.CorrelationId,
+                SourceSystem = executionContext.SourceSystem,
+                ProcessName = executionContext.ProcessName,
+                StartedAtUtc = startedAtUtc,
+                Status = SyncExecutionStatus.Running,
+                LastStepName = executionContext.CurrentStep,
+                Round = round,
+                ContextJson = executionContext.ToContextJson(),
+            },
+            cancellationToken);
+
+        IDbContextTransaction? transaction = null;
+
+        try
+        {
+            executionContext.MarkStep("Load market status payload");
+            var marketStatus = await cartolaApiClient.GetMarketStatusAsync(cancellationToken);
+            executionContext.SetContext("season", marketStatus.Season);
+            executionContext.SetContext("currentRound", marketStatus.CurrentRound);
+
+            if (round >= marketStatus.CurrentRound)
+            {
+                throw new DataCollectionIntegrityException(
+                    sourceSystem: "Cartola",
+                    stepName: "Validate requested closed round",
+                    errorLocation: "CartolaSyncService.SyncClosedRoundAsync",
+                    message: $"Round '{round}' is not considered historically closed because the current Cartola round is '{marketStatus.CurrentRound}'.",
+                    contextData: new Dictionary<string, object?>
+                    {
+                        ["requestedRound"] = round,
+                        ["currentRound"] = marketStatus.CurrentRound,
+                        ["season"] = marketStatus.Season,
+                    });
+            }
+
+            executionContext.MarkStep("Load closed round score payload");
+            var scoresPayload = await cartolaApiClient.GetAthleteScoresAsync(round, cancellationToken);
+            executionContext.SetContext("scorePayloadRound", scoresPayload.Round);
+            executionContext.SetContext("scorePayloadTotalAthletes", scoresPayload.TotalAthletes);
+
+            executionContext.MarkStep("Begin database transaction");
+            transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+            executionContext.MarkStep("Upsert clubs");
+            var clubs = await UpsertClubsAsync(scoresPayload.Clubs, EmptyClubPayload, EmptyClubPayload, cancellationToken);
+
+            executionContext.MarkStep("Upsert positions");
+            var positions = await UpsertPositionsAsync(scoresPayload.Positions, cancellationToken);
+
+            executionContext.MarkStep("Persist catalog changes");
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            executionContext.MarkStep("Finalize athlete rounds from closed score payload");
+            var finalizeResult = await FinalizeClosedRoundAthleteResultsAsync(
+                scoresPayload,
+                clubs,
+                positions,
+                cancellationToken);
+
+            executionContext.MarkStep("Persist closed round changes");
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            executionContext.MarkStep("Commit database transaction");
+            await transaction.CommitAsync(cancellationToken);
+
+            var finishedAtUtc = DateTime.UtcNow;
+            var durationMs = (long)(finishedAtUtc - startedAtUtc).TotalMilliseconds;
+            var isPartial = finalizeResult.ScorePayloadRowsWithoutLocalRound > 0 || finalizeResult.AthleteRoundsFinalized == 0;
+            var status = isPartial ? SyncExecutionStatus.Partial : SyncExecutionStatus.Success;
+            var qualityCriteriaSatisfied = !isPartial;
+            var notes = isPartial
+                ? $"Closed-round sync applied final results to {finalizeResult.AthleteRoundsFinalized} local athlete rounds, but {finalizeResult.ScorePayloadRowsWithoutLocalRound} score rows could not be mapped to a local baseline."
+                : string.Empty;
+            const string qualityCriteriaDescription = "A closed Cartola round is fully training-ready when every final-score payload row can be reconciled with an existing local athlete-round baseline.";
+            var metricsJson = JsonSerializer.Serialize(new
+            {
+                marketStatus.Season,
+                marketStatus.CurrentRound,
+                ClosedRound = scoresPayload.Round,
+                ScoresPayloadAthletes = scoresPayload.TotalAthletes,
+                ClubsUpserted = clubs.Count,
+                PositionsUpserted = positions.Count,
+                AthleteRoundsFinalized = finalizeResult.AthleteRoundsFinalized,
+                ScoutsUpserted = finalizeResult.ScoutsUpserted,
+                AthleteRoundsMissingScorePayload = finalizeResult.AthleteRoundsMissingScorePayload,
+                ScorePayloadRowsWithoutLocalRound = finalizeResult.ScorePayloadRowsWithoutLocalRound,
+            });
+
+            if (syncExecutionId.HasValue)
+            {
+                await syncExecutionLogService.UpdateAsync(
+                    syncExecutionId.Value,
+                    new SyncExecutionLogEntry
+                    {
+                        CorrelationId = executionContext.CorrelationId,
+                        SourceSystem = executionContext.SourceSystem,
+                        ProcessName = executionContext.ProcessName,
+                        StartedAtUtc = startedAtUtc,
+                        FinishedAtUtc = finishedAtUtc,
+                        DurationMs = durationMs,
+                        Status = status,
+                        LastStepName = executionContext.CurrentStep,
+                        Season = marketStatus.Season,
+                        Round = scoresPayload.Round,
+                        MetricsJson = metricsJson,
+                        ContextJson = executionContext.ToContextJson(),
+                        QualityCriteriaJson = JsonSerializer.Serialize(new
+                        {
+                            Description = qualityCriteriaDescription,
+                            QualityCriteriaSatisfied = qualityCriteriaSatisfied,
+                        }),
+                        QualityCriteriaSatisfied = qualityCriteriaSatisfied,
+                        ErrorCode = isPartial ? IntegrationErrorCode.IncompleteHistoricalBaseline : string.Empty,
+                        Notes = notes,
+                    },
+                    cancellationToken);
+            }
+
+            return new CartolaSyncResult
+            {
+                SyncExecutionId = syncExecutionId,
+                CorrelationId = executionContext.CorrelationId,
+                Status = status,
+                StartedAtUtc = startedAtUtc,
+                FinishedAtUtc = finishedAtUtc,
+                DurationMs = durationMs,
+                QualityCriteriaSatisfied = qualityCriteriaSatisfied,
+                QualityCriteriaDescription = qualityCriteriaDescription,
+                Season = marketStatus.Season,
+                CurrentRound = marketStatus.CurrentRound,
+                MatchesRound = scoresPayload.Round,
+                AthleteRounds = [scoresPayload.Round],
+                ClubsUpserted = clubs.Count,
+                PositionsUpserted = positions.Count,
+                StatusesUpserted = 0,
+                AthletesUpserted = 0,
+                MatchesUpserted = 0,
+                AthleteRoundsUpserted = finalizeResult.AthleteRoundsFinalized,
+                ScoutsUpserted = finalizeResult.ScoutsUpserted,
+                AthleteRoundsMissingScorePayload = finalizeResult.AthleteRoundsMissingScorePayload,
+                ScorePayloadRowsWithoutLocalRound = finalizeResult.ScorePayloadRowsWithoutLocalRound,
+                Notes = notes,
+            };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            var transactionRolledBack = await RollbackTransactionAsync(transaction, cancellationToken);
+            var errorLogId = await integrationFailureLogService.TryLogAsync(
+                BuildFailureLogEntry(executionContext, exception, transactionRolledBack, IntegrationLogSeverity.Error),
+                cancellationToken);
+
+            if (syncExecutionId.HasValue)
+            {
+                var finishedAtUtc = DateTime.UtcNow;
+                var durationMs = (long)(finishedAtUtc - startedAtUtc).TotalMilliseconds;
+
+                await syncExecutionLogService.UpdateAsync(
+                    syncExecutionId.Value,
+                    new SyncExecutionLogEntry
+                    {
+                        CorrelationId = executionContext.CorrelationId,
+                        SourceSystem = executionContext.SourceSystem,
+                        ProcessName = executionContext.ProcessName,
+                        StartedAtUtc = startedAtUtc,
+                        FinishedAtUtc = finishedAtUtc,
+                        DurationMs = durationMs,
+                        Status = SyncExecutionStatus.Failed,
+                        LastStepName = executionContext.CurrentStep,
+                        Season = TryGetIntContext(executionContext, "season"),
+                        Round = round,
+                        ErrorCode = IntegrationErrorClassifier.Classify(exception),
+                        Notes = exception.Message,
+                        ContextJson = executionContext.ToContextJson(),
+                        ErrorLogsCount = errorLogId.HasValue ? 1 : 0,
+                    },
+                    cancellationToken);
+            }
+
+            throw new DataCollectionProcessException(
+                sourceSystem: executionContext.SourceSystem,
+                processName: executionContext.ProcessName,
+                stepName: executionContext.CurrentStep,
+                correlationId: executionContext.CorrelationId,
+                errorLogId: errorLogId,
+                message: $"Cartola closed-round synchronization failed at step '{executionContext.CurrentStep}'. Review IntegrationFailureLogs using correlation '{executionContext.CorrelationId}'.",
                 innerException: exception);
         }
         finally
@@ -547,6 +763,106 @@ public sealed class CartolaSyncService(
         }
 
         return (roundsUpserted, scoutsUpserted, roundIds);
+    }
+
+    private async Task<(int AthleteRoundsFinalized, int ScoutsUpserted, int AthleteRoundsMissingScorePayload, int ScorePayloadRowsWithoutLocalRound)> FinalizeClosedRoundAthleteResultsAsync(
+        CartolaAthleteScoresResponse scoresPayload,
+        IReadOnlyDictionary<int, Club> clubs,
+        IReadOnlyDictionary<int, Position> positions,
+        CancellationToken cancellationToken)
+    {
+        var existingRounds = await dbContext.AthleteRounds
+            .Include(round => round.Athlete)
+            .Include(round => round.Scouts)
+            .Where(round => round.RoundId == scoresPayload.Round)
+            .ToListAsync(cancellationToken);
+        var existingRoundsByAthleteCartolaId = existingRounds
+            .ToDictionary(round => round.Athlete.CartolaId);
+        var clubRoundClubIds = await dbContext.ClubRounds
+            .Where(round => round.Round == scoresPayload.Round)
+            .Select(round => round.ClubId)
+            .ToListAsync(cancellationToken);
+        var clubRoundKeySet = clubRoundClubIds.ToHashSet();
+
+        var athleteRoundsFinalized = 0;
+        var scoutsUpserted = 0;
+        var athleteRoundsMissingScorePayload = 0;
+        var scorePayloadRowsWithoutLocalRound = 0;
+        var scoredAthleteIds = scoresPayload.Athletes.Keys.ToHashSet();
+
+        foreach (var athleteScore in scoresPayload.Athletes.OrderBy(item => item.Key))
+        {
+            if (!existingRoundsByAthleteCartolaId.TryGetValue(athleteScore.Key, out var athleteRound))
+            {
+                scorePayloadRowsWithoutLocalRound++;
+                continue;
+            }
+
+            if (!clubs.TryGetValue(athleteScore.Value.ClubId, out var club) ||
+                !positions.TryGetValue(athleteScore.Value.PositionId, out var position))
+            {
+                throw new DataCollectionIntegrityException(
+                    sourceSystem: "Cartola",
+                    stepName: "Finalize athlete rounds from closed score payload",
+                    errorLocation: "CartolaSyncService.FinalizeClosedRoundAthleteResultsAsync",
+                    message: $"Closed score row '{scoresPayload.Round}/{athleteScore.Key}' references catalog data that could not be resolved locally.",
+                    contextData: new Dictionary<string, object?>
+                    {
+                        ["roundId"] = scoresPayload.Round,
+                        ["athleteCartolaId"] = athleteScore.Key,
+                        ["clubCartolaId"] = athleteScore.Value.ClubId,
+                        ["positionCartolaId"] = athleteScore.Value.PositionId,
+                    });
+            }
+
+            athleteRound.ClubId = club.Id;
+            athleteRound.PositionId = position.Id;
+            athleteRound.ScoreNum = athleteScore.Value.Score;
+            athleteRound.WasInGame = athleteScore.Value.WasInGame;
+            athleteRound.DataPhase = RoundDataPhaseValues.HistoricalClosed;
+
+            athleteRound.Scouts ??= [];
+            dbContext.AthleteRoundScouts.RemoveRange(athleteRound.Scouts);
+            athleteRound.Scouts.Clear();
+
+            foreach (var scout in athleteScore.Value.Scout.OrderBy(scout => scout.Key))
+            {
+                var scoutEntity = new AthleteRoundScouts(
+                    id: 0,
+                    athleteRoundId: athleteRound.Id,
+                    scoutKey: ToRequiredValue(scout.Key, "UNK", 5),
+                    valor: scout.Value)
+                {
+                    AthleteRound = athleteRound,
+                };
+
+                athleteRound.Scouts.Add(scoutEntity);
+                scoutsUpserted++;
+            }
+
+            TrainingReadinessEvaluator.ApplyAthleteReadiness(
+                athleteRound,
+                clubRoundKeySet.Contains(athleteRound.ClubId));
+
+            athleteRoundsFinalized++;
+        }
+
+        foreach (var athleteRound in existingRounds.Where(round => !scoredAthleteIds.Contains(round.Athlete.CartolaId)))
+        {
+            athleteRound.ScoreNum = 0m;
+            athleteRound.WasInGame = false;
+            athleteRound.DataPhase = RoundDataPhaseValues.HistoricalClosed;
+            athleteRound.Scouts ??= [];
+            dbContext.AthleteRoundScouts.RemoveRange(athleteRound.Scouts);
+            athleteRound.Scouts.Clear();
+            TrainingReadinessEvaluator.ApplyAthleteReadiness(
+                athleteRound,
+                clubRoundKeySet.Contains(athleteRound.ClubId));
+            athleteRoundsMissingScorePayload++;
+            athleteRoundsFinalized++;
+        }
+
+        return (athleteRoundsFinalized, scoutsUpserted, athleteRoundsMissingScorePayload, scorePayloadRowsWithoutLocalRound);
     }
 
     private static async Task<bool> RollbackTransactionAsync(IDbContextTransaction? transaction, CancellationToken cancellationToken)

@@ -99,4 +99,19 @@ public sealed class CartolaSyncResult
     /// Gets the number of scout rows recreated for the synchronized athlete rounds.
     /// </summary>
     public int ScoutsUpserted { get; init; }
+
+    /// <summary>
+    /// Gets the number of existing local athlete rounds that were finalized with zero points because the closed Cartola payload did not contain them explicitly.
+    /// </summary>
+    public int AthleteRoundsMissingScorePayload { get; init; }
+
+    /// <summary>
+    /// Gets the number of final score payload rows that could not be mapped to a local athlete round baseline.
+    /// </summary>
+    public int ScorePayloadRowsWithoutLocalRound { get; init; }
+
+    /// <summary>
+    /// Gets additional execution notes that help interpret partial or historical synchronizations.
+    /// </summary>
+    public string Notes { get; init; } = string.Empty;
 }

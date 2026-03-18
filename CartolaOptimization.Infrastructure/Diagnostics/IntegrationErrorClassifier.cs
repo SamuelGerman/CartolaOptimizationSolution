@@ -45,6 +45,12 @@ public static class IntegrationErrorClassifier
             {
                 return IntegrationErrorCode.ConfrontationRoundMismatch;
             }
+
+            if (integrityException.Message.Contains("historically closed", StringComparison.OrdinalIgnoreCase) ||
+                integrityException.Message.Contains("local baseline", StringComparison.OrdinalIgnoreCase))
+            {
+                return IntegrationErrorCode.IncompleteHistoricalBaseline;
+            }
         }
 
         return IntegrationErrorCode.Unknown;

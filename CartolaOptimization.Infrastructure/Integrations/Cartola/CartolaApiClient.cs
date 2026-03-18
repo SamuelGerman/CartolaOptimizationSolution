@@ -21,6 +21,9 @@ public sealed class CartolaApiClient(HttpClient httpClient) : ICartolaApiClient
     public Task<CartolaAthletesMarketResponse> GetAthletesMarketAsync(CancellationToken cancellationToken = default)
         => GetRequiredAsync<CartolaAthletesMarketResponse>("atletas/mercado?a=true", cancellationToken);
 
+    public Task<CartolaAthleteScoresResponse> GetAthleteScoresAsync(int round, CancellationToken cancellationToken = default)
+        => GetRequiredAsync<CartolaAthleteScoresResponse>($"atletas/pontuados/{round}", cancellationToken);
+
     public Task<CartolaMatchesResponse> GetMatchesAsync(int? round = null, CancellationToken cancellationToken = default)
     {
         var endpoint = round.HasValue ? $"partidas/{round.Value}" : "partidas?a=true";

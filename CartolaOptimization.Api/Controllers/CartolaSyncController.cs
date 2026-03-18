@@ -40,4 +40,19 @@ public sealed class CartolaSyncController(ICartolaSyncService cartolaSyncService
         var result = await cartolaSyncService.SyncAsync(round, cancellationToken);
         return Ok(result);
     }
+
+    /// <summary>
+    /// Synchronizes the final score payload of a closed historical Cartola round and applies it to already persisted athlete rounds.
+    /// </summary>
+    /// <param name="round">Closed historical round that should be finalized locally.</param>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>A summary describing the finalized athlete rounds and any remaining local gaps.</returns>
+    [HttpPost("closed-round/{round:int}")]
+    [ProducesResponseType(typeof(CartolaSyncResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SyncClosedRound(int round, CancellationToken cancellationToken)
+    {
+        var result = await cartolaSyncService.SyncClosedRoundAsync(round, cancellationToken);
+        return Ok(result);
+    }
 }

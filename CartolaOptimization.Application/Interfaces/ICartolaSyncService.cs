@@ -16,4 +16,12 @@ public interface ICartolaSyncService
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
     /// <returns>A summary of the synchronization execution.</returns>
     Task<CartolaSyncResult> SyncAsync(int? matchesRound = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Synchronizes the final score payload of a closed historical Cartola round and applies it to already persisted local athlete rounds.
+    /// </summary>
+    /// <param name="round">Closed historical round that should be finalized locally.</param>
+    /// <param name="cancellationToken">Cancellation token for the operation.</param>
+    /// <returns>A summary of the synchronization execution.</returns>
+    Task<CartolaSyncResult> SyncClosedRoundAsync(int round, CancellationToken cancellationToken = default);
 }

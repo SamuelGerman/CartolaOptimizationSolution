@@ -12,6 +12,7 @@ namespace CartolaOptimization.Infrastructure.Services;
 /// </summary>
 public sealed class TrainingDatasetPreparationService(
     AppDbContext dbContext,
+    ICartolaSyncService cartolaSyncService,
     IGatoMestreSyncService gatoMestreSyncService) : ITrainingDatasetPreparationService
 {
     public async Task<TrainingDatasetReadinessResult> RecomputeReadinessAsync(
@@ -65,6 +66,70 @@ public sealed class TrainingDatasetPreparationService(
             ClubRoundsComplete = clubRounds.Count(round => round.TrainingReadinessStatus == TrainingReadinessStatusValues.Complete),
             ClubRoundsPartial = clubRounds.Count(round => round.TrainingReadinessStatus == TrainingReadinessStatusValues.Partial),
             ClubRoundsUnfit = clubRounds.Count(round => round.TrainingReadinessStatus == TrainingReadinessStatusValues.UnfitForTraining),
+        };
+    }
+
+    public async Task<CartolaBackfillResult> BackfillCartolaResultsAsync(
+        int fromRound,
+        int toRound,
+        CancellationToken cancellationToken = default)
+    {
+        NormalizeRange(ref fromRound, ref toRound);
+
+        var rounds = new List<CartolaBackfillRoundResult>();
+        var successfulRounds = 0;
+        var partialRounds = 0;
+        var failedRounds = 0;
+
+        for (var round = fromRound; round <= toRound; round++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                var result = await cartolaSyncService.SyncClosedRoundAsync(round, cancellationToken);
+
+                if (result.Status == SyncExecutionStatus.Partial)
+                {
+                    partialRounds++;
+                }
+                else
+                {
+                    successfulRounds++;
+                }
+
+                rounds.Add(new CartolaBackfillRoundResult
+                {
+                    Round = round,
+                    Status = result.Status,
+                    SyncExecutionId = result.SyncExecutionId,
+                    CorrelationId = result.CorrelationId,
+                    Notes = result.Notes,
+                });
+            }
+            catch (DataCollectionProcessException exception)
+            {
+                failedRounds++;
+                rounds.Add(new CartolaBackfillRoundResult
+                {
+                    Round = round,
+                    Status = SyncExecutionStatus.Failed,
+                    CorrelationId = exception.CorrelationId,
+                    ErrorMessage = exception.Message,
+                    ErrorLogId = exception.ErrorLogId,
+                });
+            }
+        }
+
+        return new CartolaBackfillResult
+        {
+            FromRound = fromRound,
+            ToRound = toRound,
+            RequestedRounds = toRound - fromRound + 1,
+            SuccessfulRounds = successfulRounds,
+            PartialRounds = partialRounds,
+            FailedRounds = failedRounds,
+            Rounds = rounds,
         };
     }
 
