@@ -940,6 +940,11 @@ public sealed class GatoMestreSyncService(
 
     private static int? ReadGames(JsonElement gamesElement, string propertyName)
     {
+        if (gamesElement.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
         if (!gamesElement.TryGetProperty(propertyName, out var property))
         {
             return null;
@@ -955,6 +960,11 @@ public sealed class GatoMestreSyncService(
 
     private static decimal? ReadAverage(JsonElement averagesElement, string bucketName, string metricName)
     {
+        if (averagesElement.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
         if (!averagesElement.TryGetProperty(bucketName, out var bucket))
         {
             return null;

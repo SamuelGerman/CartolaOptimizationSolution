@@ -261,6 +261,107 @@ public sealed class GatoMestreSyncServiceTests
         Assert.Equal(2.3m, athleteRound.ScoreNum);
     }
 
+    [Fact]
+    public async Task SyncRoundAsync_UsesZeroValues_WhenDetailNumericSnapshotsAreNull()
+    {
+        await using var dbContext = CreateDbContext();
+        var failureLogService = new FakeIntegrationFailureLogService();
+        var syncExecutionLogService = new FakeSyncExecutionLogService();
+        var service = new GatoMestreSyncService(dbContext, new FakeGatoMestreApiClient
+        {
+            Teams = new Dictionary<int, GatoMestreTeamResponse>
+            {
+                [293] = CreateTeam(293, "CAP", "atletico-pr", "Athletico-PR"),
+            },
+            AthletesRound = new GatoMestreAthletesRoundResponse
+            {
+                Result =
+                [
+                    new GatoMestreAthleteRoundSummaryResponse
+                    {
+                        AthleteId = 130843,
+                        Games = JsonDocument.Parse("""{}""").RootElement.Clone(),
+                        Averages = JsonDocument.Parse("""{}""").RootElement.Clone(),
+                        Points = JsonDocument.Parse("""{}""").RootElement.Clone(),
+                        Price = JsonDocument.Parse("""{}""").RootElement.Clone(),
+                        Scouts = JsonDocument.Parse("""{}""").RootElement.Clone(),
+                    }
+                ],
+            },
+            AthleteDetails = new Dictionary<int, GatoMestreAthleteDetailResponse>
+            {
+                [130843] = new()
+                {
+                    Athlete = new GatoMestreAthleteProfileResponse
+                    {
+                        AthleteId = 130843,
+                        TeamId = 293,
+                        Name = "Arthur dos Santos Barbosa Dias",
+                        PopularName = "Arthur Dias",
+                        Nickname = "Arthur Dias",
+                        Position = new GatoMestrePositionDescriptorResponse
+                        {
+                            Macro = "ZAG",
+                            Sigla = "ZAG",
+                            Description = "Zagueiro",
+                        },
+                    },
+                    Team = CreateTeam(293, "CAP", "atletico-pr", "Athletico-PR"),
+                    Rounds =
+                    [
+                        new GatoMestreAthleteRoundDetailResponse
+                        {
+                            Round = 4,
+                            WasInGame = false,
+                            GamesCount = 0,
+                            StatusName = "Provavel",
+                            Price = new GatoMestrePriceSnapshotResponse { Num = null, Variation = null },
+                            Points = new GatoMestreNumericSnapshotResponse { Num = null, Variation = null },
+                            Averages = new GatoMestreDetailedAveragesResponse
+                            {
+                                Overall = new GatoMestreAveragesBucketResponse
+                                {
+                                    Moving = new GatoMestreNumericSnapshotResponse { Num = null },
+                                    Total = new GatoMestreNumericSnapshotResponse { Num = null },
+                                },
+                                Home = new GatoMestreAveragesBucketResponse
+                                {
+                                    Total = new GatoMestreNumericSnapshotResponse { Num = null },
+                                },
+                                Away = new GatoMestreAveragesBucketResponse
+                                {
+                                    Total = new GatoMestreNumericSnapshotResponse { Num = null },
+                                },
+                            },
+                        }
+                    ],
+                },
+            },
+            ClubConfrontations = new Dictionary<int, GatoMestreClubConfrontationResponse>
+            {
+                [293] = new()
+                {
+                    Round = 7,
+                    Home = CreateClubBlock(293, "mandante", 40m, 30m, 60m, 50m, 48m, []),
+                    Away = CreateClubBlock(262, "visitante", 40m, 30m, 40m, 52m, 49m, []),
+                },
+            },
+        }, failureLogService, syncExecutionLogService);
+
+        var result = await service.SyncRoundAsync(2026, 4);
+        var athleteRound = await dbContext.AthleteRounds.SingleAsync();
+
+        Assert.Equal(1, result.AthleteRoundsUpserted);
+        Assert.Equal(1, result.AthleteDetailsFetched);
+        Assert.Equal(0m, athleteRound.ScoreNum);
+        Assert.Equal(0m, athleteRound.MovingAverage);
+        Assert.Equal(0m, athleteRound.AverageScoreNum);
+        Assert.Equal(0m, athleteRound.HomeAverageScore);
+        Assert.Equal(0m, athleteRound.AwayAverageScore);
+        Assert.Equal(0m, athleteRound.PriceNum);
+        Assert.Equal(0m, athleteRound.VariationNum);
+    }
+
     private static AppDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
