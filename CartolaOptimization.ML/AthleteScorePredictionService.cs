@@ -34,7 +34,7 @@ public sealed class AthleteScorePredictionService(
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var query = dbContext.AthleteRounds
+        var currentRoundQuery = dbContext.AthleteRounds
             .AsNoTracking()
             .Include(item => item.Athlete)
             .Include(item => item.Club)
@@ -49,26 +49,39 @@ public sealed class AthleteScorePredictionService(
 
         if (statusCartolaId.HasValue)
         {
-            query = query.Where(item => item.Status.CartolaId == statusCartolaId.Value);
+            currentRoundQuery = currentRoundQuery.Where(item => item.Status.CartolaId == statusCartolaId.Value);
         }
 
         if (clubCartolaId.HasValue)
         {
-            query = query.Where(item => item.Club.CartolaId == clubCartolaId.Value);
+            currentRoundQuery = currentRoundQuery.Where(item => item.Club.CartolaId == clubCartolaId.Value);
         }
 
         if (positionCartolaId.HasValue)
         {
-            query = query.Where(item => item.Position.CartolaId == positionCartolaId.Value);
+            currentRoundQuery = currentRoundQuery.Where(item => item.Position.CartolaId == positionCartolaId.Value);
         }
 
-        var baselines = await query
+        var currentRoundBaselines = await currentRoundQuery
             .OrderBy(item => item.Athlete.Name)
             .ToListAsync(cancellationToken);
 
+        var usingCurrentRoundBaselines = currentRoundBaselines.Count > 0;
+
+        var baselines = usingCurrentRoundBaselines
+            ? currentRoundBaselines
+            : await LoadLatestPersistedBaselinesAsync(
+                dbContext,
+                round,
+                statusCartolaId,
+                clubCartolaId,
+                positionCartolaId,
+                cancellationToken);
+
         if (baselines.Count == 0)
         {
-            throw new InvalidOperationException($"No current athlete baseline rows were found for round {round}. Synchronize the current Cartola round before requesting predictions.");
+            throw new InvalidOperationException(
+                $"No athlete baseline rows were found for round {round}. Synchronize the current Cartola round or ensure at least one earlier persisted athlete round exists.");
         }
 
         var mlContext = new MLContext(seed: 42);
@@ -114,7 +127,9 @@ public sealed class AthleteScorePredictionService(
                 MovingAverage = baseline.MovingAverage,
                 AverageScore = baseline.AverageScoreNum,
                 PredictedScore = Math.Round(Clamp((decimal)prediction.Score, -10m, 30m), 2, MidpointRounding.AwayFromZero),
-                PredictionNotes = "Prediction generated from the current pre-round athlete baseline using the trained v0 athlete-only regression model.",
+                PredictionNotes = usingCurrentRoundBaselines
+                    ? "Prediction generated from the current pre-round athlete baseline using the trained v0 athlete-only regression model."
+                    : $"Prediction generated from the latest persisted athlete baseline before round {round} because no current pre-round rows were available for that round.",
             })
             .OrderByDescending(item => item.PredictedScore)
             .ThenBy(item => item.AthleteName)
@@ -140,4 +155,60 @@ public sealed class AthleteScorePredictionService(
 
     private static decimal Clamp(decimal value, decimal min, decimal max)
         => value < min ? min : value > max ? max : value;
+
+    private static async Task<List<Domain.Entities.AthleteRound>> LoadLatestPersistedBaselinesAsync(
+        AppDbContext dbContext,
+        int round,
+        int? statusCartolaId,
+        int? clubCartolaId,
+        int? positionCartolaId,
+        CancellationToken cancellationToken)
+    {
+        var historicalBaselines = await dbContext.AthleteRounds
+            .AsNoTracking()
+            .Include(item => item.Athlete)
+            .Include(item => item.Club)
+            .Include(item => item.Position)
+            .Include(item => item.Status)
+            .Where(item =>
+                item.RoundId < round &&
+                item.ClubId != 0 &&
+                item.PositionId != 0 &&
+                item.StatusId != 0)
+            .OrderBy(item => item.Athlete.Name)
+            .ToListAsync(cancellationToken);
+
+        var latestBaselines = historicalBaselines
+            .GroupBy(item => item.AthleteId)
+            .Select(group => group
+                .OrderByDescending(item => item.RoundId)
+                .ThenByDescending(item => item.Id)
+                .First())
+            .ToList();
+
+        if (statusCartolaId.HasValue)
+        {
+            latestBaselines = latestBaselines
+                .Where(item => item.Status.CartolaId == statusCartolaId.Value)
+                .ToList();
+        }
+
+        if (clubCartolaId.HasValue)
+        {
+            latestBaselines = latestBaselines
+                .Where(item => item.Club.CartolaId == clubCartolaId.Value)
+                .ToList();
+        }
+
+        if (positionCartolaId.HasValue)
+        {
+            latestBaselines = latestBaselines
+                .Where(item => item.Position.CartolaId == positionCartolaId.Value)
+                .ToList();
+        }
+
+        return latestBaselines
+            .OrderBy(item => item.Athlete.Name)
+            .ToList();
+    }
 }
