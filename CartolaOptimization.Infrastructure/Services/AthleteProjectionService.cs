@@ -17,6 +17,7 @@ public sealed class AthleteProjectionService(AppDbContext dbContext) : IAthleteP
         int round,
         int? positionCartolaId = null,
         int? clubCartolaId = null,
+        int? statusCartolaId = null,
         int take = 100,
         CancellationToken cancellationToken = default)
     {
@@ -55,6 +56,13 @@ public sealed class AthleteProjectionService(AppDbContext dbContext) : IAthleteP
         {
             baselines = baselines
                 .Where(item => item.Club.CartolaId == clubCartolaId.Value)
+                .ToList();
+        }
+
+        if (statusCartolaId.HasValue)
+        {
+            baselines = baselines
+                .Where(item => item.Status.CartolaId == statusCartolaId.Value)
                 .ToList();
         }
 
@@ -97,6 +105,7 @@ public sealed class AthleteProjectionService(AppDbContext dbContext) : IAthleteP
             TotalAthletesProjected = projections.Count,
             PositionCartolaIdFilter = positionCartolaId,
             ClubCartolaIdFilter = clubCartolaId,
+            StatusCartolaIdFilter = statusCartolaId,
             Athletes = projections,
         };
     }

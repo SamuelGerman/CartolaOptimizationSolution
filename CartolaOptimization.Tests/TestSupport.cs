@@ -5,6 +5,9 @@ using CartolaOptimization.Infrastructure.Diagnostics;
 using CartolaOptimization.Infrastructure.Integrations.Cartola;
 using CartolaOptimization.Infrastructure.Integrations.Cartola.Models;
 using CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Primitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -116,4 +119,24 @@ internal sealed class FakeGatoMestreSyncService : IGatoMestreSyncService
 
     public Task<GatoMestreSyncResult> SyncRoundAsync(int season, int round, CancellationToken cancellationToken = default)
         => OnSyncRoundAsync(season, round, cancellationToken);
+}
+
+internal sealed class FakeHostEnvironment(string contentRootPath) : IHostEnvironment
+{
+    public string EnvironmentName { get; set; } = "Development";
+
+    public string ApplicationName { get; set; } = "CartolaOptimization.Tests";
+
+    public string ContentRootPath { get; set; } = contentRootPath;
+
+    public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+
+    private sealed class NullFileProvider : IFileProvider
+    {
+        public IDirectoryContents GetDirectoryContents(string subpath) => NotFoundDirectoryContents.Singleton;
+
+        public IFileInfo GetFileInfo(string subpath) => new NotFoundFileInfo(subpath);
+
+        public IChangeToken Watch(string filter) => NullChangeToken.Singleton;
+    }
 }

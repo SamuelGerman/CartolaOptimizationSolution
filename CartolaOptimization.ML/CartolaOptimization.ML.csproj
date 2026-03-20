@@ -7,6 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.ML" Version="4.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CartolaOptimization.Application\CartolaOptimization.Application.csproj" />
     <ProjectReference Include="..\CartolaOptimization.Domain\CartolaOptimization.Domain.csproj" />
     <ProjectReference Include="..\CartolaOptimization.Infrastructure\CartolaOptimization.Infrastructure.csproj" />
   </ItemGroup>

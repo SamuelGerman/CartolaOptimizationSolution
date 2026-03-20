@@ -11,6 +11,7 @@ public interface IAthleteProjectionService
         int round,
         int? positionCartolaId = null,
         int? clubCartolaId = null,
+        int? statusCartolaId = null,
         int take = 100,
         CancellationToken cancellationToken = default);
 }

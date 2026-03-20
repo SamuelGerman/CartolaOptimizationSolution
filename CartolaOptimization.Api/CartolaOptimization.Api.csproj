@@ -21,6 +21,7 @@
     <ProjectReference Include="..\CartolaOptimization.Application\CartolaOptimization.Application.csproj" />
     <ProjectReference Include="..\CartolaOptimization.Domain\CartolaOptimization.Domain.csproj" />
     <ProjectReference Include="..\CartolaOptimization.Infrastructure\CartolaOptimization.Infrastructure.csproj" />
+    <ProjectReference Include="..\CartolaOptimization.ML\CartolaOptimization.ML.csproj" />
   </ItemGroup>
 
 </Project>

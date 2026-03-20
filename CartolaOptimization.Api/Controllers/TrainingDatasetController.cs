@@ -12,7 +12,8 @@ namespace CartolaOptimization.Api.Controllers;
 [Produces("application/json")]
 public sealed class TrainingDatasetController(
     ITrainingDatasetPreparationService trainingDatasetPreparationService,
-    ITrainingDatasetDiagnosticsService trainingDatasetDiagnosticsService) : ControllerBase
+    ITrainingDatasetDiagnosticsService trainingDatasetDiagnosticsService,
+    IAthleteScoreModelTrainingService athleteScoreModelTrainingService) : ControllerBase
 {
     /// <summary>
     /// Returns an aggregated summary of how ready the persisted athlete and club rounds are for model training.
@@ -145,6 +146,45 @@ public sealed class TrainingDatasetController(
             cancellationToken);
 
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Trains and persists the v0 athlete-score machine learning model using the athlete-only historical dataset.
+    /// </summary>
+    /// <param name="fromRound">Optional initial round of the training window.</param>
+    /// <param name="toRound">Optional final round of the training window.</param>
+    /// <param name="validationRounds">Number of last rounds reserved for temporal validation. Defaults to one round.</param>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>The model metadata and validation metrics of the newly trained artifact.</returns>
+    [HttpPost("models/athlete-score-v0/train")]
+    [ProducesResponseType(typeof(AthleteScoreModelTrainingResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> TrainAthleteScoreModel(
+        [FromQuery] int? fromRound,
+        [FromQuery] int? toRound,
+        [FromQuery] int validationRounds = 1,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await athleteScoreModelTrainingService.TrainAsync(
+            fromRound,
+            toRound,
+            validationRounds,
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Returns metadata about the currently persisted v0 athlete-score model artifact, if one is available.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>The active model metadata or 404 when the artifact has not been trained yet.</returns>
+    [HttpGet("models/athlete-score-v0")]
+    [ProducesResponseType(typeof(AthleteScoreModelInfo), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAthleteScoreModelInfo(CancellationToken cancellationToken = default)
+    {
+        var result = await athleteScoreModelTrainingService.GetCurrentModelInfoAsync(cancellationToken);
+        return result is null ? NotFound() : Ok(result);
     }
 
     /// <summary>

@@ -10,7 +10,9 @@ namespace CartolaOptimization.Api.Controllers;
 [ApiController]
 [Route("api/projections")]
 [Produces("application/json")]
-public sealed class AthleteProjectionController(IAthleteProjectionService athleteProjectionService) : ControllerBase
+public sealed class AthleteProjectionController(
+    IAthleteProjectionService athleteProjectionService,
+    IAthleteScorePredictionService athleteScorePredictionService) : ControllerBase
 {
     /// <summary>
     /// Returns an explainable expected-score projection for the athletes that can be evaluated for the informed round.
@@ -18,6 +20,7 @@ public sealed class AthleteProjectionController(IAthleteProjectionService athlet
     /// <param name="round">Target round for the projection.</param>
     /// <param name="positionCartolaId">Optional Cartola position filter.</param>
     /// <param name="clubCartolaId">Optional Cartola club filter.</param>
+    /// <param name="statusCartolaId">Optional Cartola status filter that uses the athlete current status for the informed round.</param>
     /// <param name="take">Maximum number of projected athletes returned. Limited to 500 rows.</param>
     /// <param name="cancellationToken">Cancellation token for the request.</param>
     /// <returns>A ranked list of athlete expected scores together with the main factors behind each projection.</returns>
@@ -27,6 +30,7 @@ public sealed class AthleteProjectionController(IAthleteProjectionService athlet
         int round,
         [FromQuery] int? positionCartolaId,
         [FromQuery] int? clubCartolaId,
+        [FromQuery] int? statusCartolaId,
         [FromQuery] int take = 100,
         CancellationToken cancellationToken = default)
     {
@@ -34,6 +38,38 @@ public sealed class AthleteProjectionController(IAthleteProjectionService athlet
             round,
             positionCartolaId,
             clubCartolaId,
+            statusCartolaId,
+            take,
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Returns machine-learning score predictions for the athletes that already have a current baseline synchronized for the informed round.
+    /// </summary>
+    /// <param name="round">Target round for the prediction.</param>
+    /// <param name="statusCartolaId">Optional Cartola status filter that uses the athlete current status for the informed round.</param>
+    /// <param name="clubCartolaId">Optional Cartola club filter that uses the athlete current club for the informed round.</param>
+    /// <param name="positionCartolaId">Optional Cartola position filter that uses the athlete current position for the informed round.</param>
+    /// <param name="take">Maximum number of predicted athletes returned. Limited to 500 rows.</param>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>A ranked list of machine-learning predicted scores for the informed round.</returns>
+    [HttpGet("round/{round:int}/athletes/ml")]
+    [ProducesResponseType(typeof(AthleteScorePredictionResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMachineLearningPredictions(
+        int round,
+        [FromQuery] int? statusCartolaId,
+        [FromQuery] int? clubCartolaId,
+        [FromQuery] int? positionCartolaId,
+        [FromQuery] int take = 100,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await athleteScorePredictionService.GetPredictedScoresAsync(
+            round,
+            statusCartolaId,
+            clubCartolaId,
+            positionCartolaId,
             take,
             cancellationToken);
 

@@ -19,5 +19,7 @@ public sealed class AthleteRoundProjectionResult
 
     public int? ClubCartolaIdFilter { get; init; }
 
+    public int? StatusCartolaIdFilter { get; init; }
+
     public IReadOnlyCollection<AthleteProjectedScoreItem> Athletes { get; init; } = [];
 }

@@ -1,6 +1,7 @@
 using CartolaOptimization.Infrastructure;
 using CartolaOptimization.Infrastructure.Context;
 using CartolaOptimization.Api.Middleware;
+using CartolaOptimization.ML;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
@@ -31,6 +32,7 @@ builder.Services.AddDbContextFactory<AppDbContext>(configureDbContext);
 
 builder.Services.AddControllers();
 builder.Services.AddInfrastructureServices();
+builder.Services.AddMachineLearningServices(builder.Configuration);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
