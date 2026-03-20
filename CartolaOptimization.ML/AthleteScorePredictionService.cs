@@ -24,7 +24,7 @@ public sealed class AthleteScorePredictionService(
             throw new ArgumentOutOfRangeException(nameof(round), "Round numbers must be greater than zero.");
         }
 
-        take = Math.Clamp(take, 1, 500);
+        take = Math.Clamp(take, 1, 5000);
 
         var metadata = await artifactStore.LoadMetadataAsync(cancellationToken);
         if (metadata is null || !artifactStore.ModelExists())

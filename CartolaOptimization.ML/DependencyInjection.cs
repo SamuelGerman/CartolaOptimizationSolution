@@ -12,6 +12,7 @@ public static class DependencyInjection
         services.AddSingleton<AthleteScoreModelArtifactStore>();
         services.AddScoped<IAthleteScoreModelTrainingService, AthleteScoreModelTrainingService>();
         services.AddScoped<IAthleteScorePredictionService, AthleteScorePredictionService>();
+        services.AddScoped<IPredictedLineupOptimizationService, PredictedLineupOptimizationService>();
         return services;
     }
 }

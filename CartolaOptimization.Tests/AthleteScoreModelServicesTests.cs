@@ -125,6 +125,111 @@ public sealed class AthleteScoreModelServicesTests
         }
     }
 
+    [Fact]
+    public async Task GetOptimalLineupAsync_ReturnsBestProbableLineupWithinBudgetAndFormation()
+    {
+        var dbContextFactory = CreateDbContextFactory();
+        var artifactDirectory = CreateArtifactDirectory();
+        try
+        {
+            await SeedOptimizationTrainingDataAsync(await dbContextFactory.CreateDbContextAsync());
+
+            var options = Options.Create(new AthleteScoreModelOptions
+            {
+                ArtifactsDirectory = artifactDirectory,
+                ModelVersion = "athlete-score-v0",
+            });
+            var store = CreateArtifactStore(artifactDirectory);
+            var trainingService = new AthleteScoreModelTrainingService(dbContextFactory, store, options);
+            await trainingService.TrainAsync(fromRound: 1, toRound: 3, validationRounds: 1);
+
+            var predictionService = new AthleteScorePredictionService(dbContextFactory, store);
+            var optimizerService = new PredictedLineupOptimizationService(predictionService);
+
+            var predictions = await predictionService.GetPredictedScoresAsync(round: 4, statusCartolaId: 7, take: 5000);
+            var defenderCandidates = predictions.Athletes.Where(item => item.PositionCartolaId == 3).ToList();
+            var strikerCandidates = predictions.Athletes.Where(item => item.PositionCartolaId == 5).ToList();
+            var expected = (
+                from defender in defenderCandidates
+                from striker in strikerCandidates
+                let totalCost = defender.PriceNum + striker.PriceNum
+                where totalCost <= 20m
+                let totalScore = defender.PredictedScore + striker.PredictedScore
+                orderby totalScore descending, totalCost ascending
+                select new
+                {
+                    AthleteIds = new[] { defender.AthleteCartolaId, striker.AthleteCartolaId }.OrderBy(item => item).ToArray(),
+                    TotalCost = totalCost,
+                    TotalScore = totalScore,
+                })
+                .First();
+
+            var result = await optimizerService.GetOptimalLineupAsync(
+                4,
+                new PredictedLineupRequest
+                {
+                    Budget = 20m,
+                    Formation =
+                    [
+                        new PredictedLineupPositionRequirement { PositionCartolaId = 3, Quantity = 1 },
+                        new PredictedLineupPositionRequirement { PositionCartolaId = 5, Quantity = 1 },
+                    ],
+                });
+
+            Assert.Equal(2, result.TotalPlayers);
+            Assert.Equal(7, result.ProbableStatusCartolaId);
+            Assert.All(result.Athletes, item => Assert.Equal(7, item.StatusCartolaId));
+            Assert.Equal(expected.TotalCost, result.TotalCost);
+            Assert.Equal(expected.TotalScore, result.TotalPredictedScore);
+            Assert.Equal(expected.AthleteIds, result.Athletes.Select(item => item.AthleteCartolaId).OrderBy(item => item).ToArray());
+        }
+        finally
+        {
+            DeleteArtifactDirectory(artifactDirectory);
+        }
+    }
+
+    [Fact]
+    public async Task GetOptimalLineupAsync_Throws_WhenBudgetCannotFitRequestedFormation()
+    {
+        var dbContextFactory = CreateDbContextFactory();
+        var artifactDirectory = CreateArtifactDirectory();
+        try
+        {
+            await SeedOptimizationTrainingDataAsync(await dbContextFactory.CreateDbContextAsync());
+
+            var options = Options.Create(new AthleteScoreModelOptions
+            {
+                ArtifactsDirectory = artifactDirectory,
+                ModelVersion = "athlete-score-v0",
+            });
+            var store = CreateArtifactStore(artifactDirectory);
+            var trainingService = new AthleteScoreModelTrainingService(dbContextFactory, store, options);
+            await trainingService.TrainAsync(fromRound: 1, toRound: 3, validationRounds: 1);
+
+            var predictionService = new AthleteScorePredictionService(dbContextFactory, store);
+            var optimizerService = new PredictedLineupOptimizationService(predictionService);
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => optimizerService.GetOptimalLineupAsync(
+                4,
+                new PredictedLineupRequest
+                {
+                    Budget = 5m,
+                    Formation =
+                    [
+                        new PredictedLineupPositionRequirement { PositionCartolaId = 3, Quantity = 1 },
+                        new PredictedLineupPositionRequirement { PositionCartolaId = 5, Quantity = 1 },
+                    ],
+                }));
+
+            Assert.Contains("No feasible lineup", exception.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            DeleteArtifactDirectory(artifactDirectory);
+        }
+    }
+
     private static AthleteScoreModelArtifactStore CreateArtifactStore(string artifactDirectory)
         => new(
             new FakeHostEnvironment(artifactDirectory),
@@ -212,6 +317,74 @@ public sealed class AthleteScoreModelServicesTests
             CreateHistoricalAthleteRound(1, athleteB.Id, clubB.Id, striker.Id, doubtful.Id, 6.5m, 6.2m, 14m, -0.1m, 6.1m),
             CreateHistoricalAthleteRound(2, athleteB.Id, clubB.Id, striker.Id, doubtful.Id, 6.2m, 6.0m, 13.8m, -0.2m, 5.8m),
             CreateHistoricalAthleteRound(3, athleteB.Id, clubB.Id, striker.Id, doubtful.Id, 5.9m, 5.7m, 13.5m, -0.3m, 5.4m));
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static async Task SeedOptimizationTrainingDataAsync(AppDbContext dbContext)
+    {
+        await using var _ = dbContext;
+
+        var clubA = new Club(0, 293, "CAP", "athletico-pr", "Athletico-PR", "https://example.com/cap.png");
+        var clubB = new Club(0, 262, "FLA", "flamengo", "Flamengo", "https://example.com/fla.png");
+        var clubC = new Club(0, 275, "PAL", "palmeiras", "Palmeiras", "https://example.com/pal.png");
+        var defender = new Position(0, 3, "Zagueiro", "zag");
+        var striker = new Position(0, 5, "Atacante", "ata");
+        var probable = new AthleteStatus(0, 7, "Provavel");
+        var doubtful = new AthleteStatus(0, 2, "Duvida");
+        var athleteA = new Athlete(0, 1001, "Zagueiro A", "ZA");
+        var athleteB = new Athlete(0, 1002, "Zagueiro B", "ZB");
+        var athleteC = new Athlete(0, 1003, "Atacante A", "AA");
+        var athleteD = new Athlete(0, 1004, "Atacante B", "AB");
+        var athleteE = new Athlete(0, 1005, "Atacante C", "AC");
+
+        dbContext.Clubs.AddRange(clubA, clubB, clubC);
+        dbContext.Positions.AddRange(defender, striker);
+        dbContext.AthleteStatuses.AddRange(probable, doubtful);
+        dbContext.Athletes.AddRange(athleteA, athleteB, athleteC, athleteD, athleteE);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.AthleteRounds.AddRange(
+            CreateHistoricalAthleteRound(1, athleteA.Id, clubA.Id, defender.Id, probable.Id, 5.0m, 5.0m, 9.5m, 0.2m, 5.2m),
+            CreateHistoricalAthleteRound(2, athleteA.Id, clubA.Id, defender.Id, probable.Id, 5.3m, 5.3m, 9.7m, 0.2m, 5.5m),
+            CreateHistoricalAthleteRound(3, athleteA.Id, clubA.Id, defender.Id, probable.Id, 5.6m, 5.6m, 10.0m, 0.2m, 5.8m),
+            CreateHistoricalAthleteRound(1, athleteB.Id, clubB.Id, defender.Id, probable.Id, 4.2m, 4.2m, 8.4m, 0.1m, 4.3m),
+            CreateHistoricalAthleteRound(2, athleteB.Id, clubB.Id, defender.Id, probable.Id, 4.4m, 4.4m, 8.6m, 0.1m, 4.5m),
+            CreateHistoricalAthleteRound(3, athleteB.Id, clubB.Id, defender.Id, probable.Id, 4.5m, 4.5m, 8.8m, 0.1m, 4.6m),
+            CreateHistoricalAthleteRound(1, athleteC.Id, clubC.Id, striker.Id, probable.Id, 7.0m, 7.0m, 11.5m, 0.3m, 7.2m),
+            CreateHistoricalAthleteRound(2, athleteC.Id, clubC.Id, striker.Id, probable.Id, 7.3m, 7.3m, 11.9m, 0.3m, 7.5m),
+            CreateHistoricalAthleteRound(3, athleteC.Id, clubC.Id, striker.Id, probable.Id, 7.6m, 7.6m, 12.2m, 0.3m, 7.9m),
+            CreateHistoricalAthleteRound(1, athleteD.Id, clubB.Id, striker.Id, probable.Id, 5.7m, 5.7m, 7.5m, 0.2m, 5.8m),
+            CreateHistoricalAthleteRound(2, athleteD.Id, clubB.Id, striker.Id, probable.Id, 6.0m, 6.0m, 7.8m, 0.2m, 6.1m),
+            CreateHistoricalAthleteRound(3, athleteD.Id, clubB.Id, striker.Id, probable.Id, 6.2m, 6.2m, 8.0m, 0.2m, 6.3m),
+            CreateHistoricalAthleteRound(1, athleteE.Id, clubA.Id, striker.Id, doubtful.Id, 8.0m, 8.0m, 6.5m, 0.1m, 8.1m),
+            CreateHistoricalAthleteRound(2, athleteE.Id, clubA.Id, striker.Id, doubtful.Id, 8.1m, 8.1m, 6.7m, 0.1m, 8.2m),
+            CreateHistoricalAthleteRound(3, athleteE.Id, clubA.Id, striker.Id, doubtful.Id, 8.2m, 8.2m, 6.9m, 0.1m, 8.3m),
+            new AthleteRound(0, 4, athleteA.Id, clubA.Id, defender.Id, probable.Id, 7, 4, 3, 0m, 5.9m, 5.9m, 6.1m, 5.5m, 0.1m, 10.3m, false)
+            {
+                DataPhase = RoundDataPhaseValues.CurrentOpen,
+                Scouts = [],
+            },
+            new AthleteRound(0, 4, athleteB.Id, clubB.Id, defender.Id, probable.Id, 7, 4, 3, 0m, 4.7m, 4.7m, 4.9m, 4.4m, 0.1m, 8.9m, false)
+            {
+                DataPhase = RoundDataPhaseValues.CurrentOpen,
+                Scouts = [],
+            },
+            new AthleteRound(0, 4, athleteC.Id, clubC.Id, striker.Id, probable.Id, 7, 4, 3, 0m, 7.8m, 7.8m, 8.0m, 7.5m, 0.2m, 12.5m, false)
+            {
+                DataPhase = RoundDataPhaseValues.CurrentOpen,
+                Scouts = [],
+            },
+            new AthleteRound(0, 4, athleteD.Id, clubB.Id, striker.Id, probable.Id, 7, 4, 3, 0m, 6.4m, 6.4m, 6.6m, 6.0m, 0.2m, 8.2m, false)
+            {
+                DataPhase = RoundDataPhaseValues.CurrentOpen,
+                Scouts = [],
+            },
+            new AthleteRound(0, 4, athleteE.Id, clubA.Id, striker.Id, doubtful.Id, 7, 4, 3, 0m, 8.4m, 8.4m, 8.6m, 8.1m, 0.1m, 7.1m, false)
+            {
+                DataPhase = RoundDataPhaseValues.CurrentOpen,
+                Scouts = [],
+            });
 
         await dbContext.SaveChangesAsync();
     }
