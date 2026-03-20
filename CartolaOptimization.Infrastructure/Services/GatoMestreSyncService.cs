@@ -74,7 +74,22 @@ public sealed class GatoMestreSyncService(
             var teamsPayload = await gatoMestreApiClient.GetTeamsAsync(cancellationToken);
 
             executionContext.MarkStep("Load athletes round payload");
-            var athletesRoundPayload = await gatoMestreApiClient.GetAthletesRoundAsync(season, round, cancellationToken);
+            GatoMestreAthletesRoundResponse athletesRoundPayload;
+            try
+            {
+                athletesRoundPayload = await gatoMestreApiClient.GetAthletesRoundAsync(season, round, cancellationToken);
+            }
+            catch (ExternalApiException exception) when (IntegrationErrorClassifier.Classify(exception) == IntegrationErrorCode.RoundNotPublished)
+            {
+                return await CompleteRoundNotPublishedAsync(
+                    season,
+                    round,
+                    executionContext,
+                    syncExecutionId,
+                    startedAtUtc,
+                    exception,
+                    cancellationToken);
+            }
 
             executionContext.MarkStep("Begin database transaction");
             transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
@@ -347,12 +362,30 @@ public sealed class GatoMestreSyncService(
             executionContext.SetContext("clubCartolaId", club.CartolaId);
             executionContext.MarkStep($"Load confrontation payload for club {club.CartolaId}");
 
-            var confrontation = await gatoMestreApiClient.GetClubConfrontationAsync(club.CartolaId, cancellationToken);
+            GatoMestreClubConfrontationResponse confrontation;
+            try
+            {
+                confrontation = await gatoMestreApiClient.GetClubConfrontationAsync(club.CartolaId, cancellationToken);
+            }
+            catch (ExternalApiException exception)
+            {
+                dataAvailable = false;
+
+                if (string.IsNullOrWhiteSpace(note))
+                {
+                    note = $"One or more confrontation payloads could not be read for requested round {requestedRound}, so club round data was only partially synchronized.";
+                }
+
+                warningLogsCount += await TryLogNonFatalWarningAsync(executionContext, exception, cancellationToken);
+                await RemoveExistingClubRoundAsync(requestedRound, club.Id, cancellationToken);
+                continue;
+            }
 
             if (confrontation.Round != requestedRound)
             {
                 dataAvailable = false;
                 note = $"The confrontation endpoint currently exposes round {confrontation.Round}, so club round data was not synchronized for requested round {requestedRound}.";
+                await RemoveExistingClubRoundAsync(requestedRound, club.Id, cancellationToken);
 
                 if (!mismatchWarningLogged)
                 {
@@ -702,6 +735,118 @@ public sealed class GatoMestreSyncService(
 
         await transaction.RollbackAsync(cancellationToken);
         return true;
+    }
+
+    private async Task<GatoMestreSyncResult> CompleteRoundNotPublishedAsync(
+        int season,
+        int round,
+        SyncExecutionContext executionContext,
+        int? syncExecutionId,
+        DateTime startedAtUtc,
+        ExternalApiException exception,
+        CancellationToken cancellationToken)
+    {
+        var finishedAtUtc = DateTime.UtcNow;
+        var durationMs = (long)(finishedAtUtc - startedAtUtc).TotalMilliseconds;
+        var notes = $"The Gato Mestre round payload is not published yet for season {season}, round {round}.";
+        var metricsJson = JsonSerializer.Serialize(new
+        {
+            ClubsUpserted = 0,
+            ClubRoundsUpserted = 0,
+            ClubRoundPositionsUpserted = 0,
+            AthleteRoundsUpserted = 0,
+            AthleteRoundsSkipped = 0,
+            AthleteDetailsFetched = 0,
+            AthleteFailuresLogged = 0,
+            AthleteCoverageRate = 0m,
+            AthleteSkippedRate = 0m,
+            ClubRoundDataAvailable = false,
+        });
+
+        if (syncExecutionId.HasValue)
+        {
+            await syncExecutionLogService.UpdateAsync(
+                syncExecutionId.Value,
+                new SyncExecutionLogEntry
+                {
+                    CorrelationId = executionContext.CorrelationId,
+                    SourceSystem = executionContext.SourceSystem,
+                    ProcessName = executionContext.ProcessName,
+                    StartedAtUtc = startedAtUtc,
+                    FinishedAtUtc = finishedAtUtc,
+                    DurationMs = durationMs,
+                    Status = SyncExecutionStatus.Partial,
+                    LastStepName = executionContext.CurrentStep,
+                    Season = season,
+                    Round = round,
+                    ErrorCode = IntegrationErrorCode.RoundNotPublished,
+                    Notes = notes,
+                    MetricsJson = metricsJson,
+                    ContextJson = executionContext.ToContextJson(new Dictionary<string, object?>
+                    {
+                        ["responseStatusCode"] = exception.ResponseStatusCode,
+                        ["requestUrl"] = exception.RequestUrl,
+                    }),
+                    QualityCriteriaJson = JsonSerializer.Serialize(new
+                    {
+                        MinimumCoverageRate = MinimumHealthyCoverageRate,
+                        MaximumSkippedRate = MaximumHealthySkippedRate,
+                        QualityCriteriaDescription,
+                        QualityCriteriaSatisfied = false,
+                    }),
+                    CoverageRate = 0m,
+                    SkippedRate = 0m,
+                    QualityCriteriaSatisfied = false,
+                },
+                cancellationToken);
+        }
+
+        return new GatoMestreSyncResult
+        {
+            SyncExecutionId = syncExecutionId,
+            CorrelationId = executionContext.CorrelationId,
+            Status = SyncExecutionStatus.Partial,
+            StartedAtUtc = startedAtUtc,
+            FinishedAtUtc = finishedAtUtc,
+            DurationMs = durationMs,
+            Season = season,
+            Round = round,
+            ClubsUpserted = 0,
+            ClubRoundsUpserted = 0,
+            ClubRoundPositionsUpserted = 0,
+            AthleteRoundsUpserted = 0,
+            AthleteRoundsSkipped = 0,
+            AthleteDetailsFetched = 0,
+            AthleteFailuresLogged = 0,
+            AthleteCoverageRate = 0m,
+            AthleteSkippedRate = 0m,
+            MinimumCoverageRate = MinimumHealthyCoverageRate,
+            MaximumSkippedRate = MaximumHealthySkippedRate,
+            QualityCriteriaSatisfied = false,
+            QualityCriteriaDescription = QualityCriteriaDescription,
+            ClubRoundDataAvailable = false,
+            IsPartialSync = true,
+            Notes = notes,
+        };
+    }
+
+    private async Task RemoveExistingClubRoundAsync(int requestedRound, int clubId, CancellationToken cancellationToken)
+    {
+        var existingClubRound = await dbContext.ClubRounds
+            .Include(round => round.PositionStats)
+            .FirstOrDefaultAsync(round => round.Round == requestedRound && round.ClubId == clubId, cancellationToken);
+
+        if (existingClubRound is null)
+        {
+            return;
+        }
+
+        if (existingClubRound.PositionStats.Count > 0)
+        {
+            dbContext.ClubRoundPositions.RemoveRange(existingClubRound.PositionStats);
+        }
+
+        dbContext.ClubRounds.Remove(existingClubRound);
     }
 
     private static IntegrationFailureLogEntry BuildFailureLogEntry(

@@ -49,6 +49,27 @@ public sealed class IntegrationErrorClassifierTests
     }
 
     [Fact]
+    public void Classify_ReturnsRoundNotPublished_WhenGatoMestreRoundEndpointReturnsNotFound()
+    {
+        var exception = new ExternalApiException(
+            sourceSystem: "GatoMestre",
+            errorLocation: "GatoMestreApiClient.GetRequiredAsync",
+            requestMethod: "GET",
+            requestUrl: "https://api.gatomestre.globo.com/api/v2/atletas/2026/campeonato-brasileiro/home/atletas/rodadas/7?a=true",
+            requestHeadersJson: "{}",
+            requestPayload: string.Empty,
+            responseStatusCode: 404,
+            responseReasonPhrase: "Not Found",
+            responseHeadersJson: "{}",
+            responsePayload: """{"error":true,"message":"Conteúdo não encontrado"}""",
+            message: "The Gato Mestre API returned status code 404 for the round endpoint.");
+
+        var result = IntegrationErrorClassifier.Classify(exception);
+
+        Assert.Equal(IntegrationErrorCode.RoundNotPublished, result);
+    }
+
+    [Fact]
     public void Classify_ReturnsIncompleteHistoricalBaseline_WhenIntegrityErrorMentionsHistoricalClosure()
     {
         var exception = new DataCollectionIntegrityException(

@@ -744,7 +744,7 @@ public sealed class CartolaSyncService(
             dbContext.AthleteRoundScouts.RemoveRange(athleteRound.Scouts);
             athleteRound.Scouts.Clear();
 
-            foreach (var scout in athleteResponse.Scout.OrderBy(scout => scout.Key))
+            foreach (var scout in OrderScouts(athleteResponse.Scout))
             {
                 var scoutEntity = new AthleteRoundScouts(
                     id: 0,
@@ -825,7 +825,7 @@ public sealed class CartolaSyncService(
             dbContext.AthleteRoundScouts.RemoveRange(athleteRound.Scouts);
             athleteRound.Scouts.Clear();
 
-            foreach (var scout in athleteScore.Value.Scout.OrderBy(scout => scout.Key))
+            foreach (var scout in OrderScouts(athleteScore.Value.Scout))
             {
                 var scoutEntity = new AthleteRoundScouts(
                     id: 0,
@@ -958,6 +958,9 @@ public sealed class CartolaSyncService(
 
         return null;
     }
+
+    private static IEnumerable<KeyValuePair<string, decimal>> OrderScouts(Dictionary<string, decimal>? scoutValues)
+        => (scoutValues ?? []).OrderBy(scout => scout.Key);
 
     private static string Truncate(string? value, int maxLength)
     {

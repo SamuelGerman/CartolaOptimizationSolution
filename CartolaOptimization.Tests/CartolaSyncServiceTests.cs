@@ -211,6 +211,98 @@ public sealed class CartolaSyncServiceTests
     }
 
     [Fact]
+    public async Task SyncClosedRoundAsync_TreatsNullScoutAsEmptyCollection()
+    {
+        await using var dbContext = TestDbContextFactory.Create();
+        var failureLogService = new RecordingIntegrationFailureLogService();
+        var syncExecutionLogService = new RecordingSyncExecutionLogService();
+
+        var club = new Club(0, 293, "CAP", "athletico-pr", "Athletico-PR", "https://example.com/cap.png");
+        var position = new Position(0, 6, "Tecnico", "tec");
+        var status = new AthleteStatus(0, 7, "Provavel");
+        var athlete = new Athlete(0, 92273, "Odair Hellmann", "Odair Hellmann");
+
+        dbContext.Clubs.Add(club);
+        dbContext.Positions.Add(position);
+        dbContext.AthleteStatuses.Add(status);
+        dbContext.Athletes.Add(athlete);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.AthleteRounds.Add(new AthleteRound(
+            0,
+            5,
+            athlete.Id,
+            club.Id,
+            position.Id,
+            status.Id,
+            1,
+            1,
+            0,
+            0m,
+            1.5m,
+            1.5m,
+            1.5m,
+            0m,
+            0m,
+            9m,
+            false)
+        {
+            DataPhase = RoundDataPhaseValues.Unknown,
+            Scouts = [],
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = new CartolaSyncService(
+            dbContext,
+            new FakeCartolaApiClient
+            {
+                MarketStatus = new CartolaMarketStatusResponse
+                {
+                    Season = 2026,
+                    CurrentRound = 8,
+                },
+                AthleteScores = new CartolaAthleteScoresResponse
+                {
+                    Round = 5,
+                    TotalAthletes = 1,
+                    Clubs = new Dictionary<int, CartolaClubResponse>
+                    {
+                        [293] = CreateClub(293, "CAP", "athletico-pr", "Athletico-PR"),
+                    },
+                    Positions = new Dictionary<int, CartolaPositionResponse>
+                    {
+                        [6] = new() { Id = 6, Name = "Tecnico", Abbreviation = "tec" },
+                    },
+                    Athletes = new Dictionary<int, CartolaAthleteScoreResponse>
+                    {
+                        [92273] = new()
+                        {
+                            Nickname = "Odair Hellmann",
+                            Score = 0m,
+                            PositionId = 6,
+                            ClubId = 293,
+                            WasInGame = false,
+                            Scout = null,
+                        },
+                    },
+                },
+            },
+            failureLogService,
+            syncExecutionLogService);
+
+        var result = await service.SyncClosedRoundAsync(5);
+        var athleteRound = await dbContext.AthleteRounds.Include(item => item.Scouts).SingleAsync();
+
+        Assert.Equal(SyncExecutionStatus.Success, result.Status);
+        Assert.Equal(1, result.AthleteRoundsUpserted);
+        Assert.Empty(athleteRound.Scouts);
+        Assert.Equal(0m, athleteRound.ScoreNum);
+        Assert.False(athleteRound.WasInGame);
+        Assert.Empty(failureLogService.Entries);
+        Assert.Contains(syncExecutionLogService.UpdatedEntries, entry => entry.Entry.Status == SyncExecutionStatus.Success);
+    }
+
+    [Fact]
     public async Task SyncClosedRoundAsync_LogsFailure_WhenRequestedRoundIsNotHistorical()
     {
         await using var dbContext = TestDbContextFactory.Create();

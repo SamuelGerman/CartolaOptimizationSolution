@@ -47,5 +47,5 @@ public sealed class CartolaAthleteResponse
     public string Name { get; init; } = string.Empty;
 
     [JsonPropertyName("scout")]
-    public Dictionary<string, decimal> Scout { get; init; } = [];
+    public Dictionary<string, decimal>? Scout { get; init; } = [];
 }

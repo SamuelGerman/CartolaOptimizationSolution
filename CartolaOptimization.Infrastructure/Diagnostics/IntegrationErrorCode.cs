@@ -10,6 +10,7 @@ public static class IntegrationErrorCode
     public const string ExternalHttpError = "ExternalHttpError";
     public const string ExternalApplicationError = "ExternalApplicationError";
     public const string ExternalJsonSchemaChanged = "ExternalJsonSchemaChanged";
+    public const string RoundNotPublished = "RoundNotPublished";
     public const string AthleteDetailNotFound = "AthleteDetailNotFound";
     public const string AthleteMappingFallbackFailed = "AthleteMappingFallbackFailed";
     public const string ConfrontationRoundMismatch = "ConfrontationRoundMismatch";

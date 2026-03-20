@@ -362,6 +362,142 @@ public sealed class GatoMestreSyncServiceTests
         Assert.Equal(0m, athleteRound.VariationNum);
     }
 
+    [Fact]
+    public async Task SyncRoundAsync_ReturnsPartial_WhenRequestedRoundIsNotPublishedYet()
+    {
+        await using var dbContext = CreateDbContext();
+        var failureLogService = new FakeIntegrationFailureLogService();
+        var syncExecutionLogService = new FakeSyncExecutionLogService();
+        var service = new GatoMestreSyncService(dbContext, new FakeGatoMestreApiClient
+        {
+            Teams = new Dictionary<int, GatoMestreTeamResponse>
+            {
+                [293] = CreateTeam(293, "CAP", "atletico-pr", "Athletico-PR"),
+            },
+            ThrowAthletesRound = new ExternalApiException(
+                sourceSystem: "GatoMestre",
+                errorLocation: "GatoMestreApiClient.GetRequiredAsync",
+                requestMethod: "GET",
+                requestUrl: "https://api.gatomestre.globo.com/api/v2/atletas/2026/campeonato-brasileiro/home/atletas/rodadas/7?a=true",
+                requestHeadersJson: "{}",
+                requestPayload: string.Empty,
+                responseStatusCode: 404,
+                responseReasonPhrase: "Not Found",
+                responseHeadersJson: "{}",
+                responsePayload: """{"error":true,"message":"Conteúdo não encontrado"}""",
+                message: "The Gato Mestre API returned status code 404 for the round endpoint."),
+        }, failureLogService, syncExecutionLogService);
+
+        var result = await service.SyncRoundAsync(2026, 7);
+
+        Assert.Equal(SyncExecutionStatus.Partial, result.Status);
+        Assert.True(result.IsPartialSync);
+        Assert.False(result.QualityCriteriaSatisfied);
+        Assert.Equal(0, result.AthleteRoundsUpserted);
+        Assert.Contains("not published yet", result.Notes, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(failureLogService.Entries);
+        Assert.Contains(syncExecutionLogService.UpdatedEntries, entry =>
+            entry.Entry.Status == SyncExecutionStatus.Partial &&
+            entry.Entry.ErrorCode == IntegrationErrorCode.RoundNotPublished);
+    }
+
+    [Fact]
+    public async Task SyncRoundAsync_LogsClubWarningAndContinues_WhenConfrontationPayloadFails()
+    {
+        await using var dbContext = CreateDbContext();
+        var failureLogService = new FakeIntegrationFailureLogService();
+        var syncExecutionLogService = new FakeSyncExecutionLogService();
+        var service = new GatoMestreSyncService(dbContext, new FakeGatoMestreApiClient
+        {
+            Teams = new Dictionary<int, GatoMestreTeamResponse>
+            {
+                [293] = CreateTeam(293, "CAP", "atletico-pr", "Athletico-PR"),
+            },
+            AthletesRound = new GatoMestreAthletesRoundResponse
+            {
+                Result =
+                [
+                    new GatoMestreAthleteRoundSummaryResponse
+                    {
+                        AthleteId = 130843,
+                        Games = JsonDocument.Parse("""{"geral":3,"mandante":1,"visitante":2}""").RootElement.Clone(),
+                        Averages = JsonDocument.Parse("""{"geral":{"movel":{"num":4.33},"total":{"num":4.33}}}""").RootElement.Clone(),
+                    }
+                ],
+            },
+            AthleteDetails = new Dictionary<int, GatoMestreAthleteDetailResponse>
+            {
+                [130843] = new()
+                {
+                    Athlete = new GatoMestreAthleteProfileResponse
+                    {
+                        AthleteId = 130843,
+                        TeamId = 293,
+                        Name = "Arthur dos Santos Barbosa Dias",
+                        PopularName = "Arthur Dias",
+                        Nickname = "Arthur Dias",
+                        Position = new GatoMestrePositionDescriptorResponse
+                        {
+                            Macro = "ZAG",
+                            Sigla = "ZAG",
+                            Description = "Zagueiro",
+                        },
+                    },
+                    Team = CreateTeam(293, "CAP", "atletico-pr", "Athletico-PR"),
+                    Rounds =
+                    [
+                        new GatoMestreAthleteRoundDetailResponse
+                        {
+                            Round = 6,
+                            WasInGame = true,
+                            GamesCount = 3,
+                            StatusName = "Provavel",
+                            Price = new GatoMestrePriceSnapshotResponse { Num = 5.3m, Variation = -0.36m },
+                            Points = new GatoMestreNumericSnapshotResponse { Num = 0.8m, Variation = -3.4m },
+                            Averages = new GatoMestreDetailedAveragesResponse
+                            {
+                                Overall = new GatoMestreAveragesBucketResponse
+                                {
+                                    Moving = new GatoMestreNumericSnapshotResponse { Num = 4.33m },
+                                    Total = new GatoMestreNumericSnapshotResponse { Num = 4.33m },
+                                },
+                            },
+                        }
+                    ],
+                },
+            },
+            ThrowClubConfrontation = new ExternalApiException(
+                sourceSystem: "GatoMestre",
+                errorLocation: "GatoMestreApiClient.GetRequiredAsync",
+                requestMethod: "GET",
+                requestUrl: "https://api.gatomestre.globo.com/api/v1/conteudos/confrontos/equipe/293?a=true",
+                requestHeadersJson: "{}",
+                requestPayload: string.Empty,
+                responseStatusCode: 200,
+                responseReasonPhrase: "OK",
+                responseHeadersJson: "{}",
+                responsePayload: "<html>unexpected payload</html>",
+                message: "The Gato Mestre API payload for the confrontation endpoint could not be deserialized.",
+                innerException: new JsonException("Unexpected token while reading confrontation payload.")),
+        }, failureLogService, syncExecutionLogService);
+
+        var result = await service.SyncRoundAsync(2026, 6);
+        var athleteRound = await dbContext.AthleteRounds.SingleAsync();
+
+        Assert.Equal(SyncExecutionStatus.Partial, result.Status);
+        Assert.True(result.IsPartialSync);
+        Assert.False(result.ClubRoundDataAvailable);
+        Assert.Equal(1, result.AthleteRoundsUpserted);
+        Assert.Equal(1, result.AthleteDetailsFetched);
+        Assert.Single(failureLogService.Entries);
+        Assert.Equal(IntegrationLogSeverity.Warning, failureLogService.Entries[0].Severity);
+        Assert.Equal(IntegrationErrorCode.ExternalJsonSchemaChanged, failureLogService.Entries[0].ErrorCode);
+        Assert.Equal(6, athleteRound.RoundId);
+        Assert.Contains(syncExecutionLogService.UpdatedEntries, entry =>
+            entry.Entry.Status == SyncExecutionStatus.Partial &&
+            entry.Entry.WarningLogsCount == 1);
+    }
+
     private static AppDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
@@ -437,13 +573,24 @@ public sealed class GatoMestreSyncServiceTests
 
         public Dictionary<int, GatoMestreClubConfrontationResponse> ClubConfrontations { get; init; } = [];
 
+        public ExternalApiException? ThrowAthletesRound { get; init; }
+
         public ExternalApiException? ThrowAthleteDetail { get; init; }
+
+        public ExternalApiException? ThrowClubConfrontation { get; init; }
 
         public Task<Dictionary<int, GatoMestreTeamResponse>> GetTeamsAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(Teams);
 
         public Task<GatoMestreAthletesRoundResponse> GetAthletesRoundAsync(int season, int round, CancellationToken cancellationToken = default)
-            => Task.FromResult(AthletesRound);
+        {
+            if (ThrowAthletesRound is not null)
+            {
+                throw ThrowAthletesRound;
+            }
+
+            return Task.FromResult(AthletesRound);
+        }
 
         public Task<GatoMestreAthleteDetailResponse> GetAthleteDetailAsync(int athleteId, CancellationToken cancellationToken = default)
         {
@@ -456,9 +603,16 @@ public sealed class GatoMestreSyncServiceTests
         }
 
         public Task<GatoMestreClubConfrontationResponse> GetClubConfrontationAsync(int clubId, CancellationToken cancellationToken = default)
-            => Task.FromResult(ClubConfrontations.TryGetValue(clubId, out var confrontation)
+        {
+            if (ThrowClubConfrontation is not null)
+            {
+                throw ThrowClubConfrontation;
+            }
+
+            return Task.FromResult(ClubConfrontations.TryGetValue(clubId, out var confrontation)
                 ? confrontation
                 : new GatoMestreClubConfrontationResponse());
+        }
     }
 
     private sealed class FakeIntegrationFailureLogService : IIntegrationFailureLogService

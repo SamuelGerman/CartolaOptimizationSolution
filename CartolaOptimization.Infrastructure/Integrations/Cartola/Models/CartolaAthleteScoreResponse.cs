@@ -20,5 +20,5 @@ public sealed class CartolaAthleteScoreResponse
     public bool WasInGame { get; init; }
 
     [JsonPropertyName("scout")]
-    public Dictionary<string, decimal> Scout { get; init; } = [];
+    public Dictionary<string, decimal>? Scout { get; init; } = [];
 }

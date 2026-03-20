@@ -16,6 +16,11 @@ public static class IntegrationErrorClassifier
                 return IntegrationErrorCode.AthleteDetailNotFound;
             }
 
+            if (IsRoundNotPublished(externalApiException))
+            {
+                return IntegrationErrorCode.RoundNotPublished;
+            }
+
             if (exception.InnerException is JsonException ||
                 exception.Message.Contains("JSON", StringComparison.OrdinalIgnoreCase) ||
                 exception.Message.Contains("could not be converted", StringComparison.OrdinalIgnoreCase))
@@ -61,5 +66,13 @@ public static class IntegrationErrorClassifier
         return exception.RequestUrl.Contains("/api/v2/atletas/", StringComparison.OrdinalIgnoreCase) &&
                (exception.ResponsePayload.Contains("Atleta n", StringComparison.OrdinalIgnoreCase) ||
                 exception.Message.Contains("Atleta n", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsRoundNotPublished(ExternalApiException exception)
+    {
+        return exception.RequestUrl.Contains("/api/v2/atletas/", StringComparison.OrdinalIgnoreCase) &&
+               exception.RequestUrl.Contains("/rodadas/", StringComparison.OrdinalIgnoreCase) &&
+               exception.ResponseStatusCode == 404 &&
+               exception.ResponsePayload.Contains("encontrado", StringComparison.OrdinalIgnoreCase);
     }
 }
