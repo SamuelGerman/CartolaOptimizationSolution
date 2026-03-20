@@ -11,6 +11,8 @@ public sealed class AthleteScorePredictionService(
     IDbContextFactory<AppDbContext> dbContextFactory,
     AthleteScoreModelArtifactStore artifactStore) : IAthleteScorePredictionService
 {
+    private const string DatasetKey = "athlete-only";
+
     public async Task<AthleteScorePredictionResult> GetPredictedScoresAsync(
         int round,
         int? statusCartolaId = null,
@@ -140,15 +142,20 @@ public sealed class AthleteScorePredictionService(
         {
             Round = round,
             ModelVersion = metadata.ModelVersion,
+            DatasetKey = DatasetKey,
             GeneratedAtUtc = DateTime.UtcNow,
             ModelTrainedAtUtc = metadata.TrainedAtUtc,
             TotalAthletesConsidered = baselines.Count,
+            ExcludedAthletesWithoutContext = 0,
             TotalAthletesPredicted = athletes.Count,
             StatusCartolaIdFilter = statusCartolaId,
             ClubCartolaIdFilter = clubCartolaId,
             PositionCartolaIdFilter = positionCartolaId,
             ValidationMeanAbsoluteError = metadata.MeanAbsoluteError,
             ValidationRootMeanSquaredError = metadata.RootMeanSquaredError,
+            PredictionNotes = usingCurrentRoundBaselines
+                ? "Predictions used current pre-round athlete baselines and the trained v0 athlete-only regression model."
+                : $"Predictions used the latest persisted athlete baselines before round {round} because current pre-round rows were not available for that round.",
             Athletes = athletes,
         };
     }

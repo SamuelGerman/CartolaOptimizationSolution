@@ -13,7 +13,8 @@ namespace CartolaOptimization.Api.Controllers;
 public sealed class TrainingDatasetController(
     ITrainingDatasetPreparationService trainingDatasetPreparationService,
     ITrainingDatasetDiagnosticsService trainingDatasetDiagnosticsService,
-    IAthleteScoreModelTrainingService athleteScoreModelTrainingService) : ControllerBase
+    IAthleteScoreModelTrainingService athleteScoreModelTrainingService,
+    IFullContextAthleteScoreModelTrainingService fullContextAthleteScoreModelTrainingService) : ControllerBase
 {
     /// <summary>
     /// Returns an aggregated summary of how ready the persisted athlete and club rounds are for model training.
@@ -184,6 +185,45 @@ public sealed class TrainingDatasetController(
     public async Task<IActionResult> GetAthleteScoreModelInfo(CancellationToken cancellationToken = default)
     {
         var result = await athleteScoreModelTrainingService.GetCurrentModelInfoAsync(cancellationToken);
+        return result is null ? NotFound() : Ok(result);
+    }
+
+    /// <summary>
+    /// Trains and persists the v1 full-context athlete-score machine learning model using athlete, club, opponent and match context.
+    /// </summary>
+    /// <param name="fromRound">Optional initial round of the training window.</param>
+    /// <param name="toRound">Optional final round of the training window.</param>
+    /// <param name="validationRounds">Number of last rounds reserved for temporal validation. Defaults to one round.</param>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>The model metadata and validation metrics of the newly trained full-context artifact.</returns>
+    [HttpPost("models/athlete-score-v1-full-context/train")]
+    [ProducesResponseType(typeof(AthleteScoreModelTrainingResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> TrainFullContextAthleteScoreModel(
+        [FromQuery] int? fromRound,
+        [FromQuery] int? toRound,
+        [FromQuery] int validationRounds = 1,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await fullContextAthleteScoreModelTrainingService.TrainAsync(
+            fromRound,
+            toRound,
+            validationRounds,
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Returns metadata about the currently persisted v1 full-context athlete-score model artifact, if one is available.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>The active full-context model metadata or 404 when the artifact has not been trained yet.</returns>
+    [HttpGet("models/athlete-score-v1-full-context")]
+    [ProducesResponseType(typeof(AthleteScoreModelInfo), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetFullContextAthleteScoreModelInfo(CancellationToken cancellationToken = default)
+    {
+        var result = await fullContextAthleteScoreModelTrainingService.GetCurrentModelInfoAsync(cancellationToken);
         return result is null ? NotFound() : Ok(result);
     }
 

@@ -9,11 +9,15 @@ public sealed class AthleteScorePredictionResult
 
     public string ModelVersion { get; init; } = string.Empty;
 
+    public string DatasetKey { get; init; } = string.Empty;
+
     public DateTime GeneratedAtUtc { get; init; }
 
     public DateTime ModelTrainedAtUtc { get; init; }
 
     public int TotalAthletesConsidered { get; init; }
+
+    public int ExcludedAthletesWithoutContext { get; init; }
 
     public int TotalAthletesPredicted { get; init; }
 
@@ -26,6 +30,8 @@ public sealed class AthleteScorePredictionResult
     public double ValidationMeanAbsoluteError { get; init; }
 
     public double ValidationRootMeanSquaredError { get; init; }
+
+    public string PredictionNotes { get; init; } = string.Empty;
 
     public IReadOnlyCollection<AthleteScorePredictionItem> Athletes { get; init; } = [];
 }

@@ -33,6 +33,24 @@ public sealed class AthleteScorePredictionItem
 
     public decimal AverageScore { get; init; }
 
+    public bool? IsHomeMatch { get; init; }
+
+    public int? ClubTablePosition { get; init; }
+
+    public int? OpponentClubCartolaId { get; init; }
+
+    public string OpponentClubName { get; init; } = string.Empty;
+
+    public int? OpponentClubTablePosition { get; init; }
+
+    public decimal? ClubWinProbability { get; init; }
+
+    public decimal? ClubExpectedPoints { get; init; }
+
+    public decimal? OpponentWinProbability { get; init; }
+
+    public decimal? OpponentExpectedPoints { get; init; }
+
     public decimal PredictedScore { get; init; }
 
     public string PredictionNotes { get; init; } = string.Empty;

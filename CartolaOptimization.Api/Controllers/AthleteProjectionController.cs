@@ -13,6 +13,7 @@ namespace CartolaOptimization.Api.Controllers;
 public sealed class AthleteProjectionController(
     IAthleteProjectionService athleteProjectionService,
     IAthleteScorePredictionService athleteScorePredictionService,
+    IFullContextAthleteScorePredictionService fullContextAthleteScorePredictionService,
     IPredictedLineupOptimizationService predictedLineupOptimizationService) : ControllerBase
 {
     /// <summary>
@@ -67,6 +68,37 @@ public sealed class AthleteProjectionController(
         CancellationToken cancellationToken = default)
     {
         var result = await athleteScorePredictionService.GetPredictedScoresAsync(
+            round,
+            statusCartolaId,
+            clubCartolaId,
+            positionCartolaId,
+            take,
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Returns machine-learning score predictions for the athletes that can be evaluated with full club, opponent and match context for the informed round.
+    /// </summary>
+    /// <param name="round">Target round for the prediction.</param>
+    /// <param name="statusCartolaId">Optional Cartola status filter that uses the athlete current status for the informed round.</param>
+    /// <param name="clubCartolaId">Optional Cartola club filter that uses the athlete current club for the informed round.</param>
+    /// <param name="positionCartolaId">Optional Cartola position filter that uses the athlete current position for the informed round.</param>
+    /// <param name="take">Maximum number of predicted athletes returned. Limited to 5000 rows.</param>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>A ranked list of full-context machine-learning predicted scores for the informed round.</returns>
+    [HttpGet("round/{round:int}/athletes/ml/full-context")]
+    [ProducesResponseType(typeof(AthleteScorePredictionResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFullContextMachineLearningPredictions(
+        int round,
+        [FromQuery] int? statusCartolaId,
+        [FromQuery] int? clubCartolaId,
+        [FromQuery] int? positionCartolaId,
+        [FromQuery] int take = 100,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await fullContextAthleteScorePredictionService.GetPredictedScoresAsync(
             round,
             statusCartolaId,
             clubCartolaId,
