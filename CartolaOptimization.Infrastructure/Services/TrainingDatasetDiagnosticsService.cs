@@ -190,6 +190,250 @@ public sealed class TrainingDatasetDiagnosticsService(AppDbContext dbContext) : 
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<TrainingAthleteDatasetResult> GetAthleteOnlyDatasetAsync(
+        int? fromRound = null,
+        int? toRound = null,
+        int take = 1000,
+        CancellationToken cancellationToken = default)
+    {
+        NormalizeOptionalRange(ref fromRound, ref toRound);
+        take = Math.Clamp(take, 1, 5000);
+
+        var query = ApplyAthleteTrainingWindow(
+            dbContext.AthleteRounds
+                .AsNoTracking()
+                .Include(item => item.Athlete)
+                .Include(item => item.Club)
+                .Include(item => item.Position)
+                .Include(item => item.Status),
+            fromRound,
+            toRound);
+
+        var totalHistoricalRowsConsidered = await query.CountAsync(cancellationToken);
+        var distinctAthletes = await query
+            .Select(item => item.AthleteId)
+            .Distinct()
+            .CountAsync(cancellationToken);
+
+        var rows = await query
+            .OrderBy(item => item.RoundId)
+            .ThenBy(item => item.Athlete.CartolaId)
+            .Take(take)
+            .Select(item => new TrainingAthleteDatasetRow
+            {
+                AthleteRoundId = item.Id,
+                RoundId = item.RoundId,
+                AthleteCartolaId = item.Athlete.CartolaId,
+                AthleteName = item.Athlete.Name,
+                AthleteNickname = item.Athlete.Nickname,
+                ClubCartolaId = item.Club.CartolaId,
+                ClubName = item.Club.Nickname,
+                PositionCartolaId = item.Position.CartolaId,
+                PositionName = item.Position.Name,
+                StatusCartolaId = item.Status.CartolaId,
+                StatusName = item.Status.Name,
+                GamesNum = item.GamesNum,
+                HomeGamesNum = item.HomeGamesNum,
+                AwayGamesNum = item.AwayGamesNum,
+                MovingAverage = item.MovingAverage,
+                AverageScore = item.AverageScoreNum,
+                HomeAverageScore = item.HomeAverageScore,
+                AwayAverageScore = item.AwayAverageScore,
+                PriceNum = item.PriceNum,
+                VariationNum = item.VariationNum,
+                TargetScore = item.ScoreNum,
+                TargetWasInGame = item.WasInGame,
+            })
+            .ToListAsync(cancellationToken);
+
+        return new TrainingAthleteDatasetResult
+        {
+            FromRound = fromRound,
+            ToRound = toRound,
+            RequestedTake = take,
+            TotalHistoricalRowsConsidered = totalHistoricalRowsConsidered,
+            TotalExportableRows = totalHistoricalRowsConsidered,
+            ExcludedRows = 0,
+            DistinctAthletes = distinctAthletes,
+            ReturnedRows = rows.Count,
+            EligibilityRule = "Historical closed athlete rounds with structural references. Club-level context is optional.",
+            Rows = rows,
+        };
+    }
+
+    public async Task<TrainingFullContextDatasetResult> GetFullContextDatasetAsync(
+        int? fromRound = null,
+        int? toRound = null,
+        int take = 1000,
+        CancellationToken cancellationToken = default)
+    {
+        NormalizeOptionalRange(ref fromRound, ref toRound);
+        take = Math.Clamp(take, 1, 5000);
+
+        var athleteRounds = await ApplyAthleteTrainingWindow(
+                dbContext.AthleteRounds
+                    .AsNoTracking()
+                    .Include(item => item.Athlete)
+                    .Include(item => item.Club)
+                    .Include(item => item.Position)
+                    .Include(item => item.Status),
+                fromRound,
+                toRound)
+            .OrderBy(item => item.RoundId)
+            .ThenBy(item => item.Athlete.CartolaId)
+            .ToListAsync(cancellationToken);
+
+        var totalHistoricalRowsConsidered = athleteRounds.Count;
+        if (athleteRounds.Count == 0)
+        {
+            return new TrainingFullContextDatasetResult
+            {
+                FromRound = fromRound,
+                ToRound = toRound,
+                RequestedTake = take,
+                EligibilityRule = "Historical closed athlete rounds with structural references, valid Cartola match context, complete club-round enrichment for both clubs and position-level opponent context.",
+            };
+        }
+
+        var rounds = athleteRounds
+            .Select(item => item.RoundId)
+            .Distinct()
+            .ToArray();
+
+        var clubRounds = await dbContext.ClubRounds
+            .AsNoTracking()
+            .Include(item => item.Club)
+            .Include(item => item.PositionStats)
+            .Where(item => rounds.Contains(item.Round))
+            .ToListAsync(cancellationToken);
+
+        var completeClubRounds = clubRounds
+            .Where(item => item.PositionStats.Count > 0)
+            .ToDictionary(item => (item.Round, item.ClubId));
+
+        var matches = await dbContext.Matches
+            .AsNoTracking()
+            .Include(item => item.HomeClub)
+            .Include(item => item.AwayClub)
+            .Where(item => rounds.Contains(item.Round) && item.ValidForCartola)
+            .ToListAsync(cancellationToken);
+
+        var matchByRoundAndClubId = new Dictionary<(int Round, int ClubId), Match>();
+        foreach (var match in matches)
+        {
+            matchByRoundAndClubId[(match.Round, match.HomeClubId)] = match;
+            matchByRoundAndClubId[(match.Round, match.AwayClubId)] = match;
+        }
+
+        var exportableRows = new List<TrainingFullContextDatasetRow>(athleteRounds.Count);
+
+        foreach (var athleteRound in athleteRounds)
+        {
+            if (!completeClubRounds.TryGetValue((athleteRound.RoundId, athleteRound.ClubId), out var clubRound))
+            {
+                continue;
+            }
+
+            if (!matchByRoundAndClubId.TryGetValue((athleteRound.RoundId, athleteRound.ClubId), out var match))
+            {
+                continue;
+            }
+
+            var isHomeMatch = match.HomeClubId == athleteRound.ClubId;
+            var opponentClubId = isHomeMatch ? match.AwayClubId : match.HomeClubId;
+
+            if (!completeClubRounds.TryGetValue((athleteRound.RoundId, opponentClubId), out var opponentClubRound))
+            {
+                continue;
+            }
+
+            var clubPositionStats = clubRound.PositionStats.FirstOrDefault(item => item.PositionId == athleteRound.PositionId);
+            var opponentPositionStats = opponentClubRound.PositionStats.FirstOrDefault(item => item.PositionId == athleteRound.PositionId);
+
+            if (clubPositionStats is null || opponentPositionStats is null)
+            {
+                continue;
+            }
+
+            var clubTablePosition = isHomeMatch ? match.HomeClubPosition : match.AwayClubPosition;
+            var opponentTablePosition = isHomeMatch ? match.AwayClubPosition : match.HomeClubPosition;
+            var clubRecentForm = isHomeMatch ? match.HomeForm : match.AwayForm;
+            var opponentRecentForm = isHomeMatch ? match.AwayForm : match.HomeForm;
+            var opponentClubCartolaId = isHomeMatch ? match.AwayClub.CartolaId : match.HomeClub.CartolaId;
+            var opponentClubName = isHomeMatch ? match.AwayClub.Nickname : match.HomeClub.Nickname;
+
+            exportableRows.Add(new TrainingFullContextDatasetRow
+            {
+                AthleteRoundId = athleteRound.Id,
+                RoundId = athleteRound.RoundId,
+                AthleteCartolaId = athleteRound.Athlete.CartolaId,
+                AthleteName = athleteRound.Athlete.Name,
+                AthleteNickname = athleteRound.Athlete.Nickname,
+                ClubCartolaId = athleteRound.Club.CartolaId,
+                ClubName = athleteRound.Club.Nickname,
+                PositionCartolaId = athleteRound.Position.CartolaId,
+                PositionName = athleteRound.Position.Name,
+                StatusCartolaId = athleteRound.Status.CartolaId,
+                StatusName = athleteRound.Status.Name,
+                GamesNum = athleteRound.GamesNum,
+                HomeGamesNum = athleteRound.HomeGamesNum,
+                AwayGamesNum = athleteRound.AwayGamesNum,
+                MovingAverage = athleteRound.MovingAverage,
+                AverageScore = athleteRound.AverageScoreNum,
+                HomeAverageScore = athleteRound.HomeAverageScore,
+                AwayAverageScore = athleteRound.AwayAverageScore,
+                PriceNum = athleteRound.PriceNum,
+                VariationNum = athleteRound.VariationNum,
+                IsHomeMatch = isHomeMatch,
+                ClubTablePosition = clubTablePosition,
+                OpponentClubCartolaId = opponentClubCartolaId,
+                OpponentClubName = opponentClubName,
+                OpponentClubTablePosition = opponentTablePosition,
+                ClubRecentForm = clubRecentForm,
+                OpponentRecentForm = opponentRecentForm,
+                ClubWinProbability = clubRound.WinProbability,
+                ClubDrawProbability = clubRound.DrawProbability,
+                ClubLoseProbability = clubRound.LoseProbability,
+                ClubOverallAverage = clubRound.OverallAverage,
+                ClubMovingAverage = clubRound.MovingAverage,
+                ClubExpectedPoints = clubRound.ExpectedPoints,
+                ClubPositionPointsConcededAverage = clubPositionStats.PointsConcededAverage,
+                ClubPositionPointsConqueredAverage = clubPositionStats.PointsConqueredAverage,
+                OpponentWinProbability = opponentClubRound.WinProbability,
+                OpponentDrawProbability = opponentClubRound.DrawProbability,
+                OpponentLoseProbability = opponentClubRound.LoseProbability,
+                OpponentOverallAverage = opponentClubRound.OverallAverage,
+                OpponentMovingAverage = opponentClubRound.MovingAverage,
+                OpponentExpectedPoints = opponentClubRound.ExpectedPoints,
+                OpponentPositionPointsConcededAverage = opponentPositionStats.PointsConcededAverage,
+                OpponentPositionPointsConqueredAverage = opponentPositionStats.PointsConqueredAverage,
+                TargetScore = athleteRound.ScoreNum,
+                TargetWasInGame = athleteRound.WasInGame,
+            });
+        }
+
+        var returnedRows = exportableRows
+            .Take(take)
+            .ToList();
+
+        return new TrainingFullContextDatasetResult
+        {
+            FromRound = fromRound,
+            ToRound = toRound,
+            RequestedTake = take,
+            TotalHistoricalRowsConsidered = totalHistoricalRowsConsidered,
+            TotalExportableRows = exportableRows.Count,
+            ExcludedRows = totalHistoricalRowsConsidered - exportableRows.Count,
+            DistinctAthletes = exportableRows
+                .Select(item => item.AthleteCartolaId)
+                .Distinct()
+                .Count(),
+            ReturnedRows = returnedRows.Count,
+            EligibilityRule = "Historical closed athlete rounds with structural references, valid Cartola match context, complete club-round enrichment for both clubs and position-level opponent context.",
+            Rows = returnedRows,
+        };
+    }
+
     private static IQueryable<AthleteRound> ApplyAthleteRoundWindow(
         IQueryable<AthleteRound> query,
         int? fromRound,
@@ -206,6 +450,19 @@ public sealed class TrainingDatasetDiagnosticsService(AppDbContext dbContext) : 
         }
 
         return query;
+    }
+
+    private static IQueryable<AthleteRound> ApplyAthleteTrainingWindow(
+        IQueryable<AthleteRound> query,
+        int? fromRound,
+        int? toRound)
+    {
+        return ApplyAthleteRoundWindow(query, fromRound, toRound)
+            .Where(item =>
+                item.ClubId != 0 &&
+                item.PositionId != 0 &&
+                item.StatusId != 0 &&
+                item.DataPhase == RoundDataPhaseValues.HistoricalClosed);
     }
 
     private static IQueryable<ClubRound> ApplyClubRoundWindow(

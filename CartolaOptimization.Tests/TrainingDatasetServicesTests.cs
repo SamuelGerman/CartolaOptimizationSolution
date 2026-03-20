@@ -72,6 +72,37 @@ public sealed class TrainingDatasetServicesTests
     }
 
     [Fact]
+    public async Task RecomputeReadinessAsync_RequiresCompleteClubRoundForAthleteEligibility()
+    {
+        await using var dbContext = TestDbContextFactory.Create();
+        var (club, position, status, athletes) = await SeedTrainingBaseAsync(dbContext);
+
+        dbContext.ClubRounds.Add(new ClubRound(0, 3, club.Id, 40m, 30m, 30m, 48m, 45m, 50m)
+        {
+            PositionStats = [],
+        });
+
+        dbContext.AthleteRounds.Add(new AthleteRound(0, 3, athletes[0].Id, club.Id, position.Id, status.Id, 3, 2, 1, 5m, 5m, 5m, 5m, 5m, 0m, 10m, true)
+        {
+            DataPhase = RoundDataPhaseValues.HistoricalClosed,
+            Scouts = [],
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = new TrainingDatasetPreparationService(
+            dbContext,
+            new FakeCartolaSyncService(),
+            new FakeGatoMestreSyncService());
+
+        await service.RecomputeReadinessAsync(3, 3);
+        var athleteRound = await dbContext.AthleteRounds.SingleAsync();
+
+        Assert.False(athleteRound.IsTrainingEligible);
+        Assert.Equal("Partial", athleteRound.TrainingReadinessStatus);
+        Assert.Contains("missing or incomplete", athleteRound.TrainingReadinessReason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task BackfillCartolaResultsAsync_AggregatesSuccessfulPartialAndFailedRounds()
     {
         await using var dbContext = TestDbContextFactory.Create();
@@ -199,6 +230,93 @@ public sealed class TrainingDatasetServicesTests
         Assert.Equal(athletes[1].Name, partialAthletes.Single().AthleteName);
         Assert.Single(completeClubs);
         Assert.Equal(club.CartolaId, completeClubs.Single().ClubCartolaId);
+    }
+
+    [Fact]
+    public async Task TrainingDatasetDiagnosticsService_ReturnsAthleteOnlyAndFullContextDatasets()
+    {
+        await using var dbContext = TestDbContextFactory.Create();
+        var clubA = new Club(0, 293, "CAP", "athletico-pr", "Athletico-PR", "https://example.com/cap.png");
+        var clubB = new Club(0, 262, "FLA", "flamengo", "Flamengo", "https://example.com/fla.png");
+        var position = new Position(0, 3, "Zagueiro", "zag");
+        var status = new AthleteStatus(0, 7, "Provavel");
+        var athleteA = new Athlete(0, 1001, "Atleta A", "A");
+        var athleteB = new Athlete(0, 1002, "Atleta B", "B");
+
+        dbContext.Clubs.AddRange(clubA, clubB);
+        dbContext.Positions.Add(position);
+        dbContext.AthleteStatuses.Add(status);
+        dbContext.Athletes.AddRange(athleteA, athleteB);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.Matches.Add(new Match(
+            0,
+            9001,
+            3,
+            DateTime.UtcNow,
+            "Arena",
+            true,
+            clubA.Id,
+            3,
+            "VVE",
+            null,
+            clubB.Id,
+            12,
+            "DED",
+            null));
+
+        var clubRoundA = new ClubRound(0, 3, clubA.Id, 55m, 25m, 20m, 50m, 48m, 63m)
+        {
+            PositionStats = [],
+        };
+        var clubRoundB = new ClubRound(0, 3, clubB.Id, 20m, 25m, 55m, 39m, 37m, 36m)
+        {
+            PositionStats = [],
+        };
+        var partialClubRound = new ClubRound(0, 4, clubA.Id, 40m, 30m, 30m, 47m, 45m, 50m)
+        {
+            PositionStats = [],
+        };
+
+        dbContext.ClubRounds.AddRange(clubRoundA, clubRoundB, partialClubRound);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.ClubRoundPositions.Add(new ClubRoundPosition(0, clubRoundA.Id, position.Id, 3.5m, 5.2m));
+        dbContext.ClubRoundPositions.Add(new ClubRoundPosition(0, clubRoundB.Id, position.Id, 7.1m, 2.8m));
+
+        dbContext.AthleteRounds.AddRange(
+            new AthleteRound(0, 3, athleteA.Id, clubA.Id, position.Id, status.Id, 6, 3, 3, 7m, 6m, 5.8m, 6.1m, 5.4m, 0.4m, 12m, true)
+            {
+                DataPhase = RoundDataPhaseValues.HistoricalClosed,
+                Scouts = [],
+            },
+            new AthleteRound(0, 4, athleteB.Id, clubA.Id, position.Id, status.Id, 5, 3, 2, 4m, 4.5m, 4.3m, 4.7m, 3.9m, -0.2m, 10m, true)
+            {
+                DataPhase = RoundDataPhaseValues.HistoricalClosed,
+                Scouts = [],
+            },
+            new AthleteRound(0, 5, athleteB.Id, clubA.Id, position.Id, status.Id, 5, 3, 2, 0m, 4.5m, 4.3m, 4.7m, 3.9m, -0.2m, 10m, false)
+            {
+                DataPhase = RoundDataPhaseValues.CurrentOpen,
+                Scouts = [],
+            });
+        await dbContext.SaveChangesAsync();
+
+        var service = new TrainingDatasetDiagnosticsService(dbContext);
+
+        var athleteOnlyDataset = await service.GetAthleteOnlyDatasetAsync(3, 5, take: 10);
+        var fullContextDataset = await service.GetFullContextDatasetAsync(3, 5, take: 10);
+
+        Assert.Equal(2, athleteOnlyDataset.TotalExportableRows);
+        Assert.Equal(2, athleteOnlyDataset.ReturnedRows);
+        Assert.Equal(2, athleteOnlyDataset.DistinctAthletes);
+        Assert.Equal(1, fullContextDataset.TotalExportableRows);
+        Assert.Equal(1, fullContextDataset.ReturnedRows);
+        Assert.Equal(1, fullContextDataset.ExcludedRows);
+        Assert.Single(fullContextDataset.Rows);
+        Assert.Equal(athleteA.CartolaId, fullContextDataset.Rows.Single().AthleteCartolaId);
+        Assert.Equal(clubB.CartolaId, fullContextDataset.Rows.Single().OpponentClubCartolaId);
+        Assert.True(fullContextDataset.Rows.Single().IsHomeMatch);
     }
 
     private static async Task<(Club Club, Position Position, AthleteStatus Status, Athlete[] Athletes)> SeedTrainingBaseAsync(AppDbContext dbContext)

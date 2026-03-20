@@ -657,7 +657,7 @@ public sealed class CartolaSyncService(
             .Where(round => roundIds.Contains(round.RoundId))
             .ToDictionaryAsync(round => (round.RoundId, round.AthleteId), cancellationToken);
         var clubRoundKeys = await dbContext.ClubRounds
-            .Where(round => roundIds.Contains(round.Round))
+            .Where(round => roundIds.Contains(round.Round) && round.PositionStats.Any())
             .Select(round => new { round.Round, round.ClubId })
             .ToListAsync(cancellationToken);
         var clubRoundKeySet = clubRoundKeys

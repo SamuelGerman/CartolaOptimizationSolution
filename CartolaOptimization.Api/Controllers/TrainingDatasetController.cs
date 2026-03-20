@@ -98,6 +98,56 @@ public sealed class TrainingDatasetController(
     }
 
     /// <summary>
+    /// Returns an export-ready athlete-only historical dataset that can already be used by baseline regression models.
+    /// </summary>
+    /// <param name="fromRound">Optional initial round of the export window.</param>
+    /// <param name="toRound">Optional final round of the export window.</param>
+    /// <param name="take">Maximum number of rows returned. Limited to 5000 rows.</param>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>A historical dataset slice with athlete-only predictive features and target values.</returns>
+    [HttpGet("datasets/athlete-only")]
+    [ProducesResponseType(typeof(TrainingAthleteDatasetResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAthleteOnlyDataset(
+        [FromQuery] int? fromRound,
+        [FromQuery] int? toRound,
+        [FromQuery] int take = 1000,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await trainingDatasetDiagnosticsService.GetAthleteOnlyDatasetAsync(
+            fromRound,
+            toRound,
+            take,
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Returns an export-ready historical dataset slice that includes athlete, club, opponent and match context.
+    /// </summary>
+    /// <param name="fromRound">Optional initial round of the export window.</param>
+    /// <param name="toRound">Optional final round of the export window.</param>
+    /// <param name="take">Maximum number of rows returned. Limited to 5000 rows.</param>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>A historical dataset slice with full contextual features and target values.</returns>
+    [HttpGet("datasets/full-context")]
+    [ProducesResponseType(typeof(TrainingFullContextDatasetResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFullContextDataset(
+        [FromQuery] int? fromRound,
+        [FromQuery] int? toRound,
+        [FromQuery] int take = 1000,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await trainingDatasetDiagnosticsService.GetFullContextDatasetAsync(
+            fromRound,
+            toRound,
+            take,
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Recomputes training-readiness metadata for athlete and club rounds in the informed inclusive range.
     /// </summary>
     /// <param name="fromRound">Initial round of the recomputation range.</param>

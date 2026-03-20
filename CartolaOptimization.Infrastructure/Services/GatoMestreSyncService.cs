@@ -492,7 +492,12 @@ public sealed class GatoMestreSyncService(
             }
 
             TrainingReadinessEvaluator.ApplyClubRoundReadiness(existingClubRound);
-            availableClubIds.Add(existingClubRound.ClubId);
+
+            if (existingClubRound.IsTrainingEligible)
+            {
+                availableClubIds.Add(existingClubRound.ClubId);
+            }
+
             processedClubRounds++;
         }
 

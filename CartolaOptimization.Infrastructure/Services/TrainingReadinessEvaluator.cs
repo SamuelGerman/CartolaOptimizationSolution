@@ -8,23 +8,23 @@ namespace CartolaOptimization.Infrastructure.Services;
 /// </summary>
 internal static class TrainingReadinessEvaluator
 {
-    public static void ApplyCartolaBaseline(AthleteRound athleteRound, int currentRound, bool hasClubRoundFeatures)
+    public static void ApplyCartolaBaseline(AthleteRound athleteRound, int currentRound, bool hasCompleteClubRoundFeatures)
     {
         athleteRound.DataPhase = athleteRound.RoundId < currentRound
             ? RoundDataPhaseValues.HistoricalClosed
             : RoundDataPhaseValues.CurrentOpen;
 
-        ApplyAthleteReadiness(athleteRound, hasClubRoundFeatures);
+        ApplyAthleteReadiness(athleteRound, hasCompleteClubRoundFeatures);
     }
 
-    public static void ApplyAthleteEnrichment(AthleteRound athleteRound, bool hasClubRoundFeatures)
+    public static void ApplyAthleteEnrichment(AthleteRound athleteRound, bool hasCompleteClubRoundFeatures)
     {
         if (string.IsNullOrWhiteSpace(athleteRound.DataPhase))
         {
             athleteRound.DataPhase = RoundDataPhaseValues.Unknown;
         }
 
-        ApplyAthleteReadiness(athleteRound, hasClubRoundFeatures);
+        ApplyAthleteReadiness(athleteRound, hasCompleteClubRoundFeatures);
     }
 
     public static void ApplyClubRoundReadiness(ClubRound clubRound)
@@ -40,7 +40,7 @@ internal static class TrainingReadinessEvaluator
             : "Club round was synchronized without position statistics, so the enrichment is incomplete for model training.";
     }
 
-    public static void ApplyAthleteReadiness(AthleteRound athleteRound, bool hasClubRoundFeatures)
+    public static void ApplyAthleteReadiness(AthleteRound athleteRound, bool hasCompleteClubRoundFeatures)
     {
         if (athleteRound.ClubId == 0 || athleteRound.PositionId == 0 || athleteRound.StatusId == 0)
         {
@@ -58,13 +58,13 @@ internal static class TrainingReadinessEvaluator
             return;
         }
 
-        if (!hasClubRoundFeatures)
+        if (!hasCompleteClubRoundFeatures)
         {
             athleteRound.IsTrainingEligible = false;
             athleteRound.TrainingReadinessStatus = TrainingReadinessStatusValues.Partial;
             athleteRound.TrainingReadinessReason = string.Equals(athleteRound.DataPhase, RoundDataPhaseValues.Unknown, StringComparison.OrdinalIgnoreCase)
                 ? "The row is enriched, but its phase is still unknown because the Cartola baseline has not confirmed whether the round is historically closed."
-                : "The athlete row is available, but club-level Gato Mestre features for the same round are still missing.";
+                : "The athlete row is available, but club-level Gato Mestre features for the same round are still missing or incomplete.";
             return;
         }
 

@@ -28,4 +28,16 @@ public interface ITrainingDatasetDiagnosticsService
         bool? isTrainingEligible = null,
         int take = 100,
         CancellationToken cancellationToken = default);
+
+    Task<TrainingAthleteDatasetResult> GetAthleteOnlyDatasetAsync(
+        int? fromRound = null,
+        int? toRound = null,
+        int take = 1000,
+        CancellationToken cancellationToken = default);
+
+    Task<TrainingFullContextDatasetResult> GetFullContextDatasetAsync(
+        int? fromRound = null,
+        int? toRound = null,
+        int take = 1000,
+        CancellationToken cancellationToken = default);
 }

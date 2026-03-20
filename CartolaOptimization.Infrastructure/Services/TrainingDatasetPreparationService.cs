@@ -27,14 +27,15 @@ public sealed class TrainingDatasetPreparationService(
             .Where(round => round.Round >= fromRound && round.Round <= toRound)
             .ToListAsync(cancellationToken);
 
-        var clubRoundKeys = clubRounds
-            .Select(round => (round.Round, round.ClubId))
-            .ToHashSet();
-
         foreach (var clubRound in clubRounds)
         {
             TrainingReadinessEvaluator.ApplyClubRoundReadiness(clubRound);
         }
+
+        var completeClubRoundKeys = clubRounds
+            .Where(round => round.IsTrainingEligible)
+            .Select(round => (round.Round, round.ClubId))
+            .ToHashSet();
 
         var athleteRounds = await dbContext.AthleteRounds
             .Where(round => round.RoundId >= fromRound && round.RoundId <= toRound)
@@ -49,7 +50,7 @@ public sealed class TrainingDatasetPreparationService(
 
             TrainingReadinessEvaluator.ApplyAthleteReadiness(
                 athleteRound,
-                clubRoundKeys.Contains((athleteRound.RoundId, athleteRound.ClubId)));
+                completeClubRoundKeys.Contains((athleteRound.RoundId, athleteRound.ClubId)));
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
