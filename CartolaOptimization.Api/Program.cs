@@ -5,8 +5,18 @@ using CartolaOptimization.ML;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
-    
-var builder = WebApplication.CreateBuilder(args);
+
+var currentDirectory = Directory.GetCurrentDirectory();
+var currentDirectoryHasAppSettings = File.Exists(Path.Combine(currentDirectory, "appsettings.json"));
+var contentRootPath = currentDirectoryHasAppSettings
+    ? currentDirectory
+    : AppContext.BaseDirectory;
+
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = contentRootPath,
+});
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
