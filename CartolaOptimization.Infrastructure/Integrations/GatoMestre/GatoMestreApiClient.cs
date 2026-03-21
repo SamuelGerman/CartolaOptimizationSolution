@@ -24,8 +24,23 @@ public sealed class GatoMestreApiClient(HttpClient httpClient) : IGatoMestreApiC
     public Task<GatoMestreAthleteDetailResponse> GetAthleteDetailAsync(int athleteId, CancellationToken cancellationToken = default)
         => GetRequiredAsync<GatoMestreAthleteDetailResponse>($"api/v2/atletas/{athleteId}?a=true", cancellationToken);
 
+    public Task<GatoMestreAthleteRoundContentResponse> GetAthleteRoundContentAsync(int athleteId, int round, CancellationToken cancellationToken = default)
+        => GetRequiredAsync<GatoMestreAthleteRoundContentResponse>($"api/v1/conteudos/atletas/{athleteId}/rodadas/{round}?a=true", cancellationToken);
+
     public Task<GatoMestreClubConfrontationResponse> GetClubConfrontationAsync(int clubId, CancellationToken cancellationToken = default)
         => GetRequiredAsync<GatoMestreClubConfrontationResponse>($"api/v1/conteudos/confrontos/equipe/{clubId}?a=true", cancellationToken);
+
+    public Task<GatoMestreRoundCollectionResponse<GatoMestreTipItemResponse>> GetRoundTipsAsync(int season, int round, CancellationToken cancellationToken = default)
+        => GetRequiredAsync<GatoMestreRoundCollectionResponse<GatoMestreTipItemResponse>>($"api/v2/dicas/{season}/campeonato-brasileiro/rodadas/{round}?a=true", cancellationToken);
+
+    public Task<GatoMestreRoundCollectionResponse<GatoMestreFavoriteMatchResponse>> GetFavoriteMatchesAsync(int season, int round, CancellationToken cancellationToken = default)
+        => GetRequiredAsync<GatoMestreRoundCollectionResponse<GatoMestreFavoriteMatchResponse>>($"api/v2/equipes/{season}/campeonato-brasileiro/favoritos/rodadas/{round}?a=true", cancellationToken);
+
+    public Task<GatoMestreRoundCollectionResponse<GatoMestreForecastMatchResponse>> GetMatchForecastsAsync(int season, int round, CancellationToken cancellationToken = default)
+        => GetRequiredAsync<GatoMestreRoundCollectionResponse<GatoMestreForecastMatchResponse>>($"api/v2/equipes/{season}/campeonato-brasileiro/previsoes/rodadas/{round}?a=true", cancellationToken);
+
+    public Task<GatoMestreRoundCollectionResponse<GatoMestreClubAverageRankingResponse>> GetClubAverageRankingsAsync(int season, int round, CancellationToken cancellationToken = default)
+        => GetRequiredAsync<GatoMestreRoundCollectionResponse<GatoMestreClubAverageRankingResponse>>($"api/v2/rankings/{season}/campeonato-brasileiro/clubes/medias/rodadas/{round}?a=true", cancellationToken);
 
     private async Task<T> GetRequiredAsync<T>(string endpoint, CancellationToken cancellationToken)
     {

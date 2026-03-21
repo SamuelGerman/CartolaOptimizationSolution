@@ -45,6 +45,28 @@ public sealed class TrainingFullContextDatasetRow
 
     public decimal VariationNum { get; init; }
 
+    public decimal TeamAverageScore { get; init; }
+
+    public decimal PointsPerCartoletaCurrent { get; init; }
+
+    public decimal GrossOverallMovingAverageCurrent { get; init; }
+
+    public decimal NetOverallMovingAverageCurrent { get; init; }
+
+    public decimal ValuationCurrent { get; init; }
+
+    public decimal MinimumToAppreciateCurrent { get; init; }
+
+    public decimal IndexPointsPerCartoleta { get; init; }
+
+    public decimal IndexOffensiveEfficiency { get; init; }
+
+    public decimal IndexDefensiveEfficiency { get; init; }
+
+    public decimal IndexShotsPerGame { get; init; }
+
+    public decimal IndexShotsPerGoal { get; init; }
+
     public bool IsHomeMatch { get; init; }
 
     public int ClubTablePosition { get; init; }
@@ -71,6 +93,30 @@ public sealed class TrainingFullContextDatasetRow
 
     public decimal ClubExpectedPoints { get; init; }
 
+    public decimal ClubPreviousOverallAverage { get; init; }
+
+    public decimal ClubRankingsHomeAverage { get; init; }
+
+    public decimal ClubRankingsAwayAverage { get; init; }
+
+    public decimal ClubHistoricalWinRate { get; init; }
+
+    public decimal ClubFavoriteWinProbability { get; init; }
+
+    public int ClubForecastExpectedResult { get; init; }
+
+    public int ClubForecastRiskScore { get; init; }
+
+    public decimal ClubPositionDistributionValue { get; init; }
+
+    public decimal ClubAverageInsightConfidence { get; init; }
+
+    public int ClubPositiveInsightNet { get; init; }
+
+    public int ClubTeamTipsCount { get; init; }
+
+    public int ClubMatchTipsCount { get; init; }
+
     public decimal ClubPositionPointsConcededAverage { get; init; }
 
     public decimal ClubPositionPointsConqueredAverage { get; init; }
@@ -86,6 +132,30 @@ public sealed class TrainingFullContextDatasetRow
     public decimal OpponentMovingAverage { get; init; }
 
     public decimal OpponentExpectedPoints { get; init; }
+
+    public decimal OpponentPreviousOverallAverage { get; init; }
+
+    public decimal OpponentRankingsHomeAverage { get; init; }
+
+    public decimal OpponentRankingsAwayAverage { get; init; }
+
+    public decimal OpponentHistoricalWinRate { get; init; }
+
+    public decimal OpponentFavoriteWinProbability { get; init; }
+
+    public int OpponentForecastExpectedResult { get; init; }
+
+    public int OpponentForecastRiskScore { get; init; }
+
+    public decimal OpponentPositionDistributionValue { get; init; }
+
+    public decimal OpponentAverageInsightConfidence { get; init; }
+
+    public int OpponentPositiveInsightNet { get; init; }
+
+    public int OpponentTeamTipsCount { get; init; }
+
+    public int OpponentMatchTipsCount { get; init; }
 
     public decimal OpponentPositionPointsConcededAverage { get; init; }
 

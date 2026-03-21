@@ -119,6 +119,17 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             nameof(FullContextAthleteScoreTrainingRow.AwayAverageScore),
             nameof(FullContextAthleteScoreTrainingRow.PriceNum),
             nameof(FullContextAthleteScoreTrainingRow.VariationNum),
+            nameof(FullContextAthleteScoreTrainingRow.TeamAverageScore),
+            nameof(FullContextAthleteScoreTrainingRow.PointsPerCartoletaCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.GrossOverallMovingAverageCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.NetOverallMovingAverageCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.ValuationCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.MinimumToAppreciateCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.IndexPointsPerCartoleta),
+            nameof(FullContextAthleteScoreTrainingRow.IndexOffensiveEfficiency),
+            nameof(FullContextAthleteScoreTrainingRow.IndexDefensiveEfficiency),
+            nameof(FullContextAthleteScoreTrainingRow.IndexShotsPerGame),
+            nameof(FullContextAthleteScoreTrainingRow.IndexShotsPerGoal),
             nameof(FullContextAthleteScoreTrainingRow.IsHomeMatch),
             nameof(FullContextAthleteScoreTrainingRow.ClubTablePosition),
             nameof(FullContextAthleteScoreTrainingRow.OpponentClubTablePosition),
@@ -128,6 +139,18 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             nameof(FullContextAthleteScoreTrainingRow.ClubOverallAverage),
             nameof(FullContextAthleteScoreTrainingRow.ClubMovingAverage),
             nameof(FullContextAthleteScoreTrainingRow.ClubExpectedPoints),
+            nameof(FullContextAthleteScoreTrainingRow.ClubPreviousOverallAverage),
+            nameof(FullContextAthleteScoreTrainingRow.ClubRankingsHomeAverage),
+            nameof(FullContextAthleteScoreTrainingRow.ClubRankingsAwayAverage),
+            nameof(FullContextAthleteScoreTrainingRow.ClubHistoricalWinRate),
+            nameof(FullContextAthleteScoreTrainingRow.ClubFavoriteWinProbability),
+            nameof(FullContextAthleteScoreTrainingRow.ClubForecastExpectedResult),
+            nameof(FullContextAthleteScoreTrainingRow.ClubForecastRiskScore),
+            nameof(FullContextAthleteScoreTrainingRow.ClubPositionDistributionValue),
+            nameof(FullContextAthleteScoreTrainingRow.ClubAverageInsightConfidence),
+            nameof(FullContextAthleteScoreTrainingRow.ClubPositiveInsightNet),
+            nameof(FullContextAthleteScoreTrainingRow.ClubTeamTipsCount),
+            nameof(FullContextAthleteScoreTrainingRow.ClubMatchTipsCount),
             nameof(FullContextAthleteScoreTrainingRow.ClubPositionPointsConcededAverage),
             nameof(FullContextAthleteScoreTrainingRow.ClubPositionPointsConqueredAverage),
             nameof(FullContextAthleteScoreTrainingRow.OpponentWinProbability),
@@ -136,6 +159,18 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             nameof(FullContextAthleteScoreTrainingRow.OpponentOverallAverage),
             nameof(FullContextAthleteScoreTrainingRow.OpponentMovingAverage),
             nameof(FullContextAthleteScoreTrainingRow.OpponentExpectedPoints),
+            nameof(FullContextAthleteScoreTrainingRow.OpponentPreviousOverallAverage),
+            nameof(FullContextAthleteScoreTrainingRow.OpponentRankingsHomeAverage),
+            nameof(FullContextAthleteScoreTrainingRow.OpponentRankingsAwayAverage),
+            nameof(FullContextAthleteScoreTrainingRow.OpponentHistoricalWinRate),
+            nameof(FullContextAthleteScoreTrainingRow.OpponentFavoriteWinProbability),
+            nameof(FullContextAthleteScoreTrainingRow.OpponentForecastExpectedResult),
+            nameof(FullContextAthleteScoreTrainingRow.OpponentForecastRiskScore),
+            nameof(FullContextAthleteScoreTrainingRow.OpponentPositionDistributionValue),
+            nameof(FullContextAthleteScoreTrainingRow.OpponentAverageInsightConfidence),
+            nameof(FullContextAthleteScoreTrainingRow.OpponentPositiveInsightNet),
+            nameof(FullContextAthleteScoreTrainingRow.OpponentTeamTipsCount),
+            nameof(FullContextAthleteScoreTrainingRow.OpponentMatchTipsCount),
             nameof(FullContextAthleteScoreTrainingRow.OpponentPositionPointsConcededAverage),
             nameof(FullContextAthleteScoreTrainingRow.OpponentPositionPointsConqueredAverage),
         };
@@ -174,6 +209,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
         var athleteQuery = dbContext.AthleteRounds
             .AsNoTracking()
             .Include(item => item.Club)
+            .Include(item => item.Context)
             .Include(item => item.Position)
             .Include(item => item.Status)
             .Where(item =>

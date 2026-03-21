@@ -55,6 +55,295 @@ public sealed class GatoMestreSyncServiceTests
     }
 
     [Fact]
+    public async Task SyncRoundAsync_PersistsExtendedAthleteAndClubContexts_WhenOptionalPayloadsAreAvailable()
+    {
+        await using var dbContext = CreateDbContext();
+        var failureLogService = new FakeIntegrationFailureLogService();
+        var syncExecutionLogService = new FakeSyncExecutionLogService();
+        var service = new GatoMestreSyncService(dbContext, new FakeGatoMestreApiClient
+        {
+            Teams = new Dictionary<int, GatoMestreTeamResponse>
+            {
+                [284] = CreateTeam(284, "GRE", "gremio", "Grêmio"),
+                [287] = CreateTeam(287, "VIT", "vitoria", "Vitória"),
+            },
+            AthletesRound = new GatoMestreAthletesRoundResponse
+            {
+                Result =
+                [
+                    new GatoMestreAthleteRoundSummaryResponse
+                    {
+                        AthleteId = 72951,
+                        Games = JsonDocument.Parse("""{"geral":1,"mandante":1,"visitante":0}""").RootElement.Clone(),
+                        Averages = JsonDocument.Parse("""{"geral":{"movel":{"num":2.4},"total":{"num":2.4}},"mandante":{"total":{"num":2.4}},"visitante":{"total":{"num":0}}}""").RootElement.Clone(),
+                        Points = JsonDocument.Parse("""{"num":2.4,"variacao":0.3}""").RootElement.Clone(),
+                        Price = JsonDocument.Parse("""{"valor":5.1,"valorizacao":0.3}""").RootElement.Clone(),
+                    }
+                ],
+            },
+            AthleteDetails = new Dictionary<int, GatoMestreAthleteDetailResponse>
+            {
+                [72951] = new()
+                {
+                    Athlete = new GatoMestreAthleteProfileResponse
+                    {
+                        AthleteId = 72951,
+                        TeamId = 284,
+                        Name = "Mercado",
+                        PopularName = "Mercado",
+                        Nickname = "Mercado",
+                        Position = new GatoMestrePositionDescriptorResponse
+                        {
+                            Macro = "ZAG",
+                            Sigla = "ZAG",
+                            Description = "Zagueiro",
+                        },
+                    },
+                    Team = CreateTeam(284, "GRE", "gremio", "Grêmio"),
+                    Rounds =
+                    [
+                        new GatoMestreAthleteRoundDetailResponse
+                        {
+                            Round = 1,
+                            WasInGame = true,
+                            GamesCount = 1,
+                            StatusName = "Provável",
+                            Price = new GatoMestrePriceSnapshotResponse { Num = 5.1m, Variation = 0.3m },
+                            Points = new GatoMestreNumericSnapshotResponse { Num = 2.4m, Variation = 0.3m },
+                            Averages = new GatoMestreDetailedAveragesResponse
+                            {
+                                Overall = new GatoMestreAveragesBucketResponse
+                                {
+                                    Moving = new GatoMestreNumericSnapshotResponse { Num = 2.4m },
+                                    Total = new GatoMestreNumericSnapshotResponse { Num = 2.4m },
+                                },
+                                Home = new GatoMestreAveragesBucketResponse
+                                {
+                                    Total = new GatoMestreNumericSnapshotResponse { Num = 2.4m },
+                                },
+                                Away = new GatoMestreAveragesBucketResponse
+                                {
+                                    Total = new GatoMestreNumericSnapshotResponse { Num = 0m },
+                                },
+                            },
+                        }
+                    ],
+                },
+            },
+            AthleteRoundContents = new Dictionary<int, GatoMestreAthleteRoundContentResponse>
+            {
+                [72951] = new()
+                {
+                    AthleteId = 72951,
+                    TeamId = 284,
+                    TeamAverageScore = 27.16m,
+                    TeamHomeAverageCurrent = 30m,
+                    TeamHomeAveragePrevious = 28m,
+                    TeamAwayAverageCurrent = 24m,
+                    TeamAwayAveragePrevious = 20m,
+                    PointsPerCartoletaCurrent = 1.25m,
+                    PointsPerCartoletaPrevious = 0.95m,
+                    GrossOverallAverageCurrent = 5.3m,
+                    GrossOverallMovingAverageCurrent = 5.8m,
+                    GrossOverallAveragePrevious = 4.8m,
+                    GrossOverallMovingAveragePrevious = 4.2m,
+                    NetOverallAverageCurrent = 4.9m,
+                    NetOverallMovingAverageCurrent = 5.2m,
+                    NetOverallAveragePrevious = 4.1m,
+                    NetOverallMovingAveragePrevious = 3.9m,
+                    ValuationCurrent = 0.42m,
+                    MinimumToAppreciateCurrent = 4.11m,
+                    ValuationPrevious = -0.25m,
+                    MinimumToAppreciatePrevious = 3.74m,
+                    Indices =
+                    [
+                        new GatoMestreNamedMetricResponse { Key = "ipc", Value = 1.25m },
+                        new GatoMestreNamedMetricResponse { Key = "ieo", Value = 4.75m },
+                        new GatoMestreNamedMetricResponse { Key = "ied", Value = 7.80m },
+                        new GatoMestreNamedMetricResponse { Key = "fj", Value = 0.60m },
+                        new GatoMestreNamedMetricResponse { Key = "fg", Value = 0.30m },
+                    ],
+                },
+            },
+            ClubConfrontations = new Dictionary<int, GatoMestreClubConfrontationResponse>
+            {
+                [284] = new()
+                {
+                    Round = 1,
+                    Home = CreateClubBlock(284, "mandante", 53m, 21m, 49m, 45m, 47m, [(3, 8m, 12m), (5, 14m, 22m)]),
+                    Away = CreateClubBlock(287, "visitante", 53m, 21m, 35m, 40m, 38m, [(3, 9m, 8m), (5, 16m, 10m)]),
+                },
+                [287] = new()
+                {
+                    Round = 1,
+                    Home = CreateClubBlock(284, "mandante", 53m, 21m, 49m, 45m, 47m, [(3, 8m, 12m), (5, 14m, 22m)]),
+                    Away = CreateClubBlock(287, "visitante", 53m, 21m, 35m, 40m, 38m, [(3, 9m, 8m), (5, 16m, 10m)]),
+                },
+            },
+            FavoriteMatches = new()
+            {
+                Result =
+                [
+                    new GatoMestreFavoriteMatchResponse
+                    {
+                        HomeTeam = new GatoMestreSimpleTeamReferenceResponse { Abbreviation = "GRE", Name = "Grêmio" },
+                        AwayTeam = new GatoMestreSimpleTeamReferenceResponse { Abbreviation = "VIT", Name = "Vitória" },
+                        Odds = new GatoMestreFavoriteMatchOddsResponse { WinProbability = 53m, DrawProbability = 31m, LoseProbability = 16m },
+                    },
+                ],
+            },
+            MatchForecasts = new()
+            {
+                Result =
+                [
+                    new GatoMestreForecastMatchResponse
+                    {
+                        HomeTeam = new GatoMestreSimpleTeamReferenceResponse { Abbreviation = "GRE", Name = "Grêmio" },
+                        AwayTeam = new GatoMestreSimpleTeamReferenceResponse { Abbreviation = "VIT", Name = "Vitória" },
+                        ResultCode = 1,
+                        RiskLevel = "baixo",
+                    },
+                ],
+            },
+            ClubAverageRankings = new()
+            {
+                Result =
+                [
+                    new GatoMestreClubAverageRankingResponse
+                    {
+                        ClubId = "284",
+                        Averages = new GatoMestreClubAverageRankingBucketsResponse
+                        {
+                            Overall = new GatoMestreAveragesBucketResponse
+                            {
+                                Total = new GatoMestreNumericSnapshotResponse { Num = 55m },
+                                Moving = new GatoMestreNumericSnapshotResponse { Num = 57m },
+                            },
+                            Home = new GatoMestreAveragesBucketResponse
+                            {
+                                Total = new GatoMestreNumericSnapshotResponse { Num = 61m },
+                                Moving = new GatoMestreNumericSnapshotResponse { Num = 62m },
+                            },
+                            Away = new GatoMestreAveragesBucketResponse
+                            {
+                                Total = new GatoMestreNumericSnapshotResponse { Num = 49m },
+                                Moving = new GatoMestreNumericSnapshotResponse { Num = 50m },
+                            },
+                        },
+                    },
+                ],
+            },
+            RoundTips = new()
+            {
+                Result =
+                [
+                    new GatoMestreTipItemResponse
+                    {
+                        Hot = true,
+                        Type = "team",
+                        Info = JsonDocument.Parse("""{"team_id":284}""").RootElement.Clone(),
+                    },
+                    new GatoMestreTipItemResponse
+                    {
+                        Hot = false,
+                        Type = "match",
+                        Info = JsonDocument.Parse("""{"homeTeam":{"abbr":"GRE"},"awayTeam":{"abbr":"VIT"}}""").RootElement.Clone(),
+                    },
+                    new GatoMestreTipItemResponse
+                    {
+                        Hot = true,
+                        Type = "insight",
+                        Info = JsonDocument.Parse("""{"homeTeam":{"abbr":"GRE"},"awayTeam":{"abbr":"VIT"},"confidence":0.8,"verdict":"home_win"}""").RootElement.Clone(),
+                    },
+                ],
+            },
+        }, failureLogService, syncExecutionLogService);
+
+        var result = await service.SyncRoundAsync(2026, 1);
+
+        var athleteRound = await dbContext.AthleteRounds.Include(item => item.Context).SingleAsync();
+        var homeClubRound = await dbContext.ClubRounds
+            .Include(item => item.Context)
+            .Include(item => item.PositionStats)
+            .SingleAsync(item => item.Club.CartolaId == 284);
+
+        Assert.Equal(SyncExecutionStatus.Success, result.Status);
+        Assert.NotNull(athleteRound.Context);
+        Assert.Equal(27.16m, athleteRound.Context!.TeamAverageScore);
+        Assert.Equal(1.25m, athleteRound.Context.IndexPointsPerCartoleta);
+        Assert.Equal(4.75m, athleteRound.Context.IndexOffensiveEfficiency);
+        Assert.NotNull(homeClubRound.Context);
+        Assert.Equal(44m, homeClubRound.Context!.PreviousOverallAverage);
+        Assert.Equal(61m, homeClubRound.Context.RankingsHomeAverage);
+        Assert.Equal(53m, homeClubRound.Context.FavoriteWinProbability);
+        Assert.Equal(1, homeClubRound.Context.ForecastExpectedResult);
+        Assert.Equal("baixo", homeClubRound.Context.ForecastRiskLevel);
+        Assert.Equal(1, homeClubRound.Context.TeamTipsCount);
+        Assert.Equal(1, homeClubRound.Context.MatchTipsCount);
+        Assert.Equal(1, homeClubRound.Context.InsightCount);
+        Assert.Equal(1, homeClubRound.Context.PositiveInsightCount);
+        Assert.Equal(0, homeClubRound.Context.NegativeInsightCount);
+        Assert.Contains(homeClubRound.PositionStats, item => item.PositionId == 3 && item.DistributionValue > 0);
+    }
+
+    [Fact]
+    public async Task SyncRoundAsync_LogsOptionalEndpointWarningsAndKeepsCoreClubData_WhenOptionalPayloadsFail()
+    {
+        await using var dbContext = CreateDbContext();
+        var failureLogService = new FakeIntegrationFailureLogService();
+        var syncExecutionLogService = new FakeSyncExecutionLogService();
+        var service = new GatoMestreSyncService(dbContext, new FakeGatoMestreApiClient
+        {
+            Teams = new Dictionary<int, GatoMestreTeamResponse>
+            {
+                [284] = CreateTeam(284, "GRE", "gremio", "GrÃªmio"),
+                [287] = CreateTeam(287, "VIT", "vitoria", "VitÃ³ria"),
+            },
+            AthletesRound = new GatoMestreAthletesRoundResponse(),
+            ClubConfrontations = new Dictionary<int, GatoMestreClubConfrontationResponse>
+            {
+                [284] = new()
+                {
+                    Round = 1,
+                    Home = CreateClubBlock(284, "mandante", 53m, 21m, 49m, 45m, 47m, [(3, 8m, 12m), (5, 14m, 22m)]),
+                    Away = CreateClubBlock(287, "visitante", 53m, 21m, 35m, 40m, 38m, [(3, 9m, 8m), (5, 16m, 10m)]),
+                },
+                [287] = new()
+                {
+                    Round = 1,
+                    Home = CreateClubBlock(284, "mandante", 53m, 21m, 49m, 45m, 47m, [(3, 8m, 12m), (5, 14m, 22m)]),
+                    Away = CreateClubBlock(287, "visitante", 53m, 21m, 35m, 40m, 38m, [(3, 9m, 8m), (5, 16m, 10m)]),
+                },
+            },
+            ThrowRoundTips = CreateOptionalPayloadException("https://api.gatomestre.globo.com/api/v2/dicas/2026/campeonato-brasileiro/rodadas/1?a=true"),
+            ThrowFavoriteMatches = CreateOptionalPayloadException("https://api.gatomestre.globo.com/api/v2/equipes/2026/campeonato-brasileiro/favoritos/rodadas/1?a=true"),
+            ThrowMatchForecasts = CreateOptionalPayloadException("https://api.gatomestre.globo.com/api/v2/equipes/2026/campeonato-brasileiro/previsoes/rodadas/1?a=true"),
+            ThrowClubAverageRankings = CreateOptionalPayloadException("https://api.gatomestre.globo.com/api/v2/rankings/2026/campeonato-brasileiro/clubes/medias/rodadas/1?a=true"),
+        }, failureLogService, syncExecutionLogService);
+
+        var result = await service.SyncRoundAsync(2026, 1);
+
+        var clubRounds = await dbContext.ClubRounds
+            .Include(item => item.Context)
+            .Include(item => item.PositionStats)
+            .OrderBy(item => item.ClubId)
+            .ToListAsync();
+
+        Assert.Equal(SyncExecutionStatus.Partial, result.Status);
+        Assert.True(result.IsPartialSync);
+        Assert.True(result.ClubRoundDataAvailable);
+        Assert.Equal(2, result.ClubRoundsUpserted);
+        Assert.Equal(4, result.ClubRoundPositionsUpserted);
+        Assert.Equal(4, failureLogService.Entries.Count);
+        Assert.Equal(4, syncExecutionLogService.UpdatedEntries.Single().Entry.WarningLogsCount);
+        Assert.Contains("tip-based club enrichment was skipped", result.Notes, StringComparison.OrdinalIgnoreCase);
+        Assert.All(clubRounds, round => Assert.NotNull(round.Context));
+        Assert.All(clubRounds, round => Assert.True(round.Context!.PreviousOverallAverage > 0m));
+        Assert.All(clubRounds, round => Assert.Equal(0m, round.Context!.FavoriteWinProbability));
+        Assert.All(clubRounds, round => Assert.Equal(0, round.Context!.TeamTipsCount));
+    }
+
+    [Fact]
     public async Task SyncRoundAsync_CreatesAthleteRoundFromDetailFallback_WhenRoundRowDoesNotExist()
     {
         await using var dbContext = CreateDbContext();
@@ -543,6 +832,7 @@ public sealed class GatoMestreSyncServiceTests
         {
             TeamId = teamId,
             OverallAverage = overallAverage,
+            PreviousOverallAverage = overallAverage - 1m,
             MovingAverage = movingAverage,
             NextConfrontation = new GatoMestreNextConfrontationResponse
             {
@@ -560,8 +850,51 @@ public sealed class GatoMestreSyncServiceTests
                 Home = mappedStats,
                 Away = mappedStats,
             },
+            PointsBalance = new GatoMestreClubPointsBalanceResponse
+            {
+                OverallPointsConcededAverage = stats.Sum(item => item.Ceded),
+                OverallPointsConqueredAverage = stats.Sum(item => item.Conquered),
+                HomePointsConcededAverage = stats.Sum(item => item.Ceded) / Math.Max(1, stats.Count),
+                HomePointsConqueredAverage = stats.Sum(item => item.Conquered) / Math.Max(1, stats.Count),
+                AwayPointsConcededAverage = stats.Sum(item => item.Ceded) / Math.Max(1, stats.Count),
+                AwayPointsConqueredAverage = stats.Sum(item => item.Conquered) / Math.Max(1, stats.Count),
+            },
+            PositionDistribution = stats.Select(item => new GatoMestrePositionDistributionResponse
+            {
+                PositionId = item.PositionId,
+                Value = item.PositionId * 0.1m,
+            }).ToList(),
+            Performance = new GatoMestreClubPerformanceResponse
+            {
+                Wins = new GatoMestreHistoricalResultResponse
+                {
+                    Rate = new GatoMestreHistoricalRateBucketResponse { Overall = 48m, Home = 60m, Away = 36m },
+                },
+                Draws = new GatoMestreHistoricalResultResponse
+                {
+                    Rate = new GatoMestreHistoricalRateBucketResponse { Overall = 26m, Home = 20m, Away = 32m },
+                },
+                Losses = new GatoMestreHistoricalResultResponse
+                {
+                    Rate = new GatoMestreHistoricalRateBucketResponse { Overall = 26m, Home = 20m, Away = 32m },
+                },
+            },
         };
     }
+
+    private static ExternalApiException CreateOptionalPayloadException(string requestUrl)
+        => new(
+            sourceSystem: "GatoMestre",
+            errorLocation: "GatoMestreApiClient.GetRequiredAsync",
+            requestMethod: "GET",
+            requestUrl: requestUrl,
+            requestHeadersJson: "{}",
+            requestPayload: string.Empty,
+            responseStatusCode: 500,
+            responseReasonPhrase: "Internal Server Error",
+            responseHeadersJson: "{}",
+            responsePayload: """{"error":true,"message":"Synthetic optional payload failure"}""",
+            message: "The Gato Mestre API returned an application error for an optional round endpoint.");
 
     private sealed class FakeGatoMestreApiClient : IGatoMestreApiClient
     {
@@ -571,13 +904,33 @@ public sealed class GatoMestreSyncServiceTests
 
         public Dictionary<int, GatoMestreAthleteDetailResponse> AthleteDetails { get; init; } = [];
 
+        public Dictionary<int, GatoMestreAthleteRoundContentResponse> AthleteRoundContents { get; init; } = [];
+
         public Dictionary<int, GatoMestreClubConfrontationResponse> ClubConfrontations { get; init; } = [];
+
+        public GatoMestreRoundCollectionResponse<GatoMestreTipItemResponse> RoundTips { get; init; } = new();
+
+        public GatoMestreRoundCollectionResponse<GatoMestreFavoriteMatchResponse> FavoriteMatches { get; init; } = new();
+
+        public GatoMestreRoundCollectionResponse<GatoMestreForecastMatchResponse> MatchForecasts { get; init; } = new();
+
+        public GatoMestreRoundCollectionResponse<GatoMestreClubAverageRankingResponse> ClubAverageRankings { get; init; } = new();
 
         public ExternalApiException? ThrowAthletesRound { get; init; }
 
         public ExternalApiException? ThrowAthleteDetail { get; init; }
 
+        public ExternalApiException? ThrowAthleteRoundContent { get; init; }
+
         public ExternalApiException? ThrowClubConfrontation { get; init; }
+
+        public ExternalApiException? ThrowRoundTips { get; init; }
+
+        public ExternalApiException? ThrowFavoriteMatches { get; init; }
+
+        public ExternalApiException? ThrowMatchForecasts { get; init; }
+
+        public ExternalApiException? ThrowClubAverageRankings { get; init; }
 
         public Task<Dictionary<int, GatoMestreTeamResponse>> GetTeamsAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(Teams);
@@ -602,6 +955,18 @@ public sealed class GatoMestreSyncServiceTests
             return Task.FromResult(AthleteDetails[athleteId]);
         }
 
+        public Task<GatoMestreAthleteRoundContentResponse> GetAthleteRoundContentAsync(int athleteId, int round, CancellationToken cancellationToken = default)
+        {
+            if (ThrowAthleteRoundContent is not null)
+            {
+                throw ThrowAthleteRoundContent;
+            }
+
+            return Task.FromResult(AthleteRoundContents.TryGetValue(athleteId, out var content)
+                ? content
+                : new GatoMestreAthleteRoundContentResponse());
+        }
+
         public Task<GatoMestreClubConfrontationResponse> GetClubConfrontationAsync(int clubId, CancellationToken cancellationToken = default)
         {
             if (ThrowClubConfrontation is not null)
@@ -612,6 +977,46 @@ public sealed class GatoMestreSyncServiceTests
             return Task.FromResult(ClubConfrontations.TryGetValue(clubId, out var confrontation)
                 ? confrontation
                 : new GatoMestreClubConfrontationResponse());
+        }
+
+        public Task<GatoMestreRoundCollectionResponse<GatoMestreTipItemResponse>> GetRoundTipsAsync(int season, int round, CancellationToken cancellationToken = default)
+        {
+            if (ThrowRoundTips is not null)
+            {
+                throw ThrowRoundTips;
+            }
+
+            return Task.FromResult(RoundTips);
+        }
+
+        public Task<GatoMestreRoundCollectionResponse<GatoMestreFavoriteMatchResponse>> GetFavoriteMatchesAsync(int season, int round, CancellationToken cancellationToken = default)
+        {
+            if (ThrowFavoriteMatches is not null)
+            {
+                throw ThrowFavoriteMatches;
+            }
+
+            return Task.FromResult(FavoriteMatches);
+        }
+
+        public Task<GatoMestreRoundCollectionResponse<GatoMestreForecastMatchResponse>> GetMatchForecastsAsync(int season, int round, CancellationToken cancellationToken = default)
+        {
+            if (ThrowMatchForecasts is not null)
+            {
+                throw ThrowMatchForecasts;
+            }
+
+            return Task.FromResult(MatchForecasts);
+        }
+
+        public Task<GatoMestreRoundCollectionResponse<GatoMestreClubAverageRankingResponse>> GetClubAverageRankingsAsync(int season, int round, CancellationToken cancellationToken = default)
+        {
+            if (ThrowClubAverageRankings is not null)
+            {
+                throw ThrowClubAverageRankings;
+            }
+
+            return Task.FromResult(ClubAverageRankings);
         }
     }
 

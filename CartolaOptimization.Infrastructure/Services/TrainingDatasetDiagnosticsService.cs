@@ -204,6 +204,7 @@ public sealed class TrainingDatasetDiagnosticsService(AppDbContext dbContext) : 
                 .AsNoTracking()
                 .Include(item => item.Athlete)
                 .Include(item => item.Club)
+                .Include(item => item.Context)
                 .Include(item => item.Position)
                 .Include(item => item.Status),
             fromRound,
@@ -275,6 +276,7 @@ public sealed class TrainingDatasetDiagnosticsService(AppDbContext dbContext) : 
                     .AsNoTracking()
                     .Include(item => item.Athlete)
                     .Include(item => item.Club)
+                    .Include(item => item.Context)
                     .Include(item => item.Position)
                     .Include(item => item.Status),
                 fromRound,
@@ -303,6 +305,7 @@ public sealed class TrainingDatasetDiagnosticsService(AppDbContext dbContext) : 
         var clubRounds = await dbContext.ClubRounds
             .AsNoTracking()
             .Include(item => item.Club)
+            .Include(item => item.Context)
             .Include(item => item.PositionStats)
             .Where(item => rounds.Contains(item.Round))
             .ToListAsync(cancellationToken);
@@ -384,6 +387,17 @@ public sealed class TrainingDatasetDiagnosticsService(AppDbContext dbContext) : 
                 AwayAverageScore = athleteRound.AwayAverageScore,
                 PriceNum = athleteRound.PriceNum,
                 VariationNum = athleteRound.VariationNum,
+                TeamAverageScore = athleteRound.Context?.TeamAverageScore ?? 0m,
+                PointsPerCartoletaCurrent = athleteRound.Context?.PointsPerCartoletaCurrent ?? 0m,
+                GrossOverallMovingAverageCurrent = athleteRound.Context?.GrossOverallMovingAverageCurrent ?? 0m,
+                NetOverallMovingAverageCurrent = athleteRound.Context?.NetOverallMovingAverageCurrent ?? 0m,
+                ValuationCurrent = athleteRound.Context?.ValuationCurrent ?? 0m,
+                MinimumToAppreciateCurrent = athleteRound.Context?.MinimumToAppreciateCurrent ?? 0m,
+                IndexPointsPerCartoleta = athleteRound.Context?.IndexPointsPerCartoleta ?? 0m,
+                IndexOffensiveEfficiency = athleteRound.Context?.IndexOffensiveEfficiency ?? 0m,
+                IndexDefensiveEfficiency = athleteRound.Context?.IndexDefensiveEfficiency ?? 0m,
+                IndexShotsPerGame = athleteRound.Context?.IndexShotsPerGame ?? 0m,
+                IndexShotsPerGoal = athleteRound.Context?.IndexShotsPerGoal ?? 0m,
                 IsHomeMatch = isHomeMatch,
                 ClubTablePosition = clubTablePosition,
                 OpponentClubCartolaId = opponentClubCartolaId,
@@ -397,6 +411,18 @@ public sealed class TrainingDatasetDiagnosticsService(AppDbContext dbContext) : 
                 ClubOverallAverage = clubRound.OverallAverage,
                 ClubMovingAverage = clubRound.MovingAverage,
                 ClubExpectedPoints = clubRound.ExpectedPoints,
+                ClubPreviousOverallAverage = clubRound.Context?.PreviousOverallAverage ?? 0m,
+                ClubRankingsHomeAverage = clubRound.Context?.RankingsHomeAverage ?? 0m,
+                ClubRankingsAwayAverage = clubRound.Context?.RankingsAwayAverage ?? 0m,
+                ClubHistoricalWinRate = clubRound.Context?.HistoricalWinRate ?? 0m,
+                ClubFavoriteWinProbability = clubRound.Context?.FavoriteWinProbability ?? 0m,
+                ClubForecastExpectedResult = clubRound.Context?.ForecastExpectedResult ?? 0,
+                ClubForecastRiskScore = MapRiskLevelToScore(clubRound.Context?.ForecastRiskLevel),
+                ClubPositionDistributionValue = clubPositionStats.DistributionValue,
+                ClubAverageInsightConfidence = clubRound.Context?.AverageInsightConfidence ?? 0m,
+                ClubPositiveInsightNet = (clubRound.Context?.PositiveInsightCount ?? 0) - (clubRound.Context?.NegativeInsightCount ?? 0),
+                ClubTeamTipsCount = clubRound.Context?.TeamTipsCount ?? 0,
+                ClubMatchTipsCount = clubRound.Context?.MatchTipsCount ?? 0,
                 ClubPositionPointsConcededAverage = clubPositionStats.PointsConcededAverage,
                 ClubPositionPointsConqueredAverage = clubPositionStats.PointsConqueredAverage,
                 OpponentWinProbability = opponentClubRound.WinProbability,
@@ -405,6 +431,18 @@ public sealed class TrainingDatasetDiagnosticsService(AppDbContext dbContext) : 
                 OpponentOverallAverage = opponentClubRound.OverallAverage,
                 OpponentMovingAverage = opponentClubRound.MovingAverage,
                 OpponentExpectedPoints = opponentClubRound.ExpectedPoints,
+                OpponentPreviousOverallAverage = opponentClubRound.Context?.PreviousOverallAverage ?? 0m,
+                OpponentRankingsHomeAverage = opponentClubRound.Context?.RankingsHomeAverage ?? 0m,
+                OpponentRankingsAwayAverage = opponentClubRound.Context?.RankingsAwayAverage ?? 0m,
+                OpponentHistoricalWinRate = opponentClubRound.Context?.HistoricalWinRate ?? 0m,
+                OpponentFavoriteWinProbability = opponentClubRound.Context?.FavoriteWinProbability ?? 0m,
+                OpponentForecastExpectedResult = opponentClubRound.Context?.ForecastExpectedResult ?? 0,
+                OpponentForecastRiskScore = MapRiskLevelToScore(opponentClubRound.Context?.ForecastRiskLevel),
+                OpponentPositionDistributionValue = opponentPositionStats.DistributionValue,
+                OpponentAverageInsightConfidence = opponentClubRound.Context?.AverageInsightConfidence ?? 0m,
+                OpponentPositiveInsightNet = (opponentClubRound.Context?.PositiveInsightCount ?? 0) - (opponentClubRound.Context?.NegativeInsightCount ?? 0),
+                OpponentTeamTipsCount = opponentClubRound.Context?.TeamTipsCount ?? 0,
+                OpponentMatchTipsCount = opponentClubRound.Context?.MatchTipsCount ?? 0,
                 OpponentPositionPointsConcededAverage = opponentPositionStats.PointsConcededAverage,
                 OpponentPositionPointsConqueredAverage = opponentPositionStats.PointsConqueredAverage,
                 TargetScore = athleteRound.ScoreNum,
@@ -509,5 +547,17 @@ public sealed class TrainingDatasetDiagnosticsService(AppDbContext dbContext) : 
         }
 
         return Math.Round((decimal)numerator / denominator * 100m, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static int MapRiskLevelToScore(string? riskLevel)
+    {
+        return (riskLevel ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "baixo" => 1,
+            "medio" => 2,
+            "médio" => 2,
+            "alto" => 3,
+            _ => 0,
+        };
     }
 }

@@ -109,5 +109,10 @@
         /// Gets or sets the PositionStats
         /// </summary>
         public ICollection<ClubRoundPosition> PositionStats { get; set; } = [];
+
+        /// <summary>
+        /// Gets or sets additional club-round enrichment collected from Gato Mestre.
+        /// </summary>
+        public ClubRoundContext? Context { get; set; }
     }
 }

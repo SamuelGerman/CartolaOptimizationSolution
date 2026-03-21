@@ -91,6 +91,34 @@ public sealed class GatoMestreSyncService(
                     cancellationToken);
             }
 
+            var roundTipsPayload = await TryLoadOptionalRoundPayloadAsync(
+                () => gatoMestreApiClient.GetRoundTipsAsync(season, round, cancellationToken),
+                executionContext,
+                $"The tips endpoint could not be loaded for round {round}, so tip-based club enrichment was skipped.",
+                "Load round tips payload",
+                cancellationToken);
+
+            var favoriteMatchesPayload = await TryLoadOptionalRoundPayloadAsync(
+                () => gatoMestreApiClient.GetFavoriteMatchesAsync(season, round, cancellationToken),
+                executionContext,
+                $"The favorites endpoint could not be loaded for round {round}, so favorite-odds club enrichment was skipped.",
+                "Load favorite matches payload",
+                cancellationToken);
+
+            var matchForecastsPayload = await TryLoadOptionalRoundPayloadAsync(
+                () => gatoMestreApiClient.GetMatchForecastsAsync(season, round, cancellationToken),
+                executionContext,
+                $"The forecasts endpoint could not be loaded for round {round}, so forecast-risk club enrichment was skipped.",
+                "Load match forecasts payload",
+                cancellationToken);
+
+            var clubAverageRankingsPayload = await TryLoadOptionalRoundPayloadAsync(
+                () => gatoMestreApiClient.GetClubAverageRankingsAsync(season, round, cancellationToken),
+                executionContext,
+                $"The club rankings endpoint could not be loaded for round {round}, so ranking-based club enrichment was skipped.",
+                "Load club average rankings payload",
+                cancellationToken);
+
             executionContext.MarkStep("Begin database transaction");
             transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
@@ -107,7 +135,15 @@ public sealed class GatoMestreSyncService(
             await dbContext.SaveChangesAsync(cancellationToken);
 
             executionContext.MarkStep("Upsert club rounds");
-            var clubRoundResult = await UpsertClubRoundsAsync(round, clubs, executionContext, cancellationToken);
+            var clubRoundResult = await UpsertClubRoundsAsync(
+                round,
+                clubs,
+                executionContext,
+                favoriteMatchesPayload.Payload,
+                matchForecastsPayload.Payload,
+                clubAverageRankingsPayload.Payload,
+                roundTipsPayload.Payload,
+                cancellationToken);
 
             executionContext.MarkStep("Upsert athlete rounds");
             var athleteRoundResult = await UpsertAthleteRoundsAsync(round, athletesRoundPayload.Result, clubs, clubRoundResult.AvailableClubIds, executionContext, cancellationToken);
@@ -126,13 +162,32 @@ public sealed class GatoMestreSyncService(
             var qualityCriteriaSatisfied =
                 athleteRoundResult.AthleteCoverageRate >= MinimumHealthyCoverageRate &&
                 athleteSkippedRate <= MaximumHealthySkippedRate;
+            var optionalClubWarningLogsCount =
+                roundTipsPayload.WarningLogsCount +
+                favoriteMatchesPayload.WarningLogsCount +
+                matchForecastsPayload.WarningLogsCount +
+                clubAverageRankingsPayload.WarningLogsCount;
+            var optionalClubNotes = string.Join(
+                " ",
+                new[]
+                {
+                    roundTipsPayload.Note,
+                    favoriteMatchesPayload.Note,
+                    matchForecastsPayload.Note,
+                    clubAverageRankingsPayload.Note,
+                }.Where(note => !string.IsNullOrWhiteSpace(note)));
             var isPartialSync =
                 athleteRoundResult.AthleteRoundsSkipped > 0 ||
                 !clubRoundResult.DataAvailable ||
                 clubRoundResult.WarningLogsCount > 0 ||
+                optionalClubWarningLogsCount > 0 ||
+                !string.IsNullOrWhiteSpace(optionalClubNotes) ||
                 athleteRoundResult.AthleteFailuresLogged > 0;
             var executionStatus = isPartialSync ? SyncExecutionStatus.Partial : SyncExecutionStatus.Success;
-            var notes = BuildNotes(clubRoundResult.Note, clubRoundResult.WarningLogsCount, athleteRoundResult);
+            var notes = BuildNotes(
+                string.Join(" ", new[] { clubRoundResult.Note, optionalClubNotes }.Where(note => !string.IsNullOrWhiteSpace(note))),
+                clubRoundResult.WarningLogsCount + optionalClubWarningLogsCount,
+                athleteRoundResult);
             var metricsJson = JsonSerializer.Serialize(new
             {
                 ClubsUpserted = clubs.Count,
@@ -145,6 +200,10 @@ public sealed class GatoMestreSyncService(
                 AthleteCoverageRate = athleteRoundResult.AthleteCoverageRate,
                 AthleteSkippedRate = athleteSkippedRate,
                 ClubRoundDataAvailable = clubRoundResult.DataAvailable,
+                TipsDataAvailable = roundTipsPayload.Payload is not null,
+                FavoriteMatchesDataAvailable = favoriteMatchesPayload.Payload is not null,
+                MatchForecastsDataAvailable = matchForecastsPayload.Payload is not null,
+                ClubAverageRankingsDataAvailable = clubAverageRankingsPayload.Payload is not null,
             });
 
             if (syncExecutionId.HasValue)
@@ -176,7 +235,7 @@ public sealed class GatoMestreSyncService(
                         CoverageRate = athleteRoundResult.AthleteCoverageRate,
                         SkippedRate = athleteSkippedRate,
                         QualityCriteriaSatisfied = qualityCriteriaSatisfied,
-                        WarningLogsCount = clubRoundResult.WarningLogsCount + athleteRoundResult.AthleteFailuresLogged,
+                        WarningLogsCount = clubRoundResult.WarningLogsCount + optionalClubWarningLogsCount + athleteRoundResult.AthleteFailuresLogged,
                     },
                     cancellationToken);
             }
@@ -346,9 +405,24 @@ public sealed class GatoMestreSyncService(
         int requestedRound,
         IReadOnlyDictionary<int, Club> clubs,
         SyncExecutionContext executionContext,
+        GatoMestreRoundCollectionResponse<GatoMestreFavoriteMatchResponse>? favoriteMatchesPayload,
+        GatoMestreRoundCollectionResponse<GatoMestreForecastMatchResponse>? matchForecastsPayload,
+        GatoMestreRoundCollectionResponse<GatoMestreClubAverageRankingResponse>? clubAverageRankingsPayload,
+        GatoMestreRoundCollectionResponse<GatoMestreTipItemResponse>? roundTipsPayload,
         CancellationToken cancellationToken)
     {
         var positions = await dbContext.Positions.ToDictionaryAsync(position => position.CartolaId, cancellationToken);
+        var clubIdByAbbreviation = clubs.Values
+            .Where(club => !string.IsNullOrWhiteSpace(club.Abreviation))
+            .ToDictionary(club => Normalize(club.Abreviation), club => club.CartolaId);
+        var favoriteByClubCartolaId = BuildFavoriteContextByClub(favoriteMatchesPayload, clubIdByAbbreviation);
+        var forecastByClubCartolaId = BuildForecastContextByClub(matchForecastsPayload, clubIdByAbbreviation);
+        var rankingsByClubCartolaId = BuildAverageRankingByClub(clubAverageRankingsPayload);
+        var tipsSummaryByClubCartolaId = BuildTipSummaryByClub(roundTipsPayload, clubIdByAbbreviation);
+        var hasFavoritePayload = favoriteMatchesPayload is not null;
+        var hasForecastPayload = matchForecastsPayload is not null;
+        var hasRankingsPayload = clubAverageRankingsPayload is not null;
+        var hasTipsPayload = roundTipsPayload is not null;
         var processedClubRounds = 0;
         var processedPositionStats = 0;
         var dataAvailable = true;
@@ -426,6 +500,7 @@ public sealed class GatoMestreSyncService(
 
             var existingClubRound = await dbContext.ClubRounds
                 .Include(round => round.PositionStats)
+                .Include(round => round.Context)
                 .FirstOrDefaultAsync(round => round.Round == requestedRound && round.ClubId == club.Id, cancellationToken);
 
             if (existingClubRound is null)
@@ -459,6 +534,9 @@ public sealed class GatoMestreSyncService(
             existingClubRound.PositionStats ??= [];
             dbContext.ClubRoundPositions.RemoveRange(existingClubRound.PositionStats);
             existingClubRound.PositionStats.Clear();
+            var positionDistribution = clubBlock.PositionDistribution
+                .GroupBy(item => item.PositionId)
+                .ToDictionary(group => group.Key, group => group.Last().Value);
 
             foreach (var positionStat in ResolvePositionStats(clubBlock).OrderBy(item => item.PositionId))
             {
@@ -482,7 +560,8 @@ public sealed class GatoMestreSyncService(
                     existingClubRound.Id,
                     position.Id,
                     positionStat.PointsConcededAverage,
-                    positionStat.PointsConqueredAverage)
+                    positionStat.PointsConqueredAverage,
+                    positionDistribution.GetValueOrDefault(positionStat.PositionId))
                 {
                     ClubRound = existingClubRound,
                     Position = position,
@@ -490,6 +569,48 @@ public sealed class GatoMestreSyncService(
 
                 processedPositionStats++;
             }
+
+            existingClubRound.Context ??= new ClubRoundContext
+            {
+                ClubRound = existingClubRound,
+                ForecastRiskLevel = string.Empty,
+            };
+
+            var ranking = rankingsByClubCartolaId.GetValueOrDefault(club.CartolaId);
+            var favoriteContext = favoriteByClubCartolaId.GetValueOrDefault(club.CartolaId);
+            var forecastContext = forecastByClubCartolaId.GetValueOrDefault(club.CartolaId);
+            var tipSummary = tipsSummaryByClubCartolaId.GetValueOrDefault(club.CartolaId) ?? ClubTipSummary.Empty;
+
+            existingClubRound.Context.PreviousOverallAverage = clubBlock.PreviousOverallAverage;
+            existingClubRound.Context.RankingsOverallAverage = ranking is not null ? GetSnapshotValue(ranking.Averages.Overall.Total) : hasRankingsPayload ? 0m : existingClubRound.Context.RankingsOverallAverage;
+            existingClubRound.Context.RankingsMovingAverage = ranking is not null ? GetSnapshotValue(ranking.Averages.Overall.Moving) : hasRankingsPayload ? 0m : existingClubRound.Context.RankingsMovingAverage;
+            existingClubRound.Context.RankingsHomeAverage = ranking is not null ? GetSnapshotValue(ranking.Averages.Home.Total) : hasRankingsPayload ? 0m : existingClubRound.Context.RankingsHomeAverage;
+            existingClubRound.Context.RankingsHomeMovingAverage = ranking is not null ? GetSnapshotValue(ranking.Averages.Home.Moving) : hasRankingsPayload ? 0m : existingClubRound.Context.RankingsHomeMovingAverage;
+            existingClubRound.Context.RankingsAwayAverage = ranking is not null ? GetSnapshotValue(ranking.Averages.Away.Total) : hasRankingsPayload ? 0m : existingClubRound.Context.RankingsAwayAverage;
+            existingClubRound.Context.RankingsAwayMovingAverage = ranking is not null ? GetSnapshotValue(ranking.Averages.Away.Moving) : hasRankingsPayload ? 0m : existingClubRound.Context.RankingsAwayMovingAverage;
+            existingClubRound.Context.GeneralPointsConcededAverage = clubBlock.PointsBalance.OverallPointsConcededAverage;
+            existingClubRound.Context.GeneralPointsConqueredAverage = clubBlock.PointsBalance.OverallPointsConqueredAverage;
+            existingClubRound.Context.HomePointsConcededAverage = clubBlock.PointsBalance.HomePointsConcededAverage;
+            existingClubRound.Context.HomePointsConqueredAverage = clubBlock.PointsBalance.HomePointsConqueredAverage;
+            existingClubRound.Context.AwayPointsConcededAverage = clubBlock.PointsBalance.AwayPointsConcededAverage;
+            existingClubRound.Context.AwayPointsConqueredAverage = clubBlock.PointsBalance.AwayPointsConqueredAverage;
+            existingClubRound.Context.HistoricalWinRate = clubBlock.Performance.Wins.Rate.Overall;
+            existingClubRound.Context.HistoricalDrawRate = clubBlock.Performance.Draws.Rate.Overall;
+            existingClubRound.Context.HistoricalLossRate = clubBlock.Performance.Losses.Rate.Overall;
+            existingClubRound.Context.FavoriteWinProbability = favoriteContext is not null ? favoriteContext.WinProbability : hasFavoritePayload ? 0m : existingClubRound.Context.FavoriteWinProbability;
+            existingClubRound.Context.FavoriteDrawProbability = favoriteContext is not null ? favoriteContext.DrawProbability : hasFavoritePayload ? 0m : existingClubRound.Context.FavoriteDrawProbability;
+            existingClubRound.Context.FavoriteLoseProbability = favoriteContext is not null ? favoriteContext.LoseProbability : hasFavoritePayload ? 0m : existingClubRound.Context.FavoriteLoseProbability;
+            existingClubRound.Context.ForecastExpectedResult = forecastContext is not null ? forecastContext.ExpectedResult : hasForecastPayload ? 0 : existingClubRound.Context.ForecastExpectedResult;
+            existingClubRound.Context.ForecastRiskLevel = forecastContext is not null ? forecastContext.RiskLevel : hasForecastPayload ? string.Empty : existingClubRound.Context.ForecastRiskLevel;
+            existingClubRound.Context.TeamTipsCount = hasTipsPayload ? tipSummary.TeamTipsCount : existingClubRound.Context.TeamTipsCount;
+            existingClubRound.Context.HotTeamTipsCount = hasTipsPayload ? tipSummary.HotTeamTipsCount : existingClubRound.Context.HotTeamTipsCount;
+            existingClubRound.Context.MatchTipsCount = hasTipsPayload ? tipSummary.MatchTipsCount : existingClubRound.Context.MatchTipsCount;
+            existingClubRound.Context.HotMatchTipsCount = hasTipsPayload ? tipSummary.HotMatchTipsCount : existingClubRound.Context.HotMatchTipsCount;
+            existingClubRound.Context.InsightCount = hasTipsPayload ? tipSummary.InsightCount : existingClubRound.Context.InsightCount;
+            existingClubRound.Context.HotInsightCount = hasTipsPayload ? tipSummary.HotInsightCount : existingClubRound.Context.HotInsightCount;
+            existingClubRound.Context.AverageInsightConfidence = hasTipsPayload ? tipSummary.AverageInsightConfidence : existingClubRound.Context.AverageInsightConfidence;
+            existingClubRound.Context.PositiveInsightCount = hasTipsPayload ? tipSummary.PositiveInsightCount : existingClubRound.Context.PositiveInsightCount;
+            existingClubRound.Context.NegativeInsightCount = hasTipsPayload ? tipSummary.NegativeInsightCount : existingClubRound.Context.NegativeInsightCount;
 
             TrainingReadinessEvaluator.ApplyClubRoundReadiness(existingClubRound);
 
@@ -519,6 +640,7 @@ public sealed class GatoMestreSyncService(
         var athleteIds = athletesByCartolaId.Values.Select(athlete => athlete.Id).ToArray();
         var existingRounds = await dbContext.AthleteRounds
             .Include(roundEntity => roundEntity.Scouts)
+            .Include(roundEntity => roundEntity.Context)
             .Where(roundEntity => roundEntity.RoundId == round && athleteIds.Contains(roundEntity.AthleteId))
             .ToDictionaryAsync(roundEntity => roundEntity.AthleteId, cancellationToken);
 
@@ -662,6 +784,18 @@ public sealed class GatoMestreSyncService(
             athleteRound.VariationNum = ReadSummaryPriceVariation(summary.Price) ?? detailRound?.Price?.Variation ?? athleteRound.VariationNum;
             athleteRound.PriceNum = ReadSummaryPriceValue(summary.Price) ?? detailRound?.Price?.Num ?? athleteRound.PriceNum;
             athleteRound.WasInGame = detailRound?.WasInGame ?? athleteRound.WasInGame;
+
+            executionContext.MarkStep($"Load athlete round content payload for athlete {summary.AthleteId}");
+            try
+            {
+                var athleteRoundContent = await gatoMestreApiClient.GetAthleteRoundContentAsync(summary.AthleteId, round, cancellationToken);
+                UpsertAthleteRoundContext(athleteRound, athleteRoundContent);
+            }
+            catch (ExternalApiException exception)
+            {
+                athleteFailuresLogged += await TryLogNonFatalWarningAsync(executionContext, exception, cancellationToken);
+            }
+
             TrainingReadinessEvaluator.ApplyAthleteEnrichment(
                 athleteRound,
                 availableClubIdSet.Contains(athleteRound.ClubId));
@@ -970,6 +1104,371 @@ public sealed class GatoMestreSyncService(
         return total == 0 ? 0m : Math.Round((decimal)skipped / total * 100m, 2);
     }
 
+    private async Task<OptionalRoundPayloadResult<TPayload>> TryLoadOptionalRoundPayloadAsync<TPayload>(
+        Func<Task<TPayload>> loader,
+        SyncExecutionContext executionContext,
+        string warningNote,
+        string stepName,
+        CancellationToken cancellationToken)
+        where TPayload : class
+    {
+        executionContext.MarkStep(stepName);
+
+        try
+        {
+            return new OptionalRoundPayloadResult<TPayload>(await loader(), 0, string.Empty);
+        }
+        catch (ExternalApiException exception)
+        {
+            var warningLogsCount = await TryLogNonFatalWarningAsync(executionContext, exception, cancellationToken);
+            return new OptionalRoundPayloadResult<TPayload>(null, warningLogsCount, warningNote);
+        }
+    }
+
+    private static void UpsertAthleteRoundContext(
+        AthleteRound athleteRound,
+        GatoMestreAthleteRoundContentResponse athleteRoundContent)
+    {
+        athleteRound.Context ??= new AthleteRoundContext
+        {
+            AthleteRound = athleteRound,
+        };
+
+        athleteRound.Context.AthleteRoundId = athleteRound.Id;
+        athleteRound.Context.TeamAverageScore = athleteRoundContent.TeamAverageScore;
+        athleteRound.Context.TeamHomeAverageCurrent = athleteRoundContent.TeamHomeAverageCurrent;
+        athleteRound.Context.TeamHomeAveragePrevious = athleteRoundContent.TeamHomeAveragePrevious;
+        athleteRound.Context.TeamAwayAverageCurrent = athleteRoundContent.TeamAwayAverageCurrent;
+        athleteRound.Context.TeamAwayAveragePrevious = athleteRoundContent.TeamAwayAveragePrevious;
+        athleteRound.Context.PointsPerCartoletaCurrent = athleteRoundContent.PointsPerCartoletaCurrent;
+        athleteRound.Context.PointsPerCartoletaPrevious = athleteRoundContent.PointsPerCartoletaPrevious;
+        athleteRound.Context.GrossOverallAverageCurrent = athleteRoundContent.GrossOverallAverageCurrent;
+        athleteRound.Context.GrossOverallMovingAverageCurrent = athleteRoundContent.GrossOverallMovingAverageCurrent;
+        athleteRound.Context.GrossOverallAveragePrevious = athleteRoundContent.GrossOverallAveragePrevious;
+        athleteRound.Context.GrossOverallMovingAveragePrevious = athleteRoundContent.GrossOverallMovingAveragePrevious;
+        athleteRound.Context.NetOverallAverageCurrent = athleteRoundContent.NetOverallAverageCurrent;
+        athleteRound.Context.NetOverallMovingAverageCurrent = athleteRoundContent.NetOverallMovingAverageCurrent;
+        athleteRound.Context.NetOverallAveragePrevious = athleteRoundContent.NetOverallAveragePrevious;
+        athleteRound.Context.NetOverallMovingAveragePrevious = athleteRoundContent.NetOverallMovingAveragePrevious;
+        athleteRound.Context.ValuationCurrent = athleteRoundContent.ValuationCurrent;
+        athleteRound.Context.MinimumToAppreciateCurrent = athleteRoundContent.MinimumToAppreciateCurrent;
+        athleteRound.Context.ValuationPrevious = athleteRoundContent.ValuationPrevious;
+        athleteRound.Context.MinimumToAppreciatePrevious = athleteRoundContent.MinimumToAppreciatePrevious;
+        athleteRound.Context.IndexPointsPerCartoleta = ReadNamedMetric(athleteRoundContent.Indices, "ipc");
+        athleteRound.Context.IndexOffensiveUsage = ReadNamedMetric(athleteRoundContent.Indices, "iao");
+        athleteRound.Context.IndexOffensiveRepresentation = ReadNamedMetric(athleteRoundContent.Indices, "iro");
+        athleteRound.Context.IndexPointsRepresentation = ReadNamedMetric(athleteRoundContent.Indices, "irp");
+        athleteRound.Context.IndexOffensiveEfficiency = ReadNamedMetric(athleteRoundContent.Indices, "ieo");
+        athleteRound.Context.IndexDefensiveEfficiency = ReadNamedMetric(athleteRoundContent.Indices, "ied");
+        athleteRound.Context.IndexTackleDuelPercent = ReadNamedMetric(athleteRoundContent.Indices, "pdsc");
+        athleteRound.Context.IndexShotsPerGame = ReadNamedMetric(athleteRoundContent.Indices, "fj");
+        athleteRound.Context.IndexShotsPerGoal = ReadNamedMetric(athleteRoundContent.Indices, "fg");
+    }
+
+    private static Dictionary<int, ClubFavoriteContext> BuildFavoriteContextByClub(
+        GatoMestreRoundCollectionResponse<GatoMestreFavoriteMatchResponse>? payload,
+        IReadOnlyDictionary<string, int> clubIdByAbbreviation)
+    {
+        var contexts = new Dictionary<int, ClubFavoriteContext>();
+        if (payload is null)
+        {
+            return contexts;
+        }
+
+        foreach (var match in payload.Result)
+        {
+            if (!TryResolveClubCartolaId(match.HomeTeam, clubIdByAbbreviation, out var homeClubId) ||
+                !TryResolveClubCartolaId(match.AwayTeam, clubIdByAbbreviation, out var awayClubId))
+            {
+                continue;
+            }
+
+            contexts[homeClubId] = new ClubFavoriteContext(
+                match.Odds.WinProbability,
+                match.Odds.DrawProbability,
+                match.Odds.LoseProbability);
+            contexts[awayClubId] = new ClubFavoriteContext(
+                match.Odds.LoseProbability,
+                match.Odds.DrawProbability,
+                match.Odds.WinProbability);
+        }
+
+        return contexts;
+    }
+
+    private static Dictionary<int, ClubForecastContext> BuildForecastContextByClub(
+        GatoMestreRoundCollectionResponse<GatoMestreForecastMatchResponse>? payload,
+        IReadOnlyDictionary<string, int> clubIdByAbbreviation)
+    {
+        var contexts = new Dictionary<int, ClubForecastContext>();
+        if (payload is null)
+        {
+            return contexts;
+        }
+
+        foreach (var match in payload.Result)
+        {
+            if (!TryResolveClubCartolaId(match.HomeTeam, clubIdByAbbreviation, out var homeClubId) ||
+                !TryResolveClubCartolaId(match.AwayTeam, clubIdByAbbreviation, out var awayClubId))
+            {
+                continue;
+            }
+
+            contexts[homeClubId] = new ClubForecastContext(
+                match.ResultCode switch
+                {
+                    1 => 1,
+                    2 => -1,
+                    _ => 0,
+                },
+                NormalizeRiskLevel(match.RiskLevel));
+            contexts[awayClubId] = new ClubForecastContext(
+                match.ResultCode switch
+                {
+                    2 => 1,
+                    1 => -1,
+                    _ => 0,
+                },
+                NormalizeRiskLevel(match.RiskLevel));
+        }
+
+        return contexts;
+    }
+
+    private static Dictionary<int, GatoMestreClubAverageRankingResponse> BuildAverageRankingByClub(
+        GatoMestreRoundCollectionResponse<GatoMestreClubAverageRankingResponse>? payload)
+    {
+        var rankings = new Dictionary<int, GatoMestreClubAverageRankingResponse>();
+        if (payload is null)
+        {
+            return rankings;
+        }
+
+        foreach (var item in payload.Result)
+        {
+            if (int.TryParse(item.ClubId, out var clubCartolaId))
+            {
+                rankings[clubCartolaId] = item;
+            }
+        }
+
+        return rankings;
+    }
+
+    private static Dictionary<int, ClubTipSummary> BuildTipSummaryByClub(
+        GatoMestreRoundCollectionResponse<GatoMestreTipItemResponse>? payload,
+        IReadOnlyDictionary<string, int> clubIdByAbbreviation)
+    {
+        var mutableSummaries = new Dictionary<int, MutableClubTipSummary>();
+        if (payload is null)
+        {
+            return [];
+        }
+
+        foreach (var tip in payload.Result)
+        {
+            var normalizedType = Normalize(tip.Type);
+            if (normalizedType == "TEAM")
+            {
+                if (TryGetIntProperty(tip.Info, "team_id", out var teamId))
+                {
+                    var summary = GetOrAddSummary(mutableSummaries, teamId);
+                    summary.TeamTipsCount++;
+                    if (tip.Hot)
+                    {
+                        summary.HotTeamTipsCount++;
+                    }
+                }
+
+                continue;
+            }
+
+            if (!TryResolveClubCartolaId(tip.Info, "homeTeam", clubIdByAbbreviation, out var homeClubId) ||
+                !TryResolveClubCartolaId(tip.Info, "awayTeam", clubIdByAbbreviation, out var awayClubId))
+            {
+                continue;
+            }
+
+            if (normalizedType == "MATCH")
+            {
+                IncrementMatchTip(GetOrAddSummary(mutableSummaries, homeClubId), tip.Hot);
+                IncrementMatchTip(GetOrAddSummary(mutableSummaries, awayClubId), tip.Hot);
+                continue;
+            }
+
+            if (normalizedType != "INSIGHT")
+            {
+                continue;
+            }
+
+            var homeSummary = GetOrAddSummary(mutableSummaries, homeClubId);
+            var awaySummary = GetOrAddSummary(mutableSummaries, awayClubId);
+            IncrementInsight(homeSummary, tip.Hot);
+            IncrementInsight(awaySummary, tip.Hot);
+
+            if (TryGetDecimalProperty(tip.Info, "confidence", out var confidence))
+            {
+                homeSummary.InsightConfidenceTotal += confidence;
+                homeSummary.InsightConfidenceSamples++;
+                awaySummary.InsightConfidenceTotal += confidence;
+                awaySummary.InsightConfidenceSamples++;
+            }
+
+            if (!TryGetStringProperty(tip.Info, "verdict", out var verdict))
+            {
+                continue;
+            }
+
+            switch (Normalize(verdict))
+            {
+                case "HOME_WIN":
+                    homeSummary.PositiveInsightCount++;
+                    awaySummary.NegativeInsightCount++;
+                    break;
+                case "AWAY_WIN":
+                    awaySummary.PositiveInsightCount++;
+                    homeSummary.NegativeInsightCount++;
+                    break;
+            }
+        }
+
+        return mutableSummaries.ToDictionary(
+            item => item.Key,
+            item => new ClubTipSummary(
+                item.Value.TeamTipsCount,
+                item.Value.HotTeamTipsCount,
+                item.Value.MatchTipsCount,
+                item.Value.HotMatchTipsCount,
+                item.Value.InsightCount,
+                item.Value.HotInsightCount,
+                item.Value.InsightConfidenceSamples == 0
+                    ? 0m
+                    : Math.Round(item.Value.InsightConfidenceTotal / item.Value.InsightConfidenceSamples, 4),
+                item.Value.PositiveInsightCount,
+                item.Value.NegativeInsightCount));
+    }
+
+    private static MutableClubTipSummary GetOrAddSummary(
+        IDictionary<int, MutableClubTipSummary> summaries,
+        int clubCartolaId)
+    {
+        if (summaries.TryGetValue(clubCartolaId, out var summary))
+        {
+            return summary;
+        }
+
+        summary = new MutableClubTipSummary();
+        summaries[clubCartolaId] = summary;
+        return summary;
+    }
+
+    private static void IncrementMatchTip(MutableClubTipSummary summary, bool hot)
+    {
+        summary.MatchTipsCount++;
+        if (hot)
+        {
+            summary.HotMatchTipsCount++;
+        }
+    }
+
+    private static void IncrementInsight(MutableClubTipSummary summary, bool hot)
+    {
+        summary.InsightCount++;
+        if (hot)
+        {
+            summary.HotInsightCount++;
+        }
+    }
+
+    private static bool TryResolveClubCartolaId(
+        GatoMestreSimpleTeamReferenceResponse reference,
+        IReadOnlyDictionary<string, int> clubIdByAbbreviation,
+        out int clubCartolaId)
+    {
+        return clubIdByAbbreviation.TryGetValue(Normalize(reference.Abbreviation), out clubCartolaId);
+    }
+
+    private static bool TryResolveClubCartolaId(
+        JsonElement container,
+        string propertyName,
+        IReadOnlyDictionary<string, int> clubIdByAbbreviation,
+        out int clubCartolaId)
+    {
+        clubCartolaId = 0;
+
+        if (container.ValueKind != JsonValueKind.Object ||
+            !container.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        if (!TryGetStringProperty(property, "abbr", out var abbreviation))
+        {
+            return false;
+        }
+
+        return clubIdByAbbreviation.TryGetValue(Normalize(abbreviation), out clubCartolaId);
+    }
+
+    private static bool TryGetIntProperty(JsonElement container, string propertyName, out int value)
+    {
+        value = 0;
+
+        if (container.ValueKind != JsonValueKind.Object || !container.TryGetProperty(propertyName, out var property))
+        {
+            return false;
+        }
+
+        if (property.ValueKind == JsonValueKind.Number)
+        {
+            return property.TryGetInt32(out value);
+        }
+
+        return property.ValueKind == JsonValueKind.String && int.TryParse(property.GetString(), out value);
+    }
+
+    private static bool TryGetDecimalProperty(JsonElement container, string propertyName, out decimal value)
+    {
+        value = 0m;
+
+        if (container.ValueKind != JsonValueKind.Object || !container.TryGetProperty(propertyName, out var property))
+        {
+            return false;
+        }
+
+        if (property.ValueKind == JsonValueKind.Number)
+        {
+            return property.TryGetDecimal(out value);
+        }
+
+        return property.ValueKind == JsonValueKind.String && decimal.TryParse(property.GetString(), out value);
+    }
+
+    private static bool TryGetStringProperty(JsonElement container, string propertyName, out string value)
+    {
+        value = string.Empty;
+
+        if (container.ValueKind != JsonValueKind.Object ||
+            !container.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        value = property.GetString() ?? string.Empty;
+        return !string.IsNullOrWhiteSpace(value);
+    }
+
+    private static decimal GetSnapshotValue(GatoMestreNumericSnapshotResponse? snapshot)
+        => snapshot?.Num ?? 0m;
+
+    private static decimal ReadNamedMetric(IReadOnlyCollection<GatoMestreNamedMetricResponse> metrics, string key)
+        => metrics.FirstOrDefault(metric => string.Equals(metric.Key, key, StringComparison.OrdinalIgnoreCase))?.Value ?? 0m;
+
+    private static string NormalizeRiskLevel(string? riskLevel)
+        => string.IsNullOrWhiteSpace(riskLevel) ? string.Empty : Normalize(riskLevel).ToLowerInvariant();
+
     private static Club? ResolveClub(
         IReadOnlyDictionary<int, Club> clubs,
         int cartolaClubId,
@@ -1226,5 +1725,49 @@ public sealed class GatoMestreSyncService(
 
         var normalized = value.Trim();
         return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
+    }
+
+    private sealed record OptionalRoundPayloadResult<TPayload>(TPayload? Payload, int WarningLogsCount, string Note)
+        where TPayload : class;
+
+    private sealed record ClubFavoriteContext(decimal WinProbability, decimal DrawProbability, decimal LoseProbability);
+
+    private sealed record ClubForecastContext(int ExpectedResult, string RiskLevel);
+
+    private sealed record ClubTipSummary(
+        int TeamTipsCount,
+        int HotTeamTipsCount,
+        int MatchTipsCount,
+        int HotMatchTipsCount,
+        int InsightCount,
+        int HotInsightCount,
+        decimal AverageInsightConfidence,
+        int PositiveInsightCount,
+        int NegativeInsightCount)
+    {
+        public static ClubTipSummary Empty { get; } = new(0, 0, 0, 0, 0, 0, 0m, 0, 0);
+    }
+
+    private sealed class MutableClubTipSummary
+    {
+        public int TeamTipsCount { get; set; }
+
+        public int HotTeamTipsCount { get; set; }
+
+        public int MatchTipsCount { get; set; }
+
+        public int HotMatchTipsCount { get; set; }
+
+        public int InsightCount { get; set; }
+
+        public int HotInsightCount { get; set; }
+
+        public decimal InsightConfidenceTotal { get; set; }
+
+        public int InsightConfidenceSamples { get; set; }
+
+        public int PositiveInsightCount { get; set; }
+
+        public int NegativeInsightCount { get; set; }
     }
 }

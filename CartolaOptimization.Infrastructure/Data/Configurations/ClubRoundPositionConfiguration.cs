@@ -14,6 +14,7 @@ public class ClubRoundPositionConfiguration : IEntityTypeConfiguration<ClubRound
 
         builder.Property(crp => crp.PointsConcededAverage).HasPrecision(10, 2);
         builder.Property(crp => crp.PointsConqueredAverage).HasPrecision(10, 2);
+        builder.Property(crp => crp.DistributionValue).HasPrecision(10, 4);
 
         builder.HasOne(crp => crp.ClubRound)
                .WithMany(cr => cr.PositionStats)

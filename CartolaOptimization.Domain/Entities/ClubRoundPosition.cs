@@ -13,13 +13,15 @@
         /// <param name="positionId">The positionId<see cref="int"/></param>
         /// <param name="pointsConcededAverage">The pointsConcededAverage<see cref="decimal"/></param>
         /// <param name="pointsConqueredAverage">The pointsConqueredAverage<see cref="decimal"/></param>
-        public ClubRoundPosition(long id, long clubRoundId, int positionId, decimal pointsConcededAverage, decimal pointsConqueredAverage)
+        /// <param name="distributionValue">The distributionValue<see cref="decimal"/></param>
+        public ClubRoundPosition(long id, long clubRoundId, int positionId, decimal pointsConcededAverage, decimal pointsConqueredAverage, decimal distributionValue = 0m)
         {
             Id = id;
             ClubRoundId = clubRoundId;
             PositionId = positionId;
             PointsConcededAverage = pointsConcededAverage;
             PointsConqueredAverage = pointsConqueredAverage;
+            DistributionValue = distributionValue;
         }
 
         /// <summary>
@@ -50,6 +52,11 @@
         /// Gets or sets the PointsConqueredAverage
         /// </summary>
         public decimal PointsConqueredAverage { get; set; }
+
+        /// <summary>
+        /// Gets or sets the share of team points historically concentrated on this position.
+        /// </summary>
+        public decimal DistributionValue { get; set; }
 
         // Navegação
 

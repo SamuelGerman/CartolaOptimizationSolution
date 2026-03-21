@@ -41,6 +41,7 @@ public sealed class FullContextAthleteScorePredictionService(
             .AsNoTracking()
             .Include(item => item.Athlete)
             .Include(item => item.Club)
+            .Include(item => item.Context)
             .Include(item => item.Position)
             .Include(item => item.Status)
             .Where(item =>
@@ -191,6 +192,7 @@ public sealed class FullContextAthleteScorePredictionService(
             .AsNoTracking()
             .Include(item => item.Athlete)
             .Include(item => item.Club)
+            .Include(item => item.Context)
             .Include(item => item.Position)
             .Include(item => item.Status)
             .Where(item =>

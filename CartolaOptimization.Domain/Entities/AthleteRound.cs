@@ -183,5 +183,10 @@
         /// Gets or sets the Scouts
         /// </summary>
         public ICollection<AthleteRoundScouts> Scouts { get; set; } = null!;
+
+        /// <summary>
+        /// Gets or sets additional athlete-round enrichment collected from Gato Mestre.
+        /// </summary>
+        public AthleteRoundContext? Context { get; set; }
     }
 }

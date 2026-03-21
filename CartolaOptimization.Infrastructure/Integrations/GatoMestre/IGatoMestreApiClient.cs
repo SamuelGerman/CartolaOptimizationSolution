@@ -23,7 +23,32 @@ public interface IGatoMestreApiClient
     Task<GatoMestreAthleteDetailResponse> GetAthleteDetailAsync(int athleteId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Loads the legacy athlete-round content payload with richer athlete-level indicators.
+    /// </summary>
+    Task<GatoMestreAthleteRoundContentResponse> GetAthleteRoundContentAsync(int athleteId, int round, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Loads team confrontation data for the next confrontation published by Gato Mestre.
     /// </summary>
     Task<GatoMestreClubConfrontationResponse> GetClubConfrontationAsync(int clubId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Loads the public round tips payload.
+    /// </summary>
+    Task<GatoMestreRoundCollectionResponse<GatoMestreTipItemResponse>> GetRoundTipsAsync(int season, int round, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Loads favorites/probability data for the matches of a round.
+    /// </summary>
+    Task<GatoMestreRoundCollectionResponse<GatoMestreFavoriteMatchResponse>> GetFavoriteMatchesAsync(int season, int round, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Loads the editorial match forecasts for a round.
+    /// </summary>
+    Task<GatoMestreRoundCollectionResponse<GatoMestreForecastMatchResponse>> GetMatchForecastsAsync(int season, int round, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Loads club average rankings for a specific round.
+    /// </summary>
+    Task<GatoMestreRoundCollectionResponse<GatoMestreClubAverageRankingResponse>> GetClubAverageRankingsAsync(int season, int round, CancellationToken cancellationToken = default);
 }

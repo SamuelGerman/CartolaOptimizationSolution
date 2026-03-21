@@ -145,6 +145,135 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                     b.ToTable("AthleteRounds", (string)null);
                 });
 
+            modelBuilder.Entity("CartolaOptimization.Domain.Entities.AthleteRoundContext", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("AthleteRoundId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("GrossOverallAverageCurrent")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("GrossOverallAveragePrevious")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("GrossOverallMovingAverageCurrent")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("GrossOverallMovingAveragePrevious")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("IndexDefensiveEfficiency")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("IndexOffensiveEfficiency")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("IndexOffensiveRepresentation")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("IndexOffensiveUsage")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("IndexPointsPerCartoleta")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("IndexPointsRepresentation")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("IndexShotsPerGame")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("IndexShotsPerGoal")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("IndexTackleDuelPercent")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("MinimumToAppreciateCurrent")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("MinimumToAppreciatePrevious")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("NetOverallAverageCurrent")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("NetOverallAveragePrevious")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("NetOverallMovingAverageCurrent")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("NetOverallMovingAveragePrevious")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("PointsPerCartoletaCurrent")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("PointsPerCartoletaPrevious")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("TeamAverageScore")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("TeamAwayAverageCurrent")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("TeamAwayAveragePrevious")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("TeamHomeAverageCurrent")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("TeamHomeAveragePrevious")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("ValuationCurrent")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("ValuationPrevious")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AthleteRoundId")
+                        .IsUnique();
+
+                    b.ToTable("AthleteRoundContexts", (string)null);
+                });
+
             modelBuilder.Entity("CartolaOptimization.Domain.Entities.AthleteRoundScouts", b =>
                 {
                     b.Property<long>("Id")
@@ -293,6 +422,135 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                     b.ToTable("ClubRounds", (string)null);
                 });
 
+            modelBuilder.Entity("CartolaOptimization.Domain.Entities.ClubRoundContext", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("AverageInsightConfidence")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("AwayPointsConcededAverage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("AwayPointsConqueredAverage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<long>("ClubRoundId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("FavoriteDrawProbability")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("FavoriteLoseProbability")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("FavoriteWinProbability")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<int>("ForecastExpectedResult")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ForecastRiskLevel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<decimal>("GeneralPointsConcededAverage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("GeneralPointsConqueredAverage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("HistoricalDrawRate")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("HistoricalLossRate")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("HistoricalWinRate")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
+
+                    b.Property<decimal>("HomePointsConcededAverage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("HomePointsConqueredAverage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int>("HotInsightCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("HotMatchTipsCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("HotTeamTipsCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("InsightCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MatchTipsCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("NegativeInsightCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PositiveInsightCount")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PreviousOverallAverage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("RankingsAwayAverage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("RankingsAwayMovingAverage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("RankingsHomeAverage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("RankingsHomeMovingAverage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("RankingsMovingAverage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("RankingsOverallAverage")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int>("TeamTipsCount")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClubRoundId")
+                        .IsUnique();
+
+                    b.ToTable("ClubRoundContexts", (string)null);
+                });
+
             modelBuilder.Entity("CartolaOptimization.Domain.Entities.ClubRoundPosition", b =>
                 {
                     b.Property<long>("Id")
@@ -301,6 +559,10 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
 
                     b.Property<long>("ClubRoundId")
                         .HasColumnType("bigint");
+
+                    b.Property<decimal>("DistributionValue")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("decimal(10,4)");
 
                     b.Property<decimal>("PointsConcededAverage")
                         .HasPrecision(10, 2)
@@ -666,6 +928,17 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                     b.Navigation("Status");
                 });
 
+            modelBuilder.Entity("CartolaOptimization.Domain.Entities.AthleteRoundContext", b =>
+                {
+                    b.HasOne("CartolaOptimization.Domain.Entities.AthleteRound", "AthleteRound")
+                        .WithOne("Context")
+                        .HasForeignKey("CartolaOptimization.Domain.Entities.AthleteRoundContext", "AthleteRoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AthleteRound");
+                });
+
             modelBuilder.Entity("CartolaOptimization.Domain.Entities.AthleteRoundScouts", b =>
                 {
                     b.HasOne("CartolaOptimization.Domain.Entities.AthleteRound", "AthleteRound")
@@ -686,6 +959,17 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Club");
+                });
+
+            modelBuilder.Entity("CartolaOptimization.Domain.Entities.ClubRoundContext", b =>
+                {
+                    b.HasOne("CartolaOptimization.Domain.Entities.ClubRound", "ClubRound")
+                        .WithOne("Context")
+                        .HasForeignKey("CartolaOptimization.Domain.Entities.ClubRoundContext", "ClubRoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ClubRound");
                 });
 
             modelBuilder.Entity("CartolaOptimization.Domain.Entities.ClubRoundPosition", b =>
@@ -733,6 +1017,8 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("CartolaOptimization.Domain.Entities.AthleteRound", b =>
                 {
+                    b.Navigation("Context");
+
                     b.Navigation("Scouts");
                 });
 
@@ -748,6 +1034,8 @@ namespace CartolaOptimization.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("CartolaOptimization.Domain.Entities.ClubRound", b =>
                 {
+                    b.Navigation("Context");
+
                     b.Navigation("PositionStats");
                 });
 

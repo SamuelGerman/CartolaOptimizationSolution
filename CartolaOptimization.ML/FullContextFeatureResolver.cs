@@ -14,6 +14,7 @@ internal static class FullContextFeatureResolver
         var clubRounds = await dbContext.ClubRounds
             .AsNoTracking()
             .Include(item => item.Club)
+            .Include(item => item.Context)
             .Include(item => item.PositionStats)
             .Where(item => rounds.Contains(item.Round))
             .ToListAsync(cancellationToken);
@@ -79,6 +80,17 @@ internal static class FullContextFeatureResolver
             AwayAverageScore = (float)athleteRound.AwayAverageScore,
             PriceNum = (float)athleteRound.PriceNum,
             VariationNum = (float)athleteRound.VariationNum,
+            TeamAverageScore = (float)(athleteRound.Context?.TeamAverageScore ?? 0m),
+            PointsPerCartoletaCurrent = (float)(athleteRound.Context?.PointsPerCartoletaCurrent ?? 0m),
+            GrossOverallMovingAverageCurrent = (float)(athleteRound.Context?.GrossOverallMovingAverageCurrent ?? 0m),
+            NetOverallMovingAverageCurrent = (float)(athleteRound.Context?.NetOverallMovingAverageCurrent ?? 0m),
+            ValuationCurrent = (float)(athleteRound.Context?.ValuationCurrent ?? 0m),
+            MinimumToAppreciateCurrent = (float)(athleteRound.Context?.MinimumToAppreciateCurrent ?? 0m),
+            IndexPointsPerCartoleta = (float)(athleteRound.Context?.IndexPointsPerCartoleta ?? 0m),
+            IndexOffensiveEfficiency = (float)(athleteRound.Context?.IndexOffensiveEfficiency ?? 0m),
+            IndexDefensiveEfficiency = (float)(athleteRound.Context?.IndexDefensiveEfficiency ?? 0m),
+            IndexShotsPerGame = (float)(athleteRound.Context?.IndexShotsPerGame ?? 0m),
+            IndexShotsPerGoal = (float)(athleteRound.Context?.IndexShotsPerGoal ?? 0m),
             IsHomeMatch = context.IsHomeMatch ? 1f : 0f,
             ClubTablePosition = context.ClubTablePosition,
             OpponentClubTablePosition = context.OpponentClubTablePosition,
@@ -90,6 +102,18 @@ internal static class FullContextFeatureResolver
             ClubOverallAverage = (float)context.ClubRound.OverallAverage,
             ClubMovingAverage = (float)context.ClubRound.MovingAverage,
             ClubExpectedPoints = (float)context.ClubRound.ExpectedPoints,
+            ClubPreviousOverallAverage = (float)(context.ClubRound.Context?.PreviousOverallAverage ?? 0m),
+            ClubRankingsHomeAverage = (float)(context.ClubRound.Context?.RankingsHomeAverage ?? 0m),
+            ClubRankingsAwayAverage = (float)(context.ClubRound.Context?.RankingsAwayAverage ?? 0m),
+            ClubHistoricalWinRate = (float)(context.ClubRound.Context?.HistoricalWinRate ?? 0m),
+            ClubFavoriteWinProbability = (float)(context.ClubRound.Context?.FavoriteWinProbability ?? 0m),
+            ClubForecastExpectedResult = context.ClubRound.Context?.ForecastExpectedResult ?? 0,
+            ClubForecastRiskScore = MapRiskLevelToScore(context.ClubRound.Context?.ForecastRiskLevel),
+            ClubPositionDistributionValue = (float)context.ClubPositionStats.DistributionValue,
+            ClubAverageInsightConfidence = (float)(context.ClubRound.Context?.AverageInsightConfidence ?? 0m),
+            ClubPositiveInsightNet = (context.ClubRound.Context?.PositiveInsightCount ?? 0) - (context.ClubRound.Context?.NegativeInsightCount ?? 0),
+            ClubTeamTipsCount = context.ClubRound.Context?.TeamTipsCount ?? 0,
+            ClubMatchTipsCount = context.ClubRound.Context?.MatchTipsCount ?? 0,
             ClubPositionPointsConcededAverage = (float)context.ClubPositionStats.PointsConcededAverage,
             ClubPositionPointsConqueredAverage = (float)context.ClubPositionStats.PointsConqueredAverage,
             OpponentWinProbability = (float)context.OpponentClubRound.WinProbability,
@@ -98,6 +122,18 @@ internal static class FullContextFeatureResolver
             OpponentOverallAverage = (float)context.OpponentClubRound.OverallAverage,
             OpponentMovingAverage = (float)context.OpponentClubRound.MovingAverage,
             OpponentExpectedPoints = (float)context.OpponentClubRound.ExpectedPoints,
+            OpponentPreviousOverallAverage = (float)(context.OpponentClubRound.Context?.PreviousOverallAverage ?? 0m),
+            OpponentRankingsHomeAverage = (float)(context.OpponentClubRound.Context?.RankingsHomeAverage ?? 0m),
+            OpponentRankingsAwayAverage = (float)(context.OpponentClubRound.Context?.RankingsAwayAverage ?? 0m),
+            OpponentHistoricalWinRate = (float)(context.OpponentClubRound.Context?.HistoricalWinRate ?? 0m),
+            OpponentFavoriteWinProbability = (float)(context.OpponentClubRound.Context?.FavoriteWinProbability ?? 0m),
+            OpponentForecastExpectedResult = context.OpponentClubRound.Context?.ForecastExpectedResult ?? 0,
+            OpponentForecastRiskScore = MapRiskLevelToScore(context.OpponentClubRound.Context?.ForecastRiskLevel),
+            OpponentPositionDistributionValue = (float)context.OpponentPositionStats.DistributionValue,
+            OpponentAverageInsightConfidence = (float)(context.OpponentClubRound.Context?.AverageInsightConfidence ?? 0m),
+            OpponentPositiveInsightNet = (context.OpponentClubRound.Context?.PositiveInsightCount ?? 0) - (context.OpponentClubRound.Context?.NegativeInsightCount ?? 0),
+            OpponentTeamTipsCount = context.OpponentClubRound.Context?.TeamTipsCount ?? 0,
+            OpponentMatchTipsCount = context.OpponentClubRound.Context?.MatchTipsCount ?? 0,
             OpponentPositionPointsConcededAverage = (float)context.OpponentPositionStats.PointsConcededAverage,
             OpponentPositionPointsConqueredAverage = (float)context.OpponentPositionStats.PointsConqueredAverage,
             Label = (float)athleteRound.ScoreNum,
@@ -144,6 +180,17 @@ internal static class FullContextFeatureResolver
                 AwayAverageScore = (float)baseline.AwayAverageScore,
                 PriceNum = (float)baseline.PriceNum,
                 VariationNum = (float)baseline.VariationNum,
+                TeamAverageScore = (float)(baseline.Context?.TeamAverageScore ?? 0m),
+                PointsPerCartoletaCurrent = (float)(baseline.Context?.PointsPerCartoletaCurrent ?? 0m),
+                GrossOverallMovingAverageCurrent = (float)(baseline.Context?.GrossOverallMovingAverageCurrent ?? 0m),
+                NetOverallMovingAverageCurrent = (float)(baseline.Context?.NetOverallMovingAverageCurrent ?? 0m),
+                ValuationCurrent = (float)(baseline.Context?.ValuationCurrent ?? 0m),
+                MinimumToAppreciateCurrent = (float)(baseline.Context?.MinimumToAppreciateCurrent ?? 0m),
+                IndexPointsPerCartoleta = (float)(baseline.Context?.IndexPointsPerCartoleta ?? 0m),
+                IndexOffensiveEfficiency = (float)(baseline.Context?.IndexOffensiveEfficiency ?? 0m),
+                IndexDefensiveEfficiency = (float)(baseline.Context?.IndexDefensiveEfficiency ?? 0m),
+                IndexShotsPerGame = (float)(baseline.Context?.IndexShotsPerGame ?? 0m),
+                IndexShotsPerGoal = (float)(baseline.Context?.IndexShotsPerGoal ?? 0m),
                 IsHomeMatch = context.IsHomeMatch ? 1f : 0f,
                 ClubTablePosition = context.ClubTablePosition,
                 OpponentClubTablePosition = context.OpponentClubTablePosition,
@@ -155,6 +202,18 @@ internal static class FullContextFeatureResolver
                 ClubOverallAverage = (float)context.ClubRound.OverallAverage,
                 ClubMovingAverage = (float)context.ClubRound.MovingAverage,
                 ClubExpectedPoints = (float)context.ClubRound.ExpectedPoints,
+                ClubPreviousOverallAverage = (float)(context.ClubRound.Context?.PreviousOverallAverage ?? 0m),
+                ClubRankingsHomeAverage = (float)(context.ClubRound.Context?.RankingsHomeAverage ?? 0m),
+                ClubRankingsAwayAverage = (float)(context.ClubRound.Context?.RankingsAwayAverage ?? 0m),
+                ClubHistoricalWinRate = (float)(context.ClubRound.Context?.HistoricalWinRate ?? 0m),
+                ClubFavoriteWinProbability = (float)(context.ClubRound.Context?.FavoriteWinProbability ?? 0m),
+                ClubForecastExpectedResult = context.ClubRound.Context?.ForecastExpectedResult ?? 0,
+                ClubForecastRiskScore = MapRiskLevelToScore(context.ClubRound.Context?.ForecastRiskLevel),
+                ClubPositionDistributionValue = (float)context.ClubPositionStats.DistributionValue,
+                ClubAverageInsightConfidence = (float)(context.ClubRound.Context?.AverageInsightConfidence ?? 0m),
+                ClubPositiveInsightNet = (context.ClubRound.Context?.PositiveInsightCount ?? 0) - (context.ClubRound.Context?.NegativeInsightCount ?? 0),
+                ClubTeamTipsCount = context.ClubRound.Context?.TeamTipsCount ?? 0,
+                ClubMatchTipsCount = context.ClubRound.Context?.MatchTipsCount ?? 0,
                 ClubPositionPointsConcededAverage = (float)context.ClubPositionStats.PointsConcededAverage,
                 ClubPositionPointsConqueredAverage = (float)context.ClubPositionStats.PointsConqueredAverage,
                 OpponentWinProbability = (float)context.OpponentClubRound.WinProbability,
@@ -163,6 +222,18 @@ internal static class FullContextFeatureResolver
                 OpponentOverallAverage = (float)context.OpponentClubRound.OverallAverage,
                 OpponentMovingAverage = (float)context.OpponentClubRound.MovingAverage,
                 OpponentExpectedPoints = (float)context.OpponentClubRound.ExpectedPoints,
+                OpponentPreviousOverallAverage = (float)(context.OpponentClubRound.Context?.PreviousOverallAverage ?? 0m),
+                OpponentRankingsHomeAverage = (float)(context.OpponentClubRound.Context?.RankingsHomeAverage ?? 0m),
+                OpponentRankingsAwayAverage = (float)(context.OpponentClubRound.Context?.RankingsAwayAverage ?? 0m),
+                OpponentHistoricalWinRate = (float)(context.OpponentClubRound.Context?.HistoricalWinRate ?? 0m),
+                OpponentFavoriteWinProbability = (float)(context.OpponentClubRound.Context?.FavoriteWinProbability ?? 0m),
+                OpponentForecastExpectedResult = context.OpponentClubRound.Context?.ForecastExpectedResult ?? 0,
+                OpponentForecastRiskScore = MapRiskLevelToScore(context.OpponentClubRound.Context?.ForecastRiskLevel),
+                OpponentPositionDistributionValue = (float)context.OpponentPositionStats.DistributionValue,
+                OpponentAverageInsightConfidence = (float)(context.OpponentClubRound.Context?.AverageInsightConfidence ?? 0m),
+                OpponentPositiveInsightNet = (context.OpponentClubRound.Context?.PositiveInsightCount ?? 0) - (context.OpponentClubRound.Context?.NegativeInsightCount ?? 0),
+                OpponentTeamTipsCount = context.OpponentClubRound.Context?.TeamTipsCount ?? 0,
+                OpponentMatchTipsCount = context.OpponentClubRound.Context?.MatchTipsCount ?? 0,
                 OpponentPositionPointsConcededAverage = (float)context.OpponentPositionStats.PointsConcededAverage,
                 OpponentPositionPointsConqueredAverage = (float)context.OpponentPositionStats.PointsConqueredAverage,
             },
@@ -178,6 +249,18 @@ internal static class FullContextFeatureResolver
         };
 
         return true;
+    }
+
+    private static int MapRiskLevelToScore(string? riskLevel)
+    {
+        return (riskLevel ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "baixo" => 1,
+            "medio" => 2,
+            "médio" => 2,
+            "alto" => 3,
+            _ => 0,
+        };
     }
 
     private static bool TryResolveContext(

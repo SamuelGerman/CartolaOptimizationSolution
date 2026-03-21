@@ -30,6 +30,28 @@ internal sealed class FullContextAthleteScorePredictionInput
 
     public float VariationNum { get; init; }
 
+    public float TeamAverageScore { get; init; }
+
+    public float PointsPerCartoletaCurrent { get; init; }
+
+    public float GrossOverallMovingAverageCurrent { get; init; }
+
+    public float NetOverallMovingAverageCurrent { get; init; }
+
+    public float ValuationCurrent { get; init; }
+
+    public float MinimumToAppreciateCurrent { get; init; }
+
+    public float IndexPointsPerCartoleta { get; init; }
+
+    public float IndexOffensiveEfficiency { get; init; }
+
+    public float IndexDefensiveEfficiency { get; init; }
+
+    public float IndexShotsPerGame { get; init; }
+
+    public float IndexShotsPerGoal { get; init; }
+
     public float IsHomeMatch { get; init; }
 
     public float ClubTablePosition { get; init; }
@@ -52,6 +74,30 @@ internal sealed class FullContextAthleteScorePredictionInput
 
     public float ClubExpectedPoints { get; init; }
 
+    public float ClubPreviousOverallAverage { get; init; }
+
+    public float ClubRankingsHomeAverage { get; init; }
+
+    public float ClubRankingsAwayAverage { get; init; }
+
+    public float ClubHistoricalWinRate { get; init; }
+
+    public float ClubFavoriteWinProbability { get; init; }
+
+    public float ClubForecastExpectedResult { get; init; }
+
+    public float ClubForecastRiskScore { get; init; }
+
+    public float ClubPositionDistributionValue { get; init; }
+
+    public float ClubAverageInsightConfidence { get; init; }
+
+    public float ClubPositiveInsightNet { get; init; }
+
+    public float ClubTeamTipsCount { get; init; }
+
+    public float ClubMatchTipsCount { get; init; }
+
     public float ClubPositionPointsConcededAverage { get; init; }
 
     public float ClubPositionPointsConqueredAverage { get; init; }
@@ -67,6 +113,30 @@ internal sealed class FullContextAthleteScorePredictionInput
     public float OpponentMovingAverage { get; init; }
 
     public float OpponentExpectedPoints { get; init; }
+
+    public float OpponentPreviousOverallAverage { get; init; }
+
+    public float OpponentRankingsHomeAverage { get; init; }
+
+    public float OpponentRankingsAwayAverage { get; init; }
+
+    public float OpponentHistoricalWinRate { get; init; }
+
+    public float OpponentFavoriteWinProbability { get; init; }
+
+    public float OpponentForecastExpectedResult { get; init; }
+
+    public float OpponentForecastRiskScore { get; init; }
+
+    public float OpponentPositionDistributionValue { get; init; }
+
+    public float OpponentAverageInsightConfidence { get; init; }
+
+    public float OpponentPositiveInsightNet { get; init; }
+
+    public float OpponentTeamTipsCount { get; init; }
+
+    public float OpponentMatchTipsCount { get; init; }
 
     public float OpponentPositionPointsConcededAverage { get; init; }
 
