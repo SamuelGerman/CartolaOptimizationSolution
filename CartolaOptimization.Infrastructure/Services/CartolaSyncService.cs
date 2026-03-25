@@ -89,6 +89,7 @@ public sealed class CartolaSyncService(
                 clubs: clubs,
                 positions: positions,
                 statuses: statuses,
+                targetRoundId: marketStatus.CurrentRound,
                 currentRound: marketStatus.CurrentRound,
                 cancellationToken: cancellationToken);
 
@@ -643,14 +644,11 @@ public sealed class CartolaSyncService(
         IReadOnlyDictionary<int, Club> clubs,
         IReadOnlyDictionary<int, Position> positions,
         IReadOnlyDictionary<int, AthleteStatus> statuses,
+        int targetRoundId,
         int currentRound,
         CancellationToken cancellationToken)
     {
-        var roundIds = athleteResponses
-            .Select(athlete => athlete.RoundId)
-            .Distinct()
-            .OrderBy(roundId => roundId)
-            .ToArray();
+        var roundIds = new[] { targetRoundId };
 
         var existingRounds = await dbContext.AthleteRounds
             .Include(round => round.Scouts)
@@ -689,13 +687,13 @@ public sealed class CartolaSyncService(
                     });
             }
 
-            var key = (athleteResponse.RoundId, athlete.Id);
+            var key = (targetRoundId, athlete.Id);
 
             if (!existingRounds.TryGetValue(key, out var athleteRound))
             {
                 athleteRound = new AthleteRound(
                     id: 0,
-                    roundId: athleteResponse.RoundId,
+                    roundId: targetRoundId,
                     athleteId: athlete.Id,
                     clubId: club.Id,
                     positionId: position.Id,
@@ -719,7 +717,7 @@ public sealed class CartolaSyncService(
                 existingRounds.Add(key, athleteRound);
             }
 
-            athleteRound.RoundId = athleteResponse.RoundId;
+            athleteRound.RoundId = targetRoundId;
             athleteRound.AthleteId = athlete.Id;
             athleteRound.ClubId = club.Id;
             athleteRound.PositionId = position.Id;

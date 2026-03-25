@@ -4,7 +4,8 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.ML;
 
 public sealed class PredictedLineupOptimizationService(
-    IAthleteScorePredictionService athleteScorePredictionService) : IPredictedLineupOptimizationService
+    IAthleteScorePredictionService athleteScorePredictionService,
+    IAthleteContextAthleteScorePredictionService athleteContextAthleteScorePredictionService) : IPredictedLineupOptimizationService
 {
     private const int ProbableStatusCartolaId = 7;
     private const string ProbableStatusName = "Provável";
@@ -24,6 +25,27 @@ public sealed class PredictedLineupOptimizationService(
         int round,
         PredictedLineupRequest request,
         CancellationToken cancellationToken = default)
+        => await GetOptimalLineupCoreAsync(
+            round,
+            request,
+            athleteScorePredictionService.GetPredictedScoresAsync,
+            cancellationToken);
+
+    public async Task<PredictedLineupResult> GetOptimalAthleteContextLineupAsync(
+        int round,
+        PredictedLineupRequest request,
+        CancellationToken cancellationToken = default)
+        => await GetOptimalLineupCoreAsync(
+            round,
+            request,
+            athleteContextAthleteScorePredictionService.GetPredictedScoresAsync,
+            cancellationToken);
+
+    private static async Task<PredictedLineupResult> GetOptimalLineupCoreAsync(
+        int round,
+        PredictedLineupRequest request,
+        Func<int, int?, int?, int?, int, CancellationToken, Task<AthleteScorePredictionResult>> predictionFunc,
+        CancellationToken cancellationToken)
     {
         if (request is null)
         {
@@ -43,12 +65,12 @@ public sealed class PredictedLineupOptimizationService(
         var normalizedFormation = NormalizeFormation(request.Formation);
         var budgetInCents = ToCents(request.Budget);
 
-        var predictions = await athleteScorePredictionService.GetPredictedScoresAsync(
+        var predictions = await predictionFunc(
             round,
-            statusCartolaId: ProbableStatusCartolaId,
-            clubCartolaId: null,
-            positionCartolaId: null,
-            take: MaxPredictionCandidates,
+            ProbableStatusCartolaId,
+            null,
+            null,
+            MaxPredictionCandidates,
             cancellationToken);
 
         var candidatesByPosition = predictions.Athletes
@@ -117,6 +139,7 @@ public sealed class PredictedLineupOptimizationService(
         return new PredictedLineupResult
         {
             Round = round,
+            DatasetKey = predictions.DatasetKey,
             ModelVersion = predictions.ModelVersion,
             GeneratedAtUtc = DateTime.UtcNow,
             ModelTrainedAtUtc = predictions.ModelTrainedAtUtc,

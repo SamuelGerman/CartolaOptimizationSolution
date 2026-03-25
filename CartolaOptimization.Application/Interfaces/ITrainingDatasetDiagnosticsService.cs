@@ -35,6 +35,12 @@ public interface ITrainingDatasetDiagnosticsService
         int take = 1000,
         CancellationToken cancellationToken = default);
 
+    Task<TrainingAthleteContextDatasetResult> GetAthleteContextDatasetAsync(
+        int? fromRound = null,
+        int? toRound = null,
+        int take = 1000,
+        CancellationToken cancellationToken = default);
+
     Task<TrainingFullContextDatasetResult> GetFullContextDatasetAsync(
         int? fromRound = null,
         int? toRound = null,

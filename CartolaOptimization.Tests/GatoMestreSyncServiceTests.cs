@@ -55,6 +55,66 @@ public sealed class GatoMestreSyncServiceTests
     }
 
     [Fact]
+    public async Task SyncRoundAsync_UsesCurrentPayloadClubs_WhenDatabaseContainsDuplicateAbbreviations()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.Clubs.Add(new Club(0, 9999, "BOT", "botafogo-antigo", "Botafogo Antigo", "https://example.com/old-bot.png"));
+        await dbContext.SaveChangesAsync();
+
+        var failureLogService = new FakeIntegrationFailureLogService();
+        var syncExecutionLogService = new FakeSyncExecutionLogService();
+        var service = new GatoMestreSyncService(dbContext, new FakeGatoMestreApiClient
+        {
+            Teams = new Dictionary<int, GatoMestreTeamResponse>
+            {
+                [263] = CreateTeam(263, "BOT", "botafogo", "Botafogo"),
+                [275] = CreateTeam(275, "PAL", "palmeiras", "Palmeiras"),
+            },
+            AthletesRound = new GatoMestreAthletesRoundResponse(),
+            ClubConfrontations = new Dictionary<int, GatoMestreClubConfrontationResponse>
+            {
+                [263] = new()
+                {
+                    Round = 6,
+                    Home = CreateClubBlock(275, "mandante", 51m, 29m, 46m, 54m, 55m, [(2, 4m, 8m), (5, 9m, 14m)]),
+                    Away = CreateClubBlock(263, "visitante", 51m, 29m, 38m, 41m, 40m, [(2, 7m, 5m), (5, 13m, 7m)]),
+                },
+                [275] = new()
+                {
+                    Round = 6,
+                    Home = CreateClubBlock(275, "mandante", 51m, 29m, 46m, 54m, 55m, [(2, 4m, 8m), (5, 9m, 14m)]),
+                    Away = CreateClubBlock(263, "visitante", 51m, 29m, 38m, 41m, 40m, [(2, 7m, 5m), (5, 13m, 7m)]),
+                },
+            },
+            FavoriteMatches = new()
+            {
+                Result =
+                [
+                    new GatoMestreFavoriteMatchResponse
+                    {
+                        HomeTeam = new GatoMestreSimpleTeamReferenceResponse { Abbreviation = "PAL", Name = "Palmeiras" },
+                        AwayTeam = new GatoMestreSimpleTeamReferenceResponse { Abbreviation = "BOT", Name = "Botafogo" },
+                        Odds = new GatoMestreFavoriteMatchOddsResponse { WinProbability = 51m, DrawProbability = 29m, LoseProbability = 20m },
+                    },
+                ],
+            },
+        }, failureLogService, syncExecutionLogService);
+
+        var result = await service.SyncRoundAsync(2026, 6);
+
+        var syncedClubCartolaIds = await dbContext.ClubRounds
+            .Include(item => item.Club)
+            .OrderBy(item => item.Club.CartolaId)
+            .Select(item => item.Club.CartolaId)
+            .ToListAsync();
+
+        Assert.Equal(SyncExecutionStatus.Success, result.Status);
+        Assert.Equal([263, 275], syncedClubCartolaIds);
+        Assert.Equal(2, result.ClubsUpserted);
+        Assert.Empty(failureLogService.Entries);
+    }
+
+    [Fact]
     public async Task SyncRoundAsync_PersistsExtendedAthleteAndClubContexts_WhenOptionalPayloadsAreAvailable()
     {
         await using var dbContext = CreateDbContext();

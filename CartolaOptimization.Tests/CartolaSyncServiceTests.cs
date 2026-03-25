@@ -10,6 +10,114 @@ namespace CartolaOptimization.Tests;
 public sealed class CartolaSyncServiceTests
 {
     [Fact]
+    public async Task SyncAsync_PersistsCurrentMarketRowsUsingCurrentRound_WhenPayloadRoundStillReferencesPreviousClosedRound()
+    {
+        await using var dbContext = TestDbContextFactory.Create();
+        var failureLogService = new RecordingIntegrationFailureLogService();
+        var syncExecutionLogService = new RecordingSyncExecutionLogService();
+
+        var service = new CartolaSyncService(
+            dbContext,
+            new FakeCartolaApiClient
+            {
+                MarketStatus = new CartolaMarketStatusResponse
+                {
+                    Season = 2026,
+                    CurrentRound = 9,
+                },
+                Clubs = new Dictionary<int, CartolaClubResponse>
+                {
+                    [277] = CreateClub(277, "SAN", "santos", "Santos"),
+                    [364] = CreateClub(364, "REM", "remo", "Remo"),
+                },
+                AthletesMarket = new CartolaAthletesMarketResponse
+                {
+                    Clubs = new Dictionary<int, CartolaClubResponse>
+                    {
+                        [277] = CreateClub(277, "SAN", "santos", "Santos"),
+                        [364] = CreateClub(364, "REM", "remo", "Remo"),
+                    },
+                    Positions = new Dictionary<int, CartolaPositionResponse>
+                    {
+                        [6] = new() { Id = 6, Name = "Tecnico", Abbreviation = "tec" },
+                    },
+                    Statuses = new Dictionary<int, CartolaStatusResponse>
+                    {
+                        [7] = new() { Id = 7, Name = "Provavel" },
+                    },
+                    Athletes =
+                    [
+                        new CartolaAthleteResponse
+                        {
+                            AthleteId = 42411,
+                            RoundId = 8,
+                            ClubId = 277,
+                            PositionId = 6,
+                            StatusId = 7,
+                            Score = 0m,
+                            AverageScore = 5.4m,
+                            Price = 12m,
+                            PriceVariation = 0m,
+                            Games = 8,
+                            WasInGame = false,
+                            Name = "Alexi Stival",
+                            Nickname = "Cuca",
+                            ShortNickname = "Cuca",
+                            Scout = null,
+                        },
+                    ],
+                },
+                Matches = new CartolaMatchesResponse
+                {
+                    Round = 9,
+                    Clubs = new Dictionary<int, CartolaClubResponse>
+                    {
+                        [277] = CreateClub(277, "SAN", "santos", "Santos"),
+                        [364] = CreateClub(364, "REM", "remo", "Remo"),
+                    },
+                    Matches =
+                    [
+                        new CartolaMatchResponse
+                        {
+                            MatchId = 9001,
+                            MatchDate = "2026-03-30 19:00:00",
+                            Location = "Vila Belmiro",
+                            ValidForCartola = true,
+                            HomeClubId = 277,
+                            HomeClubPosition = 16,
+                            HomeForm = ["d", "v", "e", "d", "v"],
+                            HomeScore = null,
+                            AwayClubId = 364,
+                            AwayClubPosition = 19,
+                            AwayForm = ["d", "d", "e", "v", "d"],
+                            AwayScore = null,
+                        },
+                    ],
+                },
+            },
+            failureLogService,
+            syncExecutionLogService);
+
+        var result = await service.SyncAsync();
+        var athleteRound = await dbContext.AthleteRounds
+            .Include(item => item.Athlete)
+            .Include(item => item.Club)
+            .Include(item => item.Position)
+            .Include(item => item.Status)
+            .SingleAsync();
+
+        Assert.Equal(SyncExecutionStatus.Success, result.Status);
+        Assert.Equal(9, result.CurrentRound);
+        Assert.Equal([9], result.AthleteRounds);
+        Assert.Equal(9, athleteRound.RoundId);
+        Assert.Equal(277, athleteRound.Club.CartolaId);
+        Assert.Equal(6, athleteRound.Position.CartolaId);
+        Assert.Equal(7, athleteRound.Status.CartolaId);
+        Assert.Equal("Cuca", athleteRound.Athlete.Nickname);
+        Assert.Empty(failureLogService.Entries);
+    }
+
+    [Fact]
     public async Task SyncClosedRoundAsync_FinalizesExistingRoundAndMarksItHistoricalClosed()
     {
         await using var dbContext = TestDbContextFactory.Create();

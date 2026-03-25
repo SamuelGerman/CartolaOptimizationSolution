@@ -374,6 +374,7 @@ public sealed class GatoMestreSyncService(
         CancellationToken cancellationToken)
     {
         var existingClubs = await dbContext.Clubs.ToDictionaryAsync(club => club.CartolaId, cancellationToken);
+        var syncedClubs = new Dictionary<int, Club>();
 
         foreach (var team in teamsPayload.Values.OrderBy(team => team.TeamId))
         {
@@ -396,9 +397,10 @@ public sealed class GatoMestreSyncService(
             club.Slug = ToOptionalValue(team.Slug, 100);
             club.Nickname = ToRequiredValue(string.IsNullOrWhiteSpace(team.PopularName) ? team.Nickname : team.PopularName, team.Name, 100);
             club.LogoUrl = ToOptionalValue(team.Shields?.Size60, 255);
+            syncedClubs[team.TeamId] = club;
         }
 
-        return existingClubs;
+        return syncedClubs;
     }
 
     private async Task<(int ClubRoundsUpserted, int PositionStatsUpserted, bool DataAvailable, string Note, int WarningLogsCount, IReadOnlyCollection<int> AvailableClubIds)> UpsertClubRoundsAsync(
@@ -414,7 +416,8 @@ public sealed class GatoMestreSyncService(
         var positions = await dbContext.Positions.ToDictionaryAsync(position => position.CartolaId, cancellationToken);
         var clubIdByAbbreviation = clubs.Values
             .Where(club => !string.IsNullOrWhiteSpace(club.Abreviation))
-            .ToDictionary(club => Normalize(club.Abreviation), club => club.CartolaId);
+            .GroupBy(club => Normalize(club.Abreviation))
+            .ToDictionary(group => group.Key, group => group.OrderBy(club => club.CartolaId).Last().CartolaId);
         var favoriteByClubCartolaId = BuildFavoriteContextByClub(favoriteMatchesPayload, clubIdByAbbreviation);
         var forecastByClubCartolaId = BuildForecastContextByClub(matchForecastsPayload, clubIdByAbbreviation);
         var rankingsByClubCartolaId = BuildAverageRankingByClub(clubAverageRankingsPayload);

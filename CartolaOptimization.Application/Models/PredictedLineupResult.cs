@@ -7,6 +7,8 @@ public sealed class PredictedLineupResult
 {
     public int Round { get; init; }
 
+    public string DatasetKey { get; init; } = string.Empty;
+
     public string ModelVersion { get; init; } = string.Empty;
 
     public DateTime GeneratedAtUtc { get; init; }

@@ -14,6 +14,7 @@ public sealed class TrainingDatasetController(
     ITrainingDatasetPreparationService trainingDatasetPreparationService,
     ITrainingDatasetDiagnosticsService trainingDatasetDiagnosticsService,
     IAthleteScoreModelTrainingService athleteScoreModelTrainingService,
+    IAthleteContextAthleteScoreModelTrainingService athleteContextAthleteScoreModelTrainingService,
     IFullContextAthleteScoreModelTrainingService fullContextAthleteScoreModelTrainingService) : ControllerBase
 {
     /// <summary>
@@ -125,6 +126,31 @@ public sealed class TrainingDatasetController(
     }
 
     /// <summary>
+    /// Returns an export-ready historical dataset slice that combines athlete-level Gato Mestre signals with Cartola match context.
+    /// </summary>
+    /// <param name="fromRound">Optional initial round of the export window.</param>
+    /// <param name="toRound">Optional final round of the export window.</param>
+    /// <param name="take">Maximum number of rows returned. Limited to 5000 rows.</param>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>A historical dataset slice with athlete and match context that does not depend on club-round enrichment.</returns>
+    [HttpGet("datasets/athlete-context")]
+    [ProducesResponseType(typeof(TrainingAthleteContextDatasetResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAthleteContextDataset(
+        [FromQuery] int? fromRound,
+        [FromQuery] int? toRound,
+        [FromQuery] int take = 1000,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await trainingDatasetDiagnosticsService.GetAthleteContextDatasetAsync(
+            fromRound,
+            toRound,
+            take,
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Returns an export-ready historical dataset slice that includes athlete, club, opponent and match context.
     /// </summary>
     /// <param name="fromRound">Optional initial round of the export window.</param>
@@ -185,6 +211,45 @@ public sealed class TrainingDatasetController(
     public async Task<IActionResult> GetAthleteScoreModelInfo(CancellationToken cancellationToken = default)
     {
         var result = await athleteScoreModelTrainingService.GetCurrentModelInfoAsync(cancellationToken);
+        return result is null ? NotFound() : Ok(result);
+    }
+
+    /// <summary>
+    /// Trains and persists the v1 athlete-context machine learning model using athlete-level Gato Mestre signals and Cartola match context.
+    /// </summary>
+    /// <param name="fromRound">Optional initial round of the training window.</param>
+    /// <param name="toRound">Optional final round of the training window.</param>
+    /// <param name="validationRounds">Number of last rounds reserved for temporal validation. Defaults to one round.</param>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>The model metadata and validation metrics of the newly trained athlete-context artifact.</returns>
+    [HttpPost("models/athlete-score-v1-athlete-context/train")]
+    [ProducesResponseType(typeof(AthleteScoreModelTrainingResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> TrainAthleteContextAthleteScoreModel(
+        [FromQuery] int? fromRound,
+        [FromQuery] int? toRound,
+        [FromQuery] int validationRounds = 1,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await athleteContextAthleteScoreModelTrainingService.TrainAsync(
+            fromRound,
+            toRound,
+            validationRounds,
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Returns metadata about the currently persisted v1 athlete-context athlete-score model artifact, if one is available.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>The active athlete-context model metadata or 404 when the artifact has not been trained yet.</returns>
+    [HttpGet("models/athlete-score-v1-athlete-context")]
+    [ProducesResponseType(typeof(AthleteScoreModelInfo), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAthleteContextAthleteScoreModelInfo(CancellationToken cancellationToken = default)
+    {
+        var result = await athleteContextAthleteScoreModelTrainingService.GetCurrentModelInfoAsync(cancellationToken);
         return result is null ? NotFound() : Ok(result);
     }
 
