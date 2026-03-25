@@ -121,6 +121,61 @@ internal sealed class FakeGatoMestreSyncService : IGatoMestreSyncService
         => OnSyncRoundAsync(season, round, cancellationToken);
 }
 
+internal sealed class FakeTrainingDatasetPreparationService : ITrainingDatasetPreparationService
+{
+    public List<(int FromRound, int ToRound)> RecomputeReadinessCalls { get; } = [];
+
+    public Func<int, int, CancellationToken, Task<TrainingDatasetReadinessResult>> OnRecomputeReadinessAsync { get; init; } =
+        (fromRound, toRound, _) => Task.FromResult(new TrainingDatasetReadinessResult
+        {
+            FromRound = fromRound,
+            ToRound = toRound,
+        });
+
+    public Task<TrainingDatasetReadinessResult> RecomputeReadinessAsync(int fromRound, int toRound, CancellationToken cancellationToken = default)
+    {
+        RecomputeReadinessCalls.Add((fromRound, toRound));
+        return OnRecomputeReadinessAsync(fromRound, toRound, cancellationToken);
+    }
+
+    public Task<CartolaBackfillResult> BackfillCartolaResultsAsync(int fromRound, int toRound, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("This fake is only intended for readiness recomputation tests.");
+
+    public Task<GatoMestreBackfillResult> BackfillGatoMestreAsync(int season, int fromRound, int toRound, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("This fake is only intended for readiness recomputation tests.");
+}
+
+internal sealed class FakeAthleteContextAthleteScoreModelTrainingService : IAthleteContextAthleteScoreModelTrainingService
+{
+    public List<(int? FromRound, int? ToRound, int ValidationRounds)> TrainCalls { get; } = [];
+
+    public Func<int?, int?, int, CancellationToken, Task<AthleteScoreModelTrainingResult>> OnTrainAsync { get; init; } =
+        (fromRound, toRound, validationRounds, _) => Task.FromResult(new AthleteScoreModelTrainingResult
+        {
+            Message = "trained",
+            ModelInfo = new AthleteScoreModelInfo
+            {
+                ModelVersion = "athlete-score-v1-athlete-context",
+                DatasetKey = "athlete-context",
+                FromRound = fromRound,
+                ToRound = toRound,
+                ValidationRounds = validationRounds,
+            },
+        });
+
+    public Func<CancellationToken, Task<AthleteScoreModelInfo?>> OnGetCurrentModelInfoAsync { get; init; } =
+        _ => Task.FromResult<AthleteScoreModelInfo?>(null);
+
+    public Task<AthleteScoreModelTrainingResult> TrainAsync(int? fromRound = null, int? toRound = null, int validationRounds = 1, CancellationToken cancellationToken = default)
+    {
+        TrainCalls.Add((fromRound, toRound, validationRounds));
+        return OnTrainAsync(fromRound, toRound, validationRounds, cancellationToken);
+    }
+
+    public Task<AthleteScoreModelInfo?> GetCurrentModelInfoAsync(CancellationToken cancellationToken = default)
+        => OnGetCurrentModelInfoAsync(cancellationToken);
+}
+
 internal sealed class FakeHostEnvironment(string contentRootPath) : IHostEnvironment
 {
     public string EnvironmentName { get; set; } = "Development";

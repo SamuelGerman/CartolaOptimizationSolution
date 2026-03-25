@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<ISyncDiagnosticsService, SyncDiagnosticsService>();
         services.AddScoped<ITrainingDatasetPreparationService, TrainingDatasetPreparationService>();
         services.AddScoped<ITrainingDatasetDiagnosticsService, TrainingDatasetDiagnosticsService>();
+        services.AddScoped<IEndOfRoundMaintenanceService, EndOfRoundMaintenanceService>();
         services.AddScoped<IIntegrationFailureLogService, IntegrationFailureLogService>();
         services.AddScoped<ISyncExecutionLogService, SyncExecutionLogService>();
 

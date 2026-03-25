@@ -13,6 +13,7 @@ namespace CartolaOptimization.Api.Controllers;
 public sealed class TrainingDatasetController(
     ITrainingDatasetPreparationService trainingDatasetPreparationService,
     ITrainingDatasetDiagnosticsService trainingDatasetDiagnosticsService,
+    IEndOfRoundMaintenanceService endOfRoundMaintenanceService,
     IAthleteScoreModelTrainingService athleteScoreModelTrainingService,
     IAthleteContextAthleteScoreModelTrainingService athleteContextAthleteScoreModelTrainingService,
     IFullContextAthleteScoreModelTrainingService fullContextAthleteScoreModelTrainingService) : ControllerBase
@@ -347,6 +348,29 @@ public sealed class TrainingDatasetController(
         CancellationToken cancellationToken = default)
     {
         var result = await trainingDatasetPreparationService.BackfillGatoMestreAsync(season, fromRound, toRound, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Executes the end-of-round maintenance workflow: synchronizes the current market, backfills only the missing historical closed rounds, refreshes readiness metadata and retrains the athlete-context model when needed.
+    /// </summary>
+    /// <param name="validationRounds">Number of last rounds reserved for temporal validation when the model is retrained. Defaults to one round.</param>
+    /// <param name="forceLatestClosedRound">When true, forces the latest closed round to be reprocessed even if it was already finalized before.</param>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>A consolidated summary of the automated end-of-round maintenance workflow.</returns>
+    [HttpPost("maintenance/end-of-round")]
+    [ProducesResponseType(typeof(EndOfRoundMaintenanceResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> RunEndOfRoundMaintenance(
+        [FromQuery] int validationRounds = 1,
+        [FromQuery] bool forceLatestClosedRound = false,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await endOfRoundMaintenanceService.RunAsync(
+            validationRounds,
+            forceLatestClosedRound,
+            cancellationToken);
+
         return Ok(result);
     }
 }
