@@ -309,6 +309,65 @@ public sealed class AthleteScoreModelServicesTests
     }
 
     [Fact]
+    public async Task GetOptimalAthleteContextLineupAsync_AutoSelectsBestSupportedFormation_WhenFormationIsOmitted()
+    {
+        var predictions = new AthleteScorePredictionResult
+        {
+            Round = 9,
+            DatasetKey = "athlete-context",
+            ModelVersion = "athlete-score-v1-athlete-context",
+            ModelTrainedAtUtc = DateTime.UtcNow,
+            ValidationMeanAbsoluteError = 1.11,
+            ValidationRootMeanSquaredError = 1.66,
+            TotalAthletesConsidered = 16,
+            TotalAthletesPredicted = 16,
+            Athletes =
+            [
+                CreatePredictionItem(1, "Goleiro A", 1, 5m, 5m),
+                CreatePredictionItem(2, "Lateral A", 2, 6m, 7m),
+                CreatePredictionItem(3, "Lateral B", 2, 6m, 6m),
+                CreatePredictionItem(4, "Zagueiro A", 3, 4m, 8m),
+                CreatePredictionItem(5, "Zagueiro B", 3, 4m, 7m),
+                CreatePredictionItem(6, "Zagueiro C", 3, 4m, 6m),
+                CreatePredictionItem(7, "Meia A", 4, 5m, 9m),
+                CreatePredictionItem(8, "Meia B", 4, 5m, 8m),
+                CreatePredictionItem(9, "Meia C", 4, 5m, 7m),
+                CreatePredictionItem(10, "Meia D", 4, 5m, 6m),
+                CreatePredictionItem(11, "Meia E", 4, 5m, 5m),
+                CreatePredictionItem(12, "Atacante A", 5, 6m, 10m),
+                CreatePredictionItem(13, "Atacante B", 5, 6m, 9m),
+                CreatePredictionItem(14, "Atacante C", 5, 6m, 8m),
+                CreatePredictionItem(15, "Tecnico A", 6, 1m, 1m),
+                CreatePredictionItem(16, "Tecnico B", 6, 4m, 0.5m),
+            ],
+        };
+
+        var optimizerService = new PredictedLineupOptimizationService(
+            new StubAthleteScorePredictionService(predictions),
+            new ConfigurableAthleteContextAthleteScorePredictionService(predictions));
+
+        var result = await optimizerService.GetOptimalAthleteContextLineupAsync(
+            9,
+            new PredictedLineupRequest
+            {
+                Budget = 60m,
+            });
+
+        Assert.Equal("athlete-context", result.DatasetKey);
+        Assert.Equal(12, result.TotalPlayers);
+        Assert.Equal(60m, result.Budget);
+        Assert.Equal(59m, result.TotalCost);
+        Assert.Equal(85m, result.TotalPredictedScore);
+        Assert.Contains("automatically selected", result.OptimizationNotes, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(
+            [1, 2, 2, 3, 3, 1],
+            result.Formation
+                .OrderBy(item => item.PositionCartolaId)
+                .Select(item => item.Quantity)
+                .ToArray());
+    }
+
+    [Fact]
     public async Task TrainAsync_PersistsAthleteContextModelArtifactAndMetadata()
     {
         var dbContextFactory = CreateDbContextFactory();
@@ -992,6 +1051,39 @@ public sealed class AthleteScoreModelServicesTests
             indexShotsPerGame,
             indexShotsPerGoal);
 
+    private static AthleteScorePredictionItem CreatePredictionItem(
+        int athleteCartolaId,
+        string athleteName,
+        int positionCartolaId,
+        decimal priceNum,
+        decimal predictedScore)
+        => new()
+        {
+            AthleteCartolaId = athleteCartolaId,
+            AthleteName = athleteName,
+            AthleteNickname = athleteName,
+            ClubCartolaId = 293,
+            ClubName = "Athletico-PR",
+            PositionCartolaId = positionCartolaId,
+            PositionName = positionCartolaId switch
+            {
+                1 => "Goleiro",
+                2 => "Lateral",
+                3 => "Zagueiro",
+                4 => "Meia",
+                5 => "Atacante",
+                6 => "Tecnico",
+                _ => "Desconhecido",
+            },
+            StatusCartolaId = 7,
+            StatusName = "Provavel",
+            BaselineRound = 9,
+            BaselineDataPhase = RoundDataPhaseValues.CurrentOpen,
+            PriceNum = priceNum,
+            PredictedScore = predictedScore,
+            PredictionNotes = "Prediction generated from the current pre-round athlete baseline for round 9.",
+        };
+
     private static string CreateArtifactDirectory()
     {
         var path = Path.Combine(Path.GetTempPath(), "cartola-ml-tests", Guid.NewGuid().ToString("N"));
@@ -1025,5 +1117,29 @@ public sealed class AthleteScoreModelServicesTests
             int take = 100,
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException("Athlete-context predictions are not expected in this test.");
+    }
+
+    private sealed class StubAthleteScorePredictionService(AthleteScorePredictionResult result) : IAthleteScorePredictionService
+    {
+        public Task<AthleteScorePredictionResult> GetPredictedScoresAsync(
+            int round,
+            int? statusCartolaId = null,
+            int? clubCartolaId = null,
+            int? positionCartolaId = null,
+            int take = 100,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(result);
+    }
+
+    private sealed class ConfigurableAthleteContextAthleteScorePredictionService(AthleteScorePredictionResult result) : IAthleteContextAthleteScorePredictionService
+    {
+        public Task<AthleteScorePredictionResult> GetPredictedScoresAsync(
+            int round,
+            int? statusCartolaId = null,
+            int? clubCartolaId = null,
+            int? positionCartolaId = null,
+            int take = 100,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(result);
     }
 }

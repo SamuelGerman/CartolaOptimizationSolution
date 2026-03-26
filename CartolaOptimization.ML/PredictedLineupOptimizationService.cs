@@ -8,8 +8,19 @@ public sealed class PredictedLineupOptimizationService(
     IAthleteContextAthleteScorePredictionService athleteContextAthleteScorePredictionService) : IPredictedLineupOptimizationService
 {
     private const int ProbableStatusCartolaId = 7;
-    private const string ProbableStatusName = "Provável";
+    private const string ProbableStatusName = "Provavel";
     private const int MaxPredictionCandidates = 5000;
+
+    private static readonly IReadOnlyList<IReadOnlyList<PredictedLineupPositionRequirement>> SupportedCartolaFormations =
+    [
+        CreateFormation(goalkeeperQuantity: 1, lateralQuantity: 0, defenderQuantity: 3, midfielderQuantity: 4, strikerQuantity: 3, coachQuantity: 1),
+        CreateFormation(goalkeeperQuantity: 1, lateralQuantity: 0, defenderQuantity: 3, midfielderQuantity: 5, strikerQuantity: 2, coachQuantity: 1),
+        CreateFormation(goalkeeperQuantity: 1, lateralQuantity: 2, defenderQuantity: 2, midfielderQuantity: 3, strikerQuantity: 3, coachQuantity: 1),
+        CreateFormation(goalkeeperQuantity: 1, lateralQuantity: 2, defenderQuantity: 2, midfielderQuantity: 4, strikerQuantity: 2, coachQuantity: 1),
+        CreateFormation(goalkeeperQuantity: 1, lateralQuantity: 2, defenderQuantity: 2, midfielderQuantity: 5, strikerQuantity: 1, coachQuantity: 1),
+        CreateFormation(goalkeeperQuantity: 1, lateralQuantity: 2, defenderQuantity: 3, midfielderQuantity: 3, strikerQuantity: 2, coachQuantity: 1),
+        CreateFormation(goalkeeperQuantity: 1, lateralQuantity: 2, defenderQuantity: 3, midfielderQuantity: 4, strikerQuantity: 1, coachQuantity: 1),
+    ];
 
     private static readonly IReadOnlyDictionary<int, string> KnownPositionNames = new Dictionary<int, string>
     {
@@ -18,7 +29,7 @@ public sealed class PredictedLineupOptimizationService(
         [3] = "Zagueiro",
         [4] = "Meia",
         [5] = "Atacante",
-        [6] = "Técnico",
+        [6] = "Tecnico",
     };
 
     public async Task<PredictedLineupResult> GetOptimalLineupAsync(
@@ -47,10 +58,7 @@ public sealed class PredictedLineupOptimizationService(
         Func<int, int?, int?, int?, int, CancellationToken, Task<AthleteScorePredictionResult>> predictionFunc,
         CancellationToken cancellationToken)
     {
-        if (request is null)
-        {
-            throw new ArgumentNullException(nameof(request));
-        }
+        ArgumentNullException.ThrowIfNull(request);
 
         if (round <= 0)
         {
@@ -62,7 +70,8 @@ public sealed class PredictedLineupOptimizationService(
             throw new ArgumentOutOfRangeException(nameof(request.Budget), "Budget must be greater than zero.");
         }
 
-        var normalizedFormation = NormalizeFormation(request.Formation);
+        var autoSelectFormation = request.Formation is null || request.Formation.Count == 0;
+        var requestedFormations = ResolveRequestedFormations(request.Formation);
         var budgetInCents = ToCents(request.Budget);
 
         var predictions = await predictionFunc(
@@ -75,41 +84,76 @@ public sealed class PredictedLineupOptimizationService(
 
         var candidatesByPosition = predictions.Athletes
             .GroupBy(item => item.PositionCartolaId)
-            .ToDictionary(group => group.Key, group => group
-                .OrderByDescending(item => item.PredictedScore)
-                .ThenBy(item => item.PriceNum)
-                .ThenBy(item => item.AthleteName)
-                .ToList());
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderByDescending(item => item.PredictedScore)
+                    .ThenBy(item => item.PriceNum)
+                    .ThenBy(item => item.AthleteName)
+                    .ToList());
 
-        foreach (var requirement in normalizedFormation)
+        var positionOptionCache = new Dictionary<(int PositionCartolaId, int Quantity), IReadOnlyList<PositionBudgetOption>>();
+        FormationOptimizationResult? optimalResult = null;
+
+        foreach (var formation in requestedFormations)
         {
-            var availableCandidates = candidatesByPosition.TryGetValue(requirement.PositionCartolaId, out var candidates)
-                ? candidates.Count
-                : 0;
-
-            if (availableCandidates < requirement.Quantity)
+            var validationFailure = ValidateFormationAvailability(formation, candidatesByPosition, round);
+            if (validationFailure is not null)
             {
-                var positionName = ResolvePositionName(requirement.PositionCartolaId, candidatesByPosition);
-                throw new InvalidOperationException(
-                    $"The requested formation needs {requirement.Quantity} athlete(s) for position '{positionName}', but only {availableCandidates} provável athlete(s) were available for round {round}.");
+                if (!autoSelectFormation)
+                {
+                    throw new InvalidOperationException(validationFailure);
+                }
+
+                continue;
+            }
+
+            var positionOptions = new List<IReadOnlyList<PositionBudgetOption>>(formation.Count);
+            foreach (var requirement in formation)
+            {
+                var cacheKey = (requirement.PositionCartolaId, requirement.Quantity);
+                if (!positionOptionCache.TryGetValue(cacheKey, out var options))
+                {
+                    options = BuildPositionOptions(
+                        requirement,
+                        candidatesByPosition[requirement.PositionCartolaId],
+                        budgetInCents);
+                    positionOptionCache[cacheKey] = options;
+                }
+
+                positionOptions.Add(options);
+            }
+
+            var optimalLineup = CombinePositionOptions(positionOptions, budgetInCents);
+            if (optimalLineup is null)
+            {
+                if (!autoSelectFormation)
+                {
+                    throw new InvalidOperationException(
+                        $"No feasible lineup was found within budget {request.Budget:F2} for the requested formation. Increase the budget or relax the formation constraints.");
+                }
+
+                continue;
+            }
+
+            var candidate = new FormationOptimizationResult(formation, optimalLineup);
+            if (optimalResult is null ||
+                candidate.TotalScore > optimalResult.TotalScore ||
+                (candidate.TotalScore == optimalResult.TotalScore && candidate.TotalCostInCents < optimalResult.TotalCostInCents))
+            {
+                optimalResult = candidate;
             }
         }
 
-        var positionOptions = normalizedFormation
-            .Select(requirement => BuildPositionOptions(
-                requirement,
-                candidatesByPosition[requirement.PositionCartolaId],
-                budgetInCents))
-            .ToList();
-
-        var optimalLineup = CombinePositionOptions(positionOptions, budgetInCents);
-        if (optimalLineup is null)
+        if (optimalResult is null)
         {
             throw new InvalidOperationException(
-                $"No feasible lineup was found within budget {request.Budget:F2} for the requested formation. Increase the budget or relax the formation constraints.");
+                autoSelectFormation
+                    ? $"No feasible lineup was found within budget {request.Budget:F2} for any supported Cartola formation. Increase the budget or provide a custom formation."
+                    : $"No feasible lineup was found within budget {request.Budget:F2} for the requested formation. Increase the budget or relax the formation constraints.");
         }
 
-        var selectedAthletes = ReconstructSelectedAthletes(optimalLineup)
+        var selectedAthletes = ReconstructSelectedAthletes(optimalResult.Lineup)
             .OrderBy(item => item.PositionCartolaId)
             .ThenByDescending(item => item.PredictedScore)
             .ThenBy(item => item.AthleteName)
@@ -132,7 +176,7 @@ public sealed class PredictedLineupOptimizationService(
             })
             .ToList();
 
-        var totalCost = FromCents(optimalLineup.TotalCostInCents);
+        var totalCost = FromCents(optimalResult.TotalCostInCents);
         var usesFallbackBaselines = selectedAthletes.Any(item =>
             item.PredictionNotes.Contains("latest persisted athlete baseline", StringComparison.OrdinalIgnoreCase));
 
@@ -146,25 +190,23 @@ public sealed class PredictedLineupOptimizationService(
             Budget = request.Budget,
             TotalCost = totalCost,
             RemainingBudget = request.Budget - totalCost,
-            TotalPredictedScore = Math.Round(optimalLineup.TotalScore, 2, MidpointRounding.AwayFromZero),
+            TotalPredictedScore = Math.Round(optimalResult.TotalScore, 2, MidpointRounding.AwayFromZero),
             TotalPlayers = selectedAthletes.Count,
             TotalProbableAthletesEvaluated = predictions.TotalAthletesConsidered,
             ProbableStatusCartolaId = ProbableStatusCartolaId,
             ProbableStatusName = ProbableStatusName,
             ValidationMeanAbsoluteError = predictions.ValidationMeanAbsoluteError,
             ValidationRootMeanSquaredError = predictions.ValidationRootMeanSquaredError,
-            OptimizationNotes = usesFallbackBaselines
-                ? $"Optimization considered only provável athletes and used the latest persisted baseline before round {round} because current pre-round rows were not available for all candidates."
-                : "Optimization considered only provável athletes and used current pre-round baselines for the target round.",
-            Formation = normalizedFormation,
+            OptimizationNotes = BuildOptimizationNotes(round, usesFallbackBaselines, autoSelectFormation, optimalResult.Formation),
+            Formation = optimalResult.Formation,
             Athletes = selectedAthletes,
         };
     }
 
     private static IReadOnlyList<PredictedLineupPositionRequirement> NormalizeFormation(
-        IReadOnlyCollection<PredictedLineupPositionRequirement> formation)
+        IReadOnlyCollection<PredictedLineupPositionRequirement>? formation)
     {
-        if (formation.Count == 0)
+        if (formation is null || formation.Count == 0)
         {
             throw new ArgumentException("At least one position quantity must be informed in the formation request.", nameof(formation));
         }
@@ -200,6 +242,86 @@ public sealed class PredictedLineupOptimizationService(
 
         return normalized;
     }
+
+    private static IReadOnlyList<IReadOnlyList<PredictedLineupPositionRequirement>> ResolveRequestedFormations(
+        IReadOnlyCollection<PredictedLineupPositionRequirement>? formation)
+    {
+        if (formation is null || formation.Count == 0)
+        {
+            return SupportedCartolaFormations;
+        }
+
+        return [NormalizeFormation(formation)];
+    }
+
+    private static string? ValidateFormationAvailability(
+        IReadOnlyList<PredictedLineupPositionRequirement> formation,
+        IReadOnlyDictionary<int, List<AthleteScorePredictionItem>> candidatesByPosition,
+        int round)
+    {
+        foreach (var requirement in formation)
+        {
+            var availableCandidates = candidatesByPosition.TryGetValue(requirement.PositionCartolaId, out var candidates)
+                ? candidates.Count
+                : 0;
+
+            if (availableCandidates < requirement.Quantity)
+            {
+                var positionName = ResolvePositionName(requirement.PositionCartolaId, candidatesByPosition);
+                return $"The requested formation needs {requirement.Quantity} athlete(s) for position '{positionName}', but only {availableCandidates} provavel athlete(s) were available for round {round}.";
+            }
+        }
+
+        return null;
+    }
+
+    private static string BuildOptimizationNotes(
+        int round,
+        bool usesFallbackBaselines,
+        bool autoSelectFormation,
+        IReadOnlyList<PredictedLineupPositionRequirement> formation)
+    {
+        var formationDescription = DescribeFormation(formation);
+        var baselineNotes = usesFallbackBaselines
+            ? $"used the latest persisted baseline before round {round} because current pre-round rows were not available for all candidates"
+            : "used current pre-round baselines for the target round";
+
+        if (autoSelectFormation)
+        {
+            return $"Optimization considered only provavel athletes, automatically selected the supported Cartola formation {formationDescription}, and {baselineNotes}.";
+        }
+
+        return $"Optimization considered only provavel athletes, respected the requested formation {formationDescription}, and {baselineNotes}.";
+    }
+
+    private static string DescribeFormation(IReadOnlyList<PredictedLineupPositionRequirement> formation)
+    {
+        var laterals = formation.FirstOrDefault(item => item.PositionCartolaId == 2)?.Quantity ?? 0;
+        var defenders = formation.FirstOrDefault(item => item.PositionCartolaId == 3)?.Quantity ?? 0;
+        var midfielders = formation.FirstOrDefault(item => item.PositionCartolaId == 4)?.Quantity ?? 0;
+        var strikers = formation.FirstOrDefault(item => item.PositionCartolaId == 5)?.Quantity ?? 0;
+
+        return $"{laterals + defenders}-{midfielders}-{strikers}";
+    }
+
+    private static IReadOnlyList<PredictedLineupPositionRequirement> CreateFormation(
+        int goalkeeperQuantity,
+        int lateralQuantity,
+        int defenderQuantity,
+        int midfielderQuantity,
+        int strikerQuantity,
+        int coachQuantity)
+        => new List<PredictedLineupPositionRequirement>
+        {
+            new() { PositionCartolaId = 1, Quantity = goalkeeperQuantity },
+            new() { PositionCartolaId = 2, Quantity = lateralQuantity },
+            new() { PositionCartolaId = 3, Quantity = defenderQuantity },
+            new() { PositionCartolaId = 4, Quantity = midfielderQuantity },
+            new() { PositionCartolaId = 5, Quantity = strikerQuantity },
+            new() { PositionCartolaId = 6, Quantity = coachQuantity },
+        }
+        .Where(item => item.Quantity > 0)
+        .ToList();
 
     private static IReadOnlyList<PositionBudgetOption> BuildPositionOptions(
         PredictedLineupPositionRequirement requirement,
@@ -398,5 +520,16 @@ public sealed class PredictedLineupOptimizationService(
         public CombinedState? Previous { get; } = previous;
 
         public PositionBudgetOption? Option { get; } = option;
+    }
+
+    private sealed class FormationOptimizationResult(IReadOnlyList<PredictedLineupPositionRequirement> formation, CombinedState lineup)
+    {
+        public IReadOnlyList<PredictedLineupPositionRequirement> Formation { get; } = formation;
+
+        public CombinedState Lineup { get; } = lineup;
+
+        public decimal TotalScore => Lineup.TotalScore;
+
+        public int TotalCostInCents => Lineup.TotalCostInCents;
     }
 }
