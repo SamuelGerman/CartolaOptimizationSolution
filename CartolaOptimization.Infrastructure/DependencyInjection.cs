@@ -32,7 +32,6 @@ public static class DependencyInjection
         services.AddScoped<IEndOfRoundMaintenanceService, EndOfRoundMaintenanceService>();
         services.AddScoped<IIntegrationFailureLogService, IntegrationFailureLogService>();
         services.AddScoped<ISyncExecutionLogService, SyncExecutionLogService>();
-        services.AddScoped<ICartolaLineupSubmissionService, CartolaLineupSubmissionService>();
 
         return services;
     }

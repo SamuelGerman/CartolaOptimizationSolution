@@ -40,6 +40,4 @@ public sealed class PredictedLineupResult
     public IReadOnlyCollection<PredictedLineupPositionRequirement> Formation { get; init; } = [];
 
     public IReadOnlyCollection<PredictedLineupAthleteItem> Athletes { get; init; } = [];
-
-    public CartolaLineupSubmissionResult? CartolaSubmission { get; set; }
 }

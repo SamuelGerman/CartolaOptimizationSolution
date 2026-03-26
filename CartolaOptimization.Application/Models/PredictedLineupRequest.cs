@@ -8,6 +8,4 @@ public sealed class PredictedLineupRequest
     public decimal Budget { get; init; }
 
     public IReadOnlyCollection<PredictedLineupPositionRequirement>? Formation { get; init; }
-
-    public CartolaLineupSubmissionRequest? CartolaSubmission { get; init; }
 }

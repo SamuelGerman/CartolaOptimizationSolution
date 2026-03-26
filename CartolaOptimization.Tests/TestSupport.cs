@@ -10,7 +10,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Primitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using System.Text.Json;
 
 namespace CartolaOptimization.Tests;
 
@@ -59,8 +58,6 @@ internal sealed class RecordingSyncExecutionLogService : ISyncExecutionLogServic
 
 internal sealed class FakeCartolaApiClient : ICartolaApiClient
 {
-    public List<(CartolaSaveTeamRequest Request, string Authorization, string? GlbTag)> SaveTeamCalls { get; } = [];
-
     public CartolaMarketStatusResponse MarketStatus { get; init; } = new();
 
     public Dictionary<int, CartolaClubResponse> Clubs { get; init; } = [];
@@ -70,9 +67,6 @@ internal sealed class FakeCartolaApiClient : ICartolaApiClient
     public CartolaAthleteScoresResponse AthleteScores { get; init; } = new();
 
     public CartolaMatchesResponse Matches { get; init; } = new();
-
-    public Func<CartolaSaveTeamRequest, string, string?, CancellationToken, Task<JsonElement>> OnSaveTeamAsync { get; init; } =
-        (_, _, _, _) => Task.FromResult(default(JsonElement));
 
     public Task<CartolaMarketStatusResponse> GetMarketStatusAsync(CancellationToken cancellationToken = default)
         => Task.FromResult(MarketStatus);
@@ -88,16 +82,6 @@ internal sealed class FakeCartolaApiClient : ICartolaApiClient
 
     public Task<CartolaMatchesResponse> GetMatchesAsync(int? round = null, CancellationToken cancellationToken = default)
         => Task.FromResult(Matches);
-
-    public Task<JsonElement> SaveTeamAsync(
-        CartolaSaveTeamRequest request,
-        string cartolaAuthorization,
-        string? cartolaGlbTag = null,
-        CancellationToken cancellationToken = default)
-    {
-        SaveTeamCalls.Add((request, cartolaAuthorization, cartolaGlbTag));
-        return OnSaveTeamAsync(request, cartolaAuthorization, cartolaGlbTag, cancellationToken);
-    }
 }
 
 internal sealed class FakeCartolaSyncService : ICartolaSyncService

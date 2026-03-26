@@ -15,8 +15,7 @@ public sealed class AthleteProjectionController(
     IAthleteScorePredictionService athleteScorePredictionService,
     IAthleteContextAthleteScorePredictionService athleteContextAthleteScorePredictionService,
     IFullContextAthleteScorePredictionService fullContextAthleteScorePredictionService,
-    IPredictedLineupOptimizationService predictedLineupOptimizationService,
-    ICartolaLineupSubmissionService cartolaLineupSubmissionService) : ControllerBase
+    IPredictedLineupOptimizationService predictedLineupOptimizationService) : ControllerBase
 {
     /// <summary>
     /// Returns an explainable expected-score projection for the athletes that can be evaluated for the informed round.
@@ -155,8 +154,6 @@ public sealed class AthleteProjectionController(
     public async Task<IActionResult> GetOptimalMachineLearningLineup(
         int round,
         [FromBody] PredictedLineupRequest request,
-        [FromHeader(Name = "X-Cartola-Authorization")] string? cartolaAuthorization,
-        [FromHeader(Name = "X-Cartola-Glb-Tag")] string? cartolaGlbTag,
         CancellationToken cancellationToken = default)
     {
         try
@@ -165,17 +162,6 @@ public sealed class AthleteProjectionController(
                 round,
                 request,
                 cancellationToken);
-
-            if (request.CartolaSubmission?.SaveToCartola == true)
-            {
-                result.CartolaSubmission = await cartolaLineupSubmissionService.SubmitAsync(
-                    round,
-                    result,
-                    request,
-                    cartolaAuthorization,
-                    cartolaGlbTag,
-                    cancellationToken);
-            }
 
             return Ok(result);
         }
@@ -214,8 +200,6 @@ public sealed class AthleteProjectionController(
     public async Task<IActionResult> GetOptimalAthleteContextMachineLearningLineup(
         int round,
         [FromBody] PredictedLineupRequest request,
-        [FromHeader(Name = "X-Cartola-Authorization")] string? cartolaAuthorization,
-        [FromHeader(Name = "X-Cartola-Glb-Tag")] string? cartolaGlbTag,
         CancellationToken cancellationToken = default)
     {
         try
@@ -224,17 +208,6 @@ public sealed class AthleteProjectionController(
                 round,
                 request,
                 cancellationToken);
-
-            if (request.CartolaSubmission?.SaveToCartola == true)
-            {
-                result.CartolaSubmission = await cartolaLineupSubmissionService.SubmitAsync(
-                    round,
-                    result,
-                    request,
-                    cartolaAuthorization,
-                    cartolaGlbTag,
-                    cancellationToken);
-            }
 
             return Ok(result);
         }
