@@ -5,7 +5,8 @@ namespace CartolaOptimization.ML;
 
 public sealed class PredictedLineupOptimizationService(
     IAthleteScorePredictionService athleteScorePredictionService,
-    IAthleteContextAthleteScorePredictionService athleteContextAthleteScorePredictionService) : IPredictedLineupOptimizationService
+    IAthleteContextAthleteScorePredictionService athleteContextAthleteScorePredictionService,
+    IFullContextAthleteScorePredictionService fullContextAthleteScorePredictionService) : IPredictedLineupOptimizationService
 {
     private const int ProbableStatusCartolaId = 7;
     private const string ProbableStatusName = "Provavel";
@@ -50,6 +51,16 @@ public sealed class PredictedLineupOptimizationService(
             round,
             request,
             athleteContextAthleteScorePredictionService.GetPredictedScoresAsync,
+            cancellationToken);
+
+    public async Task<PredictedLineupResult> GetOptimalFullContextLineupAsync(
+        int round,
+        PredictedLineupRequest request,
+        CancellationToken cancellationToken = default)
+        => await GetOptimalLineupCoreAsync(
+            round,
+            request,
+            fullContextAthleteScorePredictionService.GetPredictedScoresAsync,
             cancellationToken);
 
     private static async Task<PredictedLineupResult> GetOptimalLineupCoreAsync(

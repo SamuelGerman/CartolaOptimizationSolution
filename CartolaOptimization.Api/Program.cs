@@ -1,6 +1,7 @@
 using CartolaOptimization.Infrastructure;
 using CartolaOptimization.Infrastructure.Context;
 using CartolaOptimization.Api.Middleware;
+using CartolaOptimization.Api.Swagger;
 using CartolaOptimization.ML;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -70,6 +71,8 @@ builder.Services.AddSwaggerGen(options =>
             options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
         }
     }
+
+    options.SchemaFilter<PredictedLineupRequestSchemaFilter>();
 });
 
 var app = builder.Build();

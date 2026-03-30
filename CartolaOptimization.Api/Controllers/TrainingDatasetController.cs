@@ -352,7 +352,7 @@ public sealed class TrainingDatasetController(
     }
 
     /// <summary>
-    /// Executes the end-of-round maintenance workflow: synchronizes the current market, backfills only the missing historical closed rounds, refreshes readiness metadata and retrains the athlete-context model when needed.
+    /// Executes the end-of-round maintenance workflow: synchronizes the current market, backfills only the missing historical closed rounds, refreshes readiness metadata and retrains the primary full-context model when needed.
     /// </summary>
     /// <param name="validationRounds">Number of last rounds reserved for temporal validation when the model is retrained. Defaults to one round.</param>
     /// <param name="forceLatestClosedRound">When true, forces the latest closed round to be reprocessed even if it was already finalized before.</param>

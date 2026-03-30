@@ -8,14 +8,14 @@ using Microsoft.EntityFrameworkCore;
 namespace CartolaOptimization.Infrastructure.Services;
 
 /// <summary>
-/// Orchestrates the recurring end-of-round workflow required to refresh historical data and retrain the athlete-context model.
+/// Orchestrates the recurring end-of-round workflow required to refresh historical data and retrain the primary full-context model.
 /// </summary>
 public sealed class EndOfRoundMaintenanceService(
     IDbContextFactory<AppDbContext> dbContextFactory,
     ICartolaSyncService cartolaSyncService,
     IGatoMestreSyncService gatoMestreSyncService,
     ITrainingDatasetPreparationService trainingDatasetPreparationService,
-    IAthleteContextAthleteScoreModelTrainingService athleteContextAthleteScoreModelTrainingService) : IEndOfRoundMaintenanceService
+    IFullContextAthleteScoreModelTrainingService fullContextAthleteScoreModelTrainingService) : IEndOfRoundMaintenanceService
 {
     private const string StepStatusExecuted = "Executed";
     private const string StepStatusSkipped = "Skipped";
@@ -43,13 +43,13 @@ public sealed class EndOfRoundMaintenanceService(
             Rounds = currentRound > 0 ? [currentRound] : Array.Empty<int>(),
         });
 
-        var existingModelInfo = await athleteContextAthleteScoreModelTrainingService.GetCurrentModelInfoAsync(cancellationToken);
+        var existingModelInfo = await fullContextAthleteScoreModelTrainingService.GetCurrentModelInfoAsync(cancellationToken);
         if (lastClosedRound <= 0)
         {
             steps.Add(CreateSkippedStep("Finalize closed Cartola rounds", "There is no closed round available yet because the market is still at round 1."));
             steps.Add(CreateSkippedStep("Enrich Gato Mestre historical rounds", "There is no closed round available yet because the market is still at round 1."));
             steps.Add(CreateSkippedStep("Recompute training readiness", "No historical closed round was refreshed in this execution."));
-            steps.Add(CreateSkippedStep("Train athlete-context model", "At least two historical closed rounds are required before the athlete-context model can be trained."));
+            steps.Add(CreateSkippedStep("Train full-context model", "At least two historical closed rounds are required before the primary full-context model can be trained."));
 
             return new EndOfRoundMaintenanceResult
             {
@@ -61,7 +61,7 @@ public sealed class EndOfRoundMaintenanceService(
                 HistoricalDataUpdated = false,
                 ModelRetrained = false,
                 CurrentMarketSync = currentMarketSync,
-                AthleteContextModelInfo = existingModelInfo,
+                PrimaryModelInfo = existingModelInfo,
                 Steps = steps,
             };
         }
@@ -150,20 +150,20 @@ public sealed class EndOfRoundMaintenanceService(
         if (cartolaBackfillFailed || gatoMestreBackfillFailed)
         {
             steps.Add(CreateSkippedStep(
-                "Train athlete-context model",
+                "Train full-context model",
                 "Model training was skipped because at least one historical refresh step failed and the latest training window could not be considered stable."));
         }
         else if (!historicalDataUpdated && !modelNeedsRefresh)
         {
             steps.Add(CreateSkippedStep(
-                "Train athlete-context model",
-                $"The athlete-context model is already trained up to round {lastClosedRound} with validationRounds={validationRounds}."));
+                "Train full-context model",
+                $"The primary full-context model is already trained up to round {lastClosedRound} with validationRounds={validationRounds}."));
         }
         else
         {
             try
             {
-                trainingResult = await athleteContextAthleteScoreModelTrainingService.TrainAsync(
+                trainingResult = await fullContextAthleteScoreModelTrainingService.TrainAsync(
                     toRound: lastClosedRound,
                     validationRounds: validationRounds,
                     cancellationToken: cancellationToken);
@@ -172,16 +172,16 @@ public sealed class EndOfRoundMaintenanceService(
 
                 steps.Add(new EndOfRoundMaintenanceStepResult
                 {
-                    Step = "Train athlete-context model",
+                    Step = "Train full-context model",
                     Status = StepStatusExecuted,
-                    Reason = $"Trained the athlete-context model with historical closed rounds up to round {lastClosedRound}.",
+                    Reason = $"Trained the primary full-context model with historical closed rounds up to round {lastClosedRound}.",
                     Rounds = [lastClosedRound],
                 });
             }
             catch (InvalidOperationException exception)
             {
-                activeModelInfo = await athleteContextAthleteScoreModelTrainingService.GetCurrentModelInfoAsync(cancellationToken);
-                steps.Add(CreateSkippedStep("Train athlete-context model", exception.Message));
+                activeModelInfo = await fullContextAthleteScoreModelTrainingService.GetCurrentModelInfoAsync(cancellationToken);
+                steps.Add(CreateSkippedStep("Train full-context model", exception.Message));
             }
         }
 
@@ -198,8 +198,8 @@ public sealed class EndOfRoundMaintenanceService(
             CartolaClosedRoundBackfill = cartolaBackfill,
             GatoMestreBackfill = gatoMestreBackfill,
             ReadinessRecompute = readinessResult,
-            AthleteContextModelTraining = trainingResult,
-            AthleteContextModelInfo = activeModelInfo,
+            PrimaryModelTraining = trainingResult,
+            PrimaryModelInfo = activeModelInfo,
             Steps = steps,
         };
     }
@@ -378,7 +378,7 @@ public sealed class EndOfRoundMaintenanceService(
 
         if (modelRetrained)
         {
-            return $"End-of-round maintenance completed successfully and retrained the athlete-context model through round {lastClosedRound}.";
+            return $"End-of-round maintenance completed successfully and retrained the primary full-context model through round {lastClosedRound}.";
         }
 
         if (historicalDataUpdated)
@@ -386,7 +386,7 @@ public sealed class EndOfRoundMaintenanceService(
             return $"End-of-round maintenance refreshed historical data through round {lastClosedRound}. Model retraining was skipped because the training preconditions were not satisfied yet.";
         }
 
-        return $"End-of-round maintenance confirmed that historical data and the athlete-context model are already up to date through round {lastClosedRound}.";
+        return $"End-of-round maintenance confirmed that historical data and the primary full-context model are already up to date through round {lastClosedRound}.";
     }
 
     private static async Task<HashSet<int>> GetCompletedCartolaClosedRoundsAsync(

@@ -444,162 +444,11 @@ public sealed class TrainingDatasetDiagnosticsService(AppDbContext dbContext) : 
                 FromRound = fromRound,
                 ToRound = toRound,
                 RequestedTake = take,
-                EligibilityRule = "Historical closed athlete rounds with structural references, valid Cartola match context, complete club-round enrichment for both clubs and position-level opponent context.",
+                EligibilityRule = "Historical closed athlete rounds with structural references, valid Cartola match context and local club/opponent context derived from historical athlete rounds, scouts and matches.",
             };
         }
 
-        var rounds = athleteRounds
-            .Select(item => item.RoundId)
-            .Distinct()
-            .ToArray();
-
-        var clubRounds = await dbContext.ClubRounds
-            .AsNoTracking()
-            .Include(item => item.Club)
-            .Include(item => item.Context)
-            .Include(item => item.PositionStats)
-            .Where(item => rounds.Contains(item.Round))
-            .ToListAsync(cancellationToken);
-
-        var completeClubRounds = clubRounds
-            .Where(item => item.PositionStats.Count > 0)
-            .ToDictionary(item => (item.Round, item.ClubId));
-
-        var matches = await dbContext.Matches
-            .AsNoTracking()
-            .Include(item => item.HomeClub)
-            .Include(item => item.AwayClub)
-            .Where(item => rounds.Contains(item.Round) && item.ValidForCartola)
-            .ToListAsync(cancellationToken);
-
-        var matchByRoundAndClubId = new Dictionary<(int Round, int ClubId), Match>();
-        foreach (var match in matches)
-        {
-            matchByRoundAndClubId[(match.Round, match.HomeClubId)] = match;
-            matchByRoundAndClubId[(match.Round, match.AwayClubId)] = match;
-        }
-
-        var exportableRows = new List<TrainingFullContextDatasetRow>(athleteRounds.Count);
-
-        foreach (var athleteRound in athleteRounds)
-        {
-            if (!completeClubRounds.TryGetValue((athleteRound.RoundId, athleteRound.ClubId), out var clubRound))
-            {
-                continue;
-            }
-
-            if (!matchByRoundAndClubId.TryGetValue((athleteRound.RoundId, athleteRound.ClubId), out var match))
-            {
-                continue;
-            }
-
-            var isHomeMatch = match.HomeClubId == athleteRound.ClubId;
-            var opponentClubId = isHomeMatch ? match.AwayClubId : match.HomeClubId;
-
-            if (!completeClubRounds.TryGetValue((athleteRound.RoundId, opponentClubId), out var opponentClubRound))
-            {
-                continue;
-            }
-
-            var clubPositionStats = clubRound.PositionStats.FirstOrDefault(item => item.PositionId == athleteRound.PositionId);
-            var opponentPositionStats = opponentClubRound.PositionStats.FirstOrDefault(item => item.PositionId == athleteRound.PositionId);
-
-            if (clubPositionStats is null || opponentPositionStats is null)
-            {
-                continue;
-            }
-
-            var clubTablePosition = isHomeMatch ? match.HomeClubPosition : match.AwayClubPosition;
-            var opponentTablePosition = isHomeMatch ? match.AwayClubPosition : match.HomeClubPosition;
-            var clubRecentForm = isHomeMatch ? match.HomeForm : match.AwayForm;
-            var opponentRecentForm = isHomeMatch ? match.AwayForm : match.HomeForm;
-            var opponentClubCartolaId = isHomeMatch ? match.AwayClub.CartolaId : match.HomeClub.CartolaId;
-            var opponentClubName = isHomeMatch ? match.AwayClub.Nickname : match.HomeClub.Nickname;
-
-            exportableRows.Add(new TrainingFullContextDatasetRow
-            {
-                AthleteRoundId = athleteRound.Id,
-                RoundId = athleteRound.RoundId,
-                AthleteCartolaId = athleteRound.Athlete.CartolaId,
-                AthleteName = athleteRound.Athlete.Name,
-                AthleteNickname = athleteRound.Athlete.Nickname,
-                ClubCartolaId = athleteRound.Club.CartolaId,
-                ClubName = athleteRound.Club.Nickname,
-                PositionCartolaId = athleteRound.Position.CartolaId,
-                PositionName = athleteRound.Position.Name,
-                StatusCartolaId = athleteRound.Status.CartolaId,
-                StatusName = athleteRound.Status.Name,
-                GamesNum = athleteRound.GamesNum,
-                HomeGamesNum = athleteRound.HomeGamesNum,
-                AwayGamesNum = athleteRound.AwayGamesNum,
-                MovingAverage = athleteRound.MovingAverage,
-                AverageScore = athleteRound.AverageScoreNum,
-                HomeAverageScore = athleteRound.HomeAverageScore,
-                AwayAverageScore = athleteRound.AwayAverageScore,
-                PriceNum = athleteRound.PriceNum,
-                VariationNum = athleteRound.VariationNum,
-                TeamAverageScore = athleteRound.Context?.TeamAverageScore ?? 0m,
-                PointsPerCartoletaCurrent = athleteRound.Context?.PointsPerCartoletaCurrent ?? 0m,
-                GrossOverallMovingAverageCurrent = athleteRound.Context?.GrossOverallMovingAverageCurrent ?? 0m,
-                NetOverallMovingAverageCurrent = athleteRound.Context?.NetOverallMovingAverageCurrent ?? 0m,
-                ValuationCurrent = athleteRound.Context?.ValuationCurrent ?? 0m,
-                MinimumToAppreciateCurrent = athleteRound.Context?.MinimumToAppreciateCurrent ?? 0m,
-                IndexPointsPerCartoleta = athleteRound.Context?.IndexPointsPerCartoleta ?? 0m,
-                IndexOffensiveEfficiency = athleteRound.Context?.IndexOffensiveEfficiency ?? 0m,
-                IndexDefensiveEfficiency = athleteRound.Context?.IndexDefensiveEfficiency ?? 0m,
-                IndexShotsPerGame = athleteRound.Context?.IndexShotsPerGame ?? 0m,
-                IndexShotsPerGoal = athleteRound.Context?.IndexShotsPerGoal ?? 0m,
-                IsHomeMatch = isHomeMatch,
-                ClubTablePosition = clubTablePosition,
-                OpponentClubCartolaId = opponentClubCartolaId,
-                OpponentClubName = opponentClubName,
-                OpponentClubTablePosition = opponentTablePosition,
-                ClubRecentForm = clubRecentForm,
-                OpponentRecentForm = opponentRecentForm,
-                ClubWinProbability = clubRound.WinProbability,
-                ClubDrawProbability = clubRound.DrawProbability,
-                ClubLoseProbability = clubRound.LoseProbability,
-                ClubOverallAverage = clubRound.OverallAverage,
-                ClubMovingAverage = clubRound.MovingAverage,
-                ClubExpectedPoints = clubRound.ExpectedPoints,
-                ClubPreviousOverallAverage = clubRound.Context?.PreviousOverallAverage ?? 0m,
-                ClubRankingsHomeAverage = clubRound.Context?.RankingsHomeAverage ?? 0m,
-                ClubRankingsAwayAverage = clubRound.Context?.RankingsAwayAverage ?? 0m,
-                ClubHistoricalWinRate = clubRound.Context?.HistoricalWinRate ?? 0m,
-                ClubFavoriteWinProbability = clubRound.Context?.FavoriteWinProbability ?? 0m,
-                ClubForecastExpectedResult = clubRound.Context?.ForecastExpectedResult ?? 0,
-                ClubForecastRiskScore = MapRiskLevelToScore(clubRound.Context?.ForecastRiskLevel),
-                ClubPositionDistributionValue = clubPositionStats.DistributionValue,
-                ClubAverageInsightConfidence = clubRound.Context?.AverageInsightConfidence ?? 0m,
-                ClubPositiveInsightNet = (clubRound.Context?.PositiveInsightCount ?? 0) - (clubRound.Context?.NegativeInsightCount ?? 0),
-                ClubTeamTipsCount = clubRound.Context?.TeamTipsCount ?? 0,
-                ClubMatchTipsCount = clubRound.Context?.MatchTipsCount ?? 0,
-                ClubPositionPointsConcededAverage = clubPositionStats.PointsConcededAverage,
-                ClubPositionPointsConqueredAverage = clubPositionStats.PointsConqueredAverage,
-                OpponentWinProbability = opponentClubRound.WinProbability,
-                OpponentDrawProbability = opponentClubRound.DrawProbability,
-                OpponentLoseProbability = opponentClubRound.LoseProbability,
-                OpponentOverallAverage = opponentClubRound.OverallAverage,
-                OpponentMovingAverage = opponentClubRound.MovingAverage,
-                OpponentExpectedPoints = opponentClubRound.ExpectedPoints,
-                OpponentPreviousOverallAverage = opponentClubRound.Context?.PreviousOverallAverage ?? 0m,
-                OpponentRankingsHomeAverage = opponentClubRound.Context?.RankingsHomeAverage ?? 0m,
-                OpponentRankingsAwayAverage = opponentClubRound.Context?.RankingsAwayAverage ?? 0m,
-                OpponentHistoricalWinRate = opponentClubRound.Context?.HistoricalWinRate ?? 0m,
-                OpponentFavoriteWinProbability = opponentClubRound.Context?.FavoriteWinProbability ?? 0m,
-                OpponentForecastExpectedResult = opponentClubRound.Context?.ForecastExpectedResult ?? 0,
-                OpponentForecastRiskScore = MapRiskLevelToScore(opponentClubRound.Context?.ForecastRiskLevel),
-                OpponentPositionDistributionValue = opponentPositionStats.DistributionValue,
-                OpponentAverageInsightConfidence = opponentClubRound.Context?.AverageInsightConfidence ?? 0m,
-                OpponentPositiveInsightNet = (opponentClubRound.Context?.PositiveInsightCount ?? 0) - (opponentClubRound.Context?.NegativeInsightCount ?? 0),
-                OpponentTeamTipsCount = opponentClubRound.Context?.TeamTipsCount ?? 0,
-                OpponentMatchTipsCount = opponentClubRound.Context?.MatchTipsCount ?? 0,
-                OpponentPositionPointsConcededAverage = opponentPositionStats.PointsConcededAverage,
-                OpponentPositionPointsConqueredAverage = opponentPositionStats.PointsConqueredAverage,
-                TargetScore = athleteRound.ScoreNum,
-                TargetWasInGame = athleteRound.WasInGame,
-            });
-        }
+        var exportableRows = await TrainingFullContextLocalDatasetBuilder.BuildRowsAsync(dbContext, athleteRounds, cancellationToken);
 
         var returnedRows = exportableRows
             .Take(take)
@@ -618,7 +467,7 @@ public sealed class TrainingDatasetDiagnosticsService(AppDbContext dbContext) : 
                 .Distinct()
                 .Count(),
             ReturnedRows = returnedRows.Count,
-            EligibilityRule = "Historical closed athlete rounds with structural references, valid Cartola match context, complete club-round enrichment for both clubs and position-level opponent context.",
+            EligibilityRule = "Historical closed athlete rounds with structural references, valid Cartola match context and local club/opponent context derived from historical athlete rounds, scouts and matches.",
             Rows = returnedRows,
         };
     }

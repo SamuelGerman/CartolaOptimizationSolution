@@ -100,7 +100,7 @@ public sealed class EndOfRoundMaintenanceServiceTests
         };
 
         var preparationService = new FakeTrainingDatasetPreparationService();
-        var trainingService = new FakeAthleteContextAthleteScoreModelTrainingService();
+        var trainingService = new FakeFullContextAthleteScoreModelTrainingService();
 
         var service = new EndOfRoundMaintenanceService(
             new TestAppDbContextFactory(options),
@@ -127,7 +127,9 @@ public sealed class EndOfRoundMaintenanceServiceTests
         Assert.NotNull(result.GatoMestreBackfill);
         Assert.Equal(2, result.GatoMestreBackfill!.RequestedRounds);
         Assert.Equal(SyncExecutionStatus.Partial, result.GatoMestreBackfill.Rounds.First().Status);
-        Assert.Contains(result.Steps, item => item.Step == "Train athlete-context model" && item.Status == "Executed");
+        Assert.Contains(result.Steps, item => item.Step == "Train full-context model" && item.Status == "Executed");
+        Assert.NotNull(result.PrimaryModelInfo);
+        Assert.Equal("full-context", result.PrimaryModelInfo!.DatasetKey);
     }
 
     [Fact]
@@ -202,12 +204,13 @@ public sealed class EndOfRoundMaintenanceServiceTests
         };
 
         var preparationService = new FakeTrainingDatasetPreparationService();
-        var trainingService = new FakeAthleteContextAthleteScoreModelTrainingService
+        var trainingService = new FakeFullContextAthleteScoreModelTrainingService
         {
             OnGetCurrentModelInfoAsync = _ => Task.FromResult<AthleteScoreModelInfo?>(new AthleteScoreModelInfo
             {
-                ModelVersion = "athlete-score-v1-athlete-context",
-                DatasetKey = "athlete-context",
+                ModelVersion = "athlete-score-v1-full-context",
+                DatasetKey = "full-context",
+                TrainerName = "LightGBM",
                 ToRound = 4,
                 ValidationRounds = 1,
             }),
@@ -229,9 +232,9 @@ public sealed class EndOfRoundMaintenanceServiceTests
         Assert.Empty(preparationService.RecomputeReadinessCalls);
         Assert.Empty(trainingService.TrainCalls);
         Assert.Contains(result.Steps, item => item.Step == "Finalize closed Cartola rounds" && item.Status == "Skipped");
-        Assert.Contains(result.Steps, item => item.Step == "Train athlete-context model" && item.Status == "Skipped");
-        Assert.NotNull(result.AthleteContextModelInfo);
-        Assert.Equal(4, result.AthleteContextModelInfo!.ToRound);
+        Assert.Contains(result.Steps, item => item.Step == "Train full-context model" && item.Status == "Skipped");
+        Assert.NotNull(result.PrimaryModelInfo);
+        Assert.Equal(4, result.PrimaryModelInfo!.ToRound);
     }
 
     private static DbContextOptions<AppDbContext> CreateOptions()

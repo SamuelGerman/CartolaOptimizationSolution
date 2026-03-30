@@ -77,6 +77,7 @@ public sealed class AthleteScoreModelTrainingService(
         {
             ModelVersion = options.ModelVersion,
             DatasetKey = DatasetKey,
+            TrainerName = "SDCA",
             TrainedAtUtc = DateTime.UtcNow,
             FromRound = fromRound,
             ToRound = toRound,

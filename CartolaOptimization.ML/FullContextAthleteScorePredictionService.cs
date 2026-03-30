@@ -88,13 +88,12 @@ public sealed class FullContextAthleteScorePredictionService(
                 $"No athlete baseline rows were found for round {round}. Synchronize the current Cartola round or ensure at least one earlier persisted athlete round exists.");
         }
 
-        var completeClubRounds = await FullContextFeatureResolver.LoadCompleteClubRoundsAsync(dbContext, [round], cancellationToken);
-        var matchByRoundAndClubId = await FullContextFeatureResolver.LoadMatchesByRoundAndClubIdAsync(dbContext, [round], cancellationToken);
+        var lookup = await FullContextFeatureResolver.LoadFeatureLookupAsync(dbContext, [round], cancellationToken);
 
         var candidates = new List<FullContextPredictionCandidate>(baselines.Count);
         foreach (var baseline in baselines)
         {
-            if (FullContextFeatureResolver.TryBuildPredictionCandidate(round, baseline, completeClubRounds, matchByRoundAndClubId, out var candidate))
+            if (FullContextFeatureResolver.TryBuildPredictionCandidate(round, baseline, lookup, out var candidate))
             {
                 candidates.Add(candidate);
             }
@@ -104,7 +103,7 @@ public sealed class FullContextAthleteScorePredictionService(
         if (candidates.Count == 0)
         {
             throw new InvalidOperationException(
-                $"No full-context prediction candidates were available for round {round}. Synchronize Cartola current baselines and Gato Mestre club enrichment for the target round before requesting full-context predictions.");
+                $"No full-context prediction candidates were available for round {round}. Synchronize Cartola baselines and ensure a valid target-round match schedule exists before requesting locally derived full-context predictions.");
         }
 
         var mlContext = new MLContext(seed: 42);
@@ -116,8 +115,8 @@ public sealed class FullContextAthleteScorePredictionService(
         var scores = mlContext.Data.CreateEnumerable<AthleteScorePredictionOutput>(transformed, reuseRowObject: false).ToList();
 
         var itemPredictionNotes = usingCurrentRoundBaselines
-            ? "Prediction generated from the current pre-round athlete baseline together with target-round club and opponent context using the trained v1 full-context regression model."
-            : $"Prediction generated from the latest persisted athlete baseline before round {round} combined with target-round club and opponent context because no current pre-round athlete rows were available for that round.";
+            ? "Prediction generated from the current pre-round athlete baseline with club and opponent context derived from local historical Cartola matches, athlete rounds and scouts."
+            : $"Prediction generated from the latest persisted athlete baseline before round {round}, combined with club and opponent context derived from local historical Cartola matches, athlete rounds and scouts because no current pre-round athlete rows were available for that round.";
 
         var athletes = candidates
             .Zip(scores, (candidate, prediction) => new AthleteScorePredictionItem
@@ -154,8 +153,8 @@ public sealed class FullContextAthleteScorePredictionService(
             .ToList();
 
         var predictionNotes = usingCurrentRoundBaselines
-            ? $"Predictions used current pre-round athlete baselines and target-round club/opponent context. {excludedAthletesWithoutContext} athlete(s) were excluded because the target-round full-context enrichment was incomplete."
-            : $"Predictions used the latest persisted athlete baselines before round {round} together with target-round club/opponent context. {excludedAthletesWithoutContext} athlete(s) were excluded because the target-round full-context enrichment was incomplete.";
+            ? $"Predictions used current pre-round athlete baselines plus local full-context derived from historical Cartola matches, athlete rounds and scouts. {excludedAthletesWithoutContext} athlete(s) were excluded because a valid target-round match context was unavailable."
+            : $"Predictions used the latest persisted athlete baselines before round {round} plus local full-context derived from historical Cartola matches, athlete rounds and scouts. {excludedAthletesWithoutContext} athlete(s) were excluded because a valid target-round match context was unavailable.";
 
         return new AthleteScorePredictionResult
         {

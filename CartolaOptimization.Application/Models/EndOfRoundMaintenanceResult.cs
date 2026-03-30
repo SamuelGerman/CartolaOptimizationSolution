@@ -27,6 +27,10 @@ public sealed class EndOfRoundMaintenanceResult
 
     public TrainingDatasetReadinessResult? ReadinessRecompute { get; init; }
 
+    public AthleteScoreModelTrainingResult? PrimaryModelTraining { get; init; }
+
+    public AthleteScoreModelInfo? PrimaryModelInfo { get; init; }
+
     public AthleteScoreModelTrainingResult? AthleteContextModelTraining { get; init; }
 
     public AthleteScoreModelInfo? AthleteContextModelInfo { get; init; }

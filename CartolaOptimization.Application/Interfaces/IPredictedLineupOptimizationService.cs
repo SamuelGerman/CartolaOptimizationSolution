@@ -12,6 +12,11 @@ public interface IPredictedLineupOptimizationService
         PredictedLineupRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<PredictedLineupResult> GetOptimalFullContextLineupAsync(
+        int round,
+        PredictedLineupRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<PredictedLineupResult> GetOptimalAthleteContextLineupAsync(
         int round,
         PredictedLineupRequest request,

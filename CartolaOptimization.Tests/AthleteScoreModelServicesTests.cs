@@ -147,7 +147,8 @@ public sealed class AthleteScoreModelServicesTests
             var predictionService = new AthleteScorePredictionService(dbContextFactory, store);
             var optimizerService = new PredictedLineupOptimizationService(
                 predictionService,
-                new StubAthleteContextAthleteScorePredictionService());
+                new StubAthleteContextAthleteScorePredictionService(),
+                new StubFullContextAthleteScorePredictionService(new AthleteScorePredictionResult()));
 
             var predictions = await predictionService.GetPredictedScoresAsync(round: 4, statusCartolaId: 7, take: 5000);
             var defenderCandidates = predictions.Athletes.Where(item => item.PositionCartolaId == 3).ToList();
@@ -213,7 +214,8 @@ public sealed class AthleteScoreModelServicesTests
             var predictionService = new AthleteScorePredictionService(dbContextFactory, store);
             var optimizerService = new PredictedLineupOptimizationService(
                 predictionService,
-                new StubAthleteContextAthleteScorePredictionService());
+                new StubAthleteContextAthleteScorePredictionService(),
+                new StubFullContextAthleteScorePredictionService(new AthleteScorePredictionResult()));
 
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => optimizerService.GetOptimalLineupAsync(
                 4,
@@ -264,7 +266,10 @@ public sealed class AthleteScoreModelServicesTests
 
             var athleteScorePredictionService = new AthleteScorePredictionService(dbContextFactory, athleteScoreStore);
             var athleteContextPredictionService = new AthleteContextAthleteScorePredictionService(dbContextFactory, store);
-            var optimizerService = new PredictedLineupOptimizationService(athleteScorePredictionService, athleteContextPredictionService);
+            var optimizerService = new PredictedLineupOptimizationService(
+                athleteScorePredictionService,
+                athleteContextPredictionService,
+                new StubFullContextAthleteScorePredictionService(new AthleteScorePredictionResult()));
 
             var predictions = await athleteContextPredictionService.GetPredictedScoresAsync(round: 4, statusCartolaId: 7, take: 5000);
             var defenderCandidates = predictions.Athletes.Where(item => item.PositionCartolaId == 3).ToList();
@@ -344,7 +349,8 @@ public sealed class AthleteScoreModelServicesTests
 
         var optimizerService = new PredictedLineupOptimizationService(
             new StubAthleteScorePredictionService(predictions),
-            new ConfigurableAthleteContextAthleteScorePredictionService(predictions));
+            new ConfigurableAthleteContextAthleteScorePredictionService(predictions),
+            new StubFullContextAthleteScorePredictionService(predictions));
 
         var result = await optimizerService.GetOptimalAthleteContextLineupAsync(
             9,
@@ -365,6 +371,55 @@ public sealed class AthleteScoreModelServicesTests
                 .OrderBy(item => item.PositionCartolaId)
                 .Select(item => item.Quantity)
                 .ToArray());
+    }
+
+    [Fact]
+    public async Task GetOptimalFullContextLineupAsync_ReturnsBestProbableLineupWithinBudgetAndFormation()
+    {
+        var predictions = new AthleteScorePredictionResult
+        {
+            Round = 9,
+            DatasetKey = "full-context",
+            ModelVersion = "athlete-score-v1-full-context",
+            ModelTrainedAtUtc = DateTime.UtcNow,
+            ValidationMeanAbsoluteError = 1.01,
+            ValidationRootMeanSquaredError = 1.55,
+            TotalAthletesConsidered = 6,
+            TotalAthletesPredicted = 6,
+            Athletes =
+            [
+                CreatePredictionItem(1, "Zagueiro A", 3, 7m, 8m),
+                CreatePredictionItem(2, "Zagueiro B", 3, 6m, 7m),
+                CreatePredictionItem(3, "Atacante A", 5, 9m, 10m),
+                CreatePredictionItem(4, "Atacante B", 5, 8m, 8.5m),
+                CreatePredictionItem(5, "Atacante C", 5, 5m, 4m),
+                CreatePredictionItem(6, "Zagueiro C", 3, 5m, 5.5m),
+            ],
+        };
+
+        var optimizerService = new PredictedLineupOptimizationService(
+            new StubAthleteScorePredictionService(new AthleteScorePredictionResult()),
+            new ConfigurableAthleteContextAthleteScorePredictionService(new AthleteScorePredictionResult()),
+            new StubFullContextAthleteScorePredictionService(predictions));
+
+        var result = await optimizerService.GetOptimalFullContextLineupAsync(
+            9,
+            new PredictedLineupRequest
+            {
+                Budget = 15m,
+                Formation =
+                [
+                    new PredictedLineupPositionRequirement { PositionCartolaId = 3, Quantity = 1 },
+                    new PredictedLineupPositionRequirement { PositionCartolaId = 5, Quantity = 1 },
+                ],
+            });
+
+        Assert.Equal("full-context", result.DatasetKey);
+        Assert.Equal("athlete-score-v1-full-context", result.ModelVersion);
+        Assert.Equal(2, result.TotalPlayers);
+        Assert.Equal(15m, result.TotalCost);
+        Assert.Equal(17m, result.TotalPredictedScore);
+        Assert.Equal([2, 3], result.Athletes.Select(item => item.AthleteCartolaId).OrderBy(item => item).ToArray());
     }
 
     [Fact]
@@ -517,6 +572,7 @@ public sealed class AthleteScoreModelServicesTests
             Assert.True(File.Exists(metadata!.ModelArtifactPath));
             Assert.True(File.Exists(metadata.MetadataArtifactPath));
             Assert.Equal("full-context", metadata.DatasetKey);
+            Assert.Equal("LightGBM", metadata.TrainerName);
             Assert.Equal(4, metadata.TrainingRows);
             Assert.Equal(2, metadata.ValidationRows);
             Assert.Equal(2, metadata.TrainingDistinctRounds);
@@ -923,50 +979,46 @@ public sealed class AthleteScoreModelServicesTests
 
         await dbContext.SaveChangesAsync();
 
-        var clubRounds = new List<ClubRound>();
-        for (var round = 1; round <= 4; round++)
-        {
-            clubRounds.Add(new ClubRound(
-                0,
-                round,
-                clubA.Id,
-                0.48m + (round * 0.01m),
-                0.24m,
-                0.28m - (round * 0.01m),
-                6.2m + round,
-                6.0m + round,
-                1.8m + (round * 0.1m)));
-            clubRounds.Add(new ClubRound(
-                0,
-                round,
-                clubB.Id,
-                0.30m,
-                0.27m,
-                0.43m,
-                4.8m + round,
-                4.6m + round,
-                1.2m + (round * 0.05m)));
-        }
+        var athleteRounds = await dbContext.AthleteRounds
+            .OrderBy(item => item.RoundId)
+            .ThenBy(item => item.AthleteId)
+            .ToListAsync();
 
-        dbContext.ClubRounds.AddRange(clubRounds);
-        await dbContext.SaveChangesAsync();
+        var historicalRounds = athleteRounds
+            .Where(item => item.RoundId <= 3)
+            .ToList();
 
-        foreach (var clubRound in clubRounds)
+        dbContext.AthleteRoundContexts.AddRange(
+            CreateAthleteRoundContext(historicalRounds[0].Id, 64.4m, 66.0m, 62.0m, 60.4m, 59.1m, 0.48m, 0.45m, 6.1m, 6.0m, 5.8m, 5.6m, 5.4m, 5.3m, 5.2m, 5.0m, 0.90m, 0.40m, 0.70m, 0.10m, 0.44m, 0.39m, 0.41m, 0.52m, 0.31m, 0.27m, 0.58m, 1.8m, 3.2m),
+            CreateAthleteRoundContext(historicalRounds[1].Id, 65.7m, 67.5m, 63.2m, 61.5m, 60.3m, 0.50m, 0.46m, 6.4m, 6.2m, 6.0m, 5.8m, 5.7m, 5.5m, 5.3m, 5.2m, 1.10m, 0.55m, 0.80m, 0.20m, 0.46m, 0.42m, 0.44m, 0.55m, 0.33m, 0.29m, 0.61m, 2.0m, 3.4m),
+            CreateAthleteRoundContext(historicalRounds[2].Id, 67.2m, 69.1m, 64.1m, 62.8m, 61.2m, 0.53m, 0.49m, 6.7m, 6.5m, 6.3m, 6.0m, 5.9m, 5.7m, 5.5m, 5.4m, 1.30m, 0.70m, 1.00m, 0.30m, 0.49m, 0.45m, 0.47m, 0.58m, 0.36m, 0.30m, 0.64m, 2.2m, 3.6m),
+            CreateAthleteRoundContext(historicalRounds[3].Id, 58.3m, 60.1m, 57.0m, 56.8m, 55.2m, 0.36m, 0.34m, 5.2m, 5.0m, 4.9m, 4.7m, 4.5m, 4.4m, 4.2m, 4.0m, 0.60m, 0.15m, 0.40m, -0.05m, 0.35m, 0.28m, 0.26m, 0.44m, 0.25m, 0.20m, 0.49m, 1.4m, 2.5m),
+            CreateAthleteRoundContext(historicalRounds[4].Id, 59.5m, 61.0m, 57.9m, 57.7m, 56.1m, 0.38m, 0.35m, 5.4m, 5.2m, 5.0m, 4.8m, 4.7m, 4.5m, 4.3m, 4.1m, 0.70m, 0.22m, 0.50m, 0.03m, 0.37m, 0.30m, 0.28m, 0.46m, 0.27m, 0.22m, 0.51m, 1.5m, 2.7m),
+            CreateAthleteRoundContext(historicalRounds[5].Id, 60.2m, 61.8m, 58.6m, 58.1m, 56.8m, 0.39m, 0.36m, 5.6m, 5.4m, 5.2m, 5.0m, 4.9m, 4.7m, 4.4m, 4.2m, 0.78m, 0.28m, 0.57m, 0.08m, 0.39m, 0.32m, 0.30m, 0.48m, 0.29m, 0.24m, 0.53m, 1.6m, 2.9m));
+
+        dbContext.AthleteRoundScouts.AddRange(
+            new AthleteRoundScouts(0, historicalRounds[0].Id, "DS", 2m),
+            new AthleteRoundScouts(0, historicalRounds[0].Id, "SG", 1m),
+            new AthleteRoundScouts(0, historicalRounds[1].Id, "DS", 1m),
+            new AthleteRoundScouts(0, historicalRounds[1].Id, "CA", 1m),
+            new AthleteRoundScouts(0, historicalRounds[2].Id, "DS", 3m),
+            new AthleteRoundScouts(0, historicalRounds[2].Id, "SG", 1m),
+            new AthleteRoundScouts(0, historicalRounds[3].Id, "G", 1m),
+            new AthleteRoundScouts(0, historicalRounds[3].Id, "FF", 2m),
+            new AthleteRoundScouts(0, historicalRounds[4].Id, "A", 1m),
+            new AthleteRoundScouts(0, historicalRounds[4].Id, "FD", 1m),
+            new AthleteRoundScouts(0, historicalRounds[5].Id, "G", 1m),
+            new AthleteRoundScouts(0, historicalRounds[5].Id, "FS", 2m));
+
+        if (includeCurrentRoundAthleteBaselines)
         {
-            var isClubA = clubRound.ClubId == clubA.Id;
-            dbContext.ClubRoundPositions.AddRange(
-                new ClubRoundPosition(
-                    0,
-                    clubRound.Id,
-                    defender.Id,
-                    isClubA ? 3.2m + clubRound.Round : 5.1m + clubRound.Round,
-                    isClubA ? 5.4m + clubRound.Round : 3.6m + clubRound.Round),
-                new ClubRoundPosition(
-                    0,
-                    clubRound.Id,
-                    striker.Id,
-                    isClubA ? 4.0m + clubRound.Round : 4.8m + clubRound.Round,
-                    isClubA ? 6.3m + clubRound.Round : 4.2m + clubRound.Round));
+            var currentRounds = athleteRounds
+                .Where(item => item.RoundId == 4)
+                .ToList();
+
+            dbContext.AthleteRoundContexts.AddRange(
+                CreateAthleteRoundContext(currentRounds[0].Id, 68.0m, 69.8m, 65.0m, 63.0m, 61.9m, 0.55m, 0.51m, 6.9m, 6.7m, 6.4m, 6.1m, 6.1m, 5.9m, 5.6m, 5.5m, 1.42m, 0.82m, 1.10m, 0.36m, 0.51m, 0.47m, 0.49m, 0.60m, 0.38m, 0.31m, 0.66m, 2.3m, 3.8m),
+                CreateAthleteRoundContext(currentRounds[1].Id, 60.9m, 62.4m, 59.1m, 58.7m, 57.4m, 0.40m, 0.37m, 5.8m, 5.5m, 5.4m, 5.1m, 5.0m, 4.8m, 4.5m, 4.4m, 0.84m, 0.32m, 0.61m, 0.12m, 0.40m, 0.33m, 0.31m, 0.50m, 0.30m, 0.25m, 0.55m, 1.7m, 3.0m));
         }
 
         await dbContext.SaveChangesAsync();
@@ -1132,6 +1184,18 @@ public sealed class AthleteScoreModelServicesTests
     }
 
     private sealed class ConfigurableAthleteContextAthleteScorePredictionService(AthleteScorePredictionResult result) : IAthleteContextAthleteScorePredictionService
+    {
+        public Task<AthleteScorePredictionResult> GetPredictedScoresAsync(
+            int round,
+            int? statusCartolaId = null,
+            int? clubCartolaId = null,
+            int? positionCartolaId = null,
+            int take = 100,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(result);
+    }
+
+    private sealed class StubFullContextAthleteScorePredictionService(AthleteScorePredictionResult result) : IFullContextAthleteScorePredictionService
     {
         public Task<AthleteScorePredictionResult> GetPredictedScoresAsync(
             int round,

@@ -3,144 +3,254 @@ namespace CartolaOptimization.ML;
 internal sealed class FullContextAthleteScoreTrainingRow
 {
     public float RoundId { get; init; }
-
     public float ClubCartolaId { get; init; }
-
     public float OpponentClubCartolaId { get; init; }
-
     public float PositionCartolaId { get; init; }
-
     public float StatusCartolaId { get; init; }
-
     public float GamesNum { get; init; }
-
     public float HomeGamesNum { get; init; }
-
     public float AwayGamesNum { get; init; }
-
+    public float GamesAtVenueNum { get; init; }
     public float MovingAverage { get; init; }
-
     public float AverageScore { get; init; }
-
     public float HomeAverageScore { get; init; }
-
     public float AwayAverageScore { get; init; }
-
+    public float ContextualAverageScore { get; init; }
     public float PriceNum { get; init; }
-
     public float VariationNum { get; init; }
-
+    public float HasAthleteContext { get; init; }
     public float TeamAverageScore { get; init; }
-
+    public float TeamHomeAverageCurrent { get; init; }
+    public float TeamHomeAveragePrevious { get; init; }
+    public float TeamAwayAverageCurrent { get; init; }
+    public float TeamAwayAveragePrevious { get; init; }
+    public float TeamVenueAverageCurrent { get; init; }
+    public float TeamVenueAveragePrevious { get; init; }
     public float PointsPerCartoletaCurrent { get; init; }
-
+    public float PointsPerCartoletaPrevious { get; init; }
+    public float GrossOverallAverageCurrent { get; init; }
     public float GrossOverallMovingAverageCurrent { get; init; }
-
+    public float GrossOverallAveragePrevious { get; init; }
+    public float GrossOverallMovingAveragePrevious { get; init; }
+    public float NetOverallAverageCurrent { get; init; }
     public float NetOverallMovingAverageCurrent { get; init; }
-
+    public float NetOverallAveragePrevious { get; init; }
+    public float NetOverallMovingAveragePrevious { get; init; }
     public float ValuationCurrent { get; init; }
-
     public float MinimumToAppreciateCurrent { get; init; }
-
+    public float ValuationPrevious { get; init; }
+    public float MinimumToAppreciatePrevious { get; init; }
     public float IndexPointsPerCartoleta { get; init; }
-
+    public float IndexOffensiveUsage { get; init; }
+    public float IndexOffensiveRepresentation { get; init; }
+    public float IndexPointsRepresentation { get; init; }
     public float IndexOffensiveEfficiency { get; init; }
-
     public float IndexDefensiveEfficiency { get; init; }
-
+    public float IndexTackleDuelPercent { get; init; }
     public float IndexShotsPerGame { get; init; }
-
     public float IndexShotsPerGoal { get; init; }
-
     public float IsHomeMatch { get; init; }
-
     public float ClubTablePosition { get; init; }
-
     public float OpponentClubTablePosition { get; init; }
-
-    public string ClubRecentForm { get; init; } = string.Empty;
-
-    public string OpponentRecentForm { get; init; } = string.Empty;
-
-    public float ClubWinProbability { get; init; }
-
-    public float ClubDrawProbability { get; init; }
-
-    public float ClubLoseProbability { get; init; }
-
-    public float ClubOverallAverage { get; init; }
-
-    public float ClubMovingAverage { get; init; }
-
-    public float ClubExpectedPoints { get; init; }
-
-    public float ClubPreviousOverallAverage { get; init; }
-
-    public float ClubRankingsHomeAverage { get; init; }
-
-    public float ClubRankingsAwayAverage { get; init; }
-
-    public float ClubHistoricalWinRate { get; init; }
-
-    public float ClubFavoriteWinProbability { get; init; }
-
-    public float ClubForecastExpectedResult { get; init; }
-
-    public float ClubForecastRiskScore { get; init; }
-
-    public float ClubPositionDistributionValue { get; init; }
-
-    public float ClubAverageInsightConfidence { get; init; }
-
-    public float ClubPositiveInsightNet { get; init; }
-
-    public float ClubTeamTipsCount { get; init; }
-
-    public float ClubMatchTipsCount { get; init; }
-
-    public float ClubPositionPointsConcededAverage { get; init; }
-
-    public float ClubPositionPointsConqueredAverage { get; init; }
-
-    public float OpponentWinProbability { get; init; }
-
-    public float OpponentDrawProbability { get; init; }
-
-    public float OpponentLoseProbability { get; init; }
-
-    public float OpponentOverallAverage { get; init; }
-
-    public float OpponentMovingAverage { get; init; }
-
-    public float OpponentExpectedPoints { get; init; }
-
-    public float OpponentPreviousOverallAverage { get; init; }
-
-    public float OpponentRankingsHomeAverage { get; init; }
-
-    public float OpponentRankingsAwayAverage { get; init; }
-
-    public float OpponentHistoricalWinRate { get; init; }
-
-    public float OpponentFavoriteWinProbability { get; init; }
-
-    public float OpponentForecastExpectedResult { get; init; }
-
-    public float OpponentForecastRiskScore { get; init; }
-
-    public float OpponentPositionDistributionValue { get; init; }
-
-    public float OpponentAverageInsightConfidence { get; init; }
-
-    public float OpponentPositiveInsightNet { get; init; }
-
-    public float OpponentTeamTipsCount { get; init; }
-
-    public float OpponentMatchTipsCount { get; init; }
-
-    public float OpponentPositionPointsConcededAverage { get; init; }
-
-    public float OpponentPositionPointsConqueredAverage { get; init; }
-
+    public float TablePositionDelta { get; init; }
+    public float ClubRecentFormPoints { get; init; }
+    public float OpponentRecentFormPoints { get; init; }
+    public float RecentFormPointsDelta { get; init; }
+    public float ScoreLast1 { get; init; }
+    public float ScoreAverageLast3 { get; init; }
+    public float ScoreAverageLast5 { get; init; }
+    public float ScoreEwmaLast3 { get; init; }
+    public float ScoreEwmaLast5 { get; init; }
+    public float ScoreStdLast5 { get; init; }
+    public float ScoreFloorLast5 { get; init; }
+    public float ScoreCeilingLast5 { get; init; }
+    public float ScoreHitRateOver3Last5 { get; init; }
+    public float ScoreHitRateOver5Last5 { get; init; }
+    public float ScoreHitRateOver8Last5 { get; init; }
+    public float ScoreNegativeRateLast5 { get; init; }
+    public float ScoreTrendLast3VsPrev3 { get; init; }
+    public float HomeScoreAverageLast5 { get; init; }
+    public float AwayScoreAverageLast5 { get; init; }
+    public float VenueScoreAverageLast5 { get; init; }
+    public float HomeScoreEwmaLast3 { get; init; }
+    public float AwayScoreEwmaLast3 { get; init; }
+    public float VenueScoreEwmaLast3 { get; init; }
+    public float ScoutOffensiveSumLast3 { get; init; }
+    public float ScoutOffensiveSumLast5 { get; init; }
+    public float ScoutOffensiveAverageLast3 { get; init; }
+    public float ScoutOffensiveAverageLast5 { get; init; }
+    public float ScoutOffensiveEwmaLast3 { get; init; }
+    public float ScoutOffensiveEwmaLast5 { get; init; }
+    public float ScoutDefensiveSumLast3 { get; init; }
+    public float ScoutDefensiveSumLast5 { get; init; }
+    public float ScoutDefensiveAverageLast3 { get; init; }
+    public float ScoutDefensiveAverageLast5 { get; init; }
+    public float ScoutDefensiveEwmaLast3 { get; init; }
+    public float ScoutDefensiveEwmaLast5 { get; init; }
+    public float ScoutNegativeSumLast3 { get; init; }
+    public float ScoutNegativeSumLast5 { get; init; }
+    public float ScoutNegativeAverageLast3 { get; init; }
+    public float ScoutNegativeAverageLast5 { get; init; }
+    public float ScoutNegativeEwmaLast3 { get; init; }
+    public float ScoutNegativeEwmaLast5 { get; init; }
+    public float ScoutBalanceSumLast3 { get; init; }
+    public float ScoutBalanceSumLast5 { get; init; }
+    public float ScoutBalanceAverageLast3 { get; init; }
+    public float ScoutBalanceAverageLast5 { get; init; }
+    public float ScoutBalanceEwmaLast3 { get; init; }
+    public float ScoutBalanceEwmaLast5 { get; init; }
+    public float ScoutGoalsAverageLast3 { get; init; }
+    public float ScoutGoalsAverageLast5 { get; init; }
+    public float ScoutAssistsAverageLast3 { get; init; }
+    public float ScoutAssistsAverageLast5 { get; init; }
+    public float ScoutTacklesAverageLast3 { get; init; }
+    public float ScoutTacklesAverageLast5 { get; init; }
+    public float ScoutCleanSheetRateLast3 { get; init; }
+    public float ScoutCleanSheetRateLast5 { get; init; }
+    public float PlayRateLast5 { get; init; }
+    public float RoundsSinceLastInGame { get; init; }
+    public float StatusStabilityLast5 { get; init; }
+    public float StatusChangeFlag { get; init; }
+    public float EmpiricalPlayRateForCurrentStatus { get; init; }
+    public float PriceTrendLast3 { get; init; }
+    public float PriceVolatilityLast5 { get; init; }
+    public float HistoricalPointsPerCartoletaLast3 { get; init; }
+    public float HistoricalPointsPerCartoletaLast5 { get; init; }
+    public float PositionRelativePriceSignal { get; init; }
+    public float PriceDeltaVsHistoricalAverage { get; init; }
+    public float ClubMatchesSampleSize { get; init; }
+    public float ClubPointsPerMatchLast3 { get; init; }
+    public float ClubPointsPerMatchLast5 { get; init; }
+    public float ClubVenuePointsPerMatchLast3 { get; init; }
+    public float ClubVenuePointsPerMatchLast5 { get; init; }
+    public float ClubGoalsForPerMatchLast3 { get; init; }
+    public float ClubGoalsForPerMatchLast5 { get; init; }
+    public float ClubGoalsAgainstPerMatchLast3 { get; init; }
+    public float ClubGoalsAgainstPerMatchLast5 { get; init; }
+    public float ClubGoalDifferencePerMatchLast3 { get; init; }
+    public float ClubGoalDifferencePerMatchLast5 { get; init; }
+    public float ClubVenueGoalsForPerMatchLast3 { get; init; }
+    public float ClubVenueGoalsForPerMatchLast5 { get; init; }
+    public float ClubVenueGoalsAgainstPerMatchLast3 { get; init; }
+    public float ClubVenueGoalsAgainstPerMatchLast5 { get; init; }
+    public float ClubCleanSheetRateLast3 { get; init; }
+    public float ClubCleanSheetRateLast5 { get; init; }
+    public float ClubFailedToScoreRateLast3 { get; init; }
+    public float ClubFailedToScoreRateLast5 { get; init; }
+    public float ClubFantasyPointsForAverageLast3 { get; init; }
+    public float ClubFantasyPointsForAverageLast5 { get; init; }
+    public float ClubFantasyPointsAgainstAverageLast3 { get; init; }
+    public float ClubFantasyPointsAgainstAverageLast5 { get; init; }
+    public float ClubScoutOffensiveConcededAverageLast3 { get; init; }
+    public float ClubScoutOffensiveConcededAverageLast5 { get; init; }
+    public float ClubScoutDefensiveConcededAverageLast3 { get; init; }
+    public float ClubScoutDefensiveConcededAverageLast5 { get; init; }
+    public float ClubScoutNegativeConcededAverageLast3 { get; init; }
+    public float ClubScoutNegativeConcededAverageLast5 { get; init; }
+    public float ClubScoutBalanceConcededAverageLast3 { get; init; }
+    public float ClubScoutBalanceConcededAverageLast5 { get; init; }
+    public float ClubScoutGoalsConcededAverageLast3 { get; init; }
+    public float ClubScoutGoalsConcededAverageLast5 { get; init; }
+    public float ClubScoutAssistsConcededAverageLast3 { get; init; }
+    public float ClubScoutAssistsConcededAverageLast5 { get; init; }
+    public float ClubScoutTacklesConcededAverageLast3 { get; init; }
+    public float ClubScoutTacklesConcededAverageLast5 { get; init; }
+    public float ClubPositionFantasyPointsForAverageLast3 { get; init; }
+    public float ClubPositionFantasyPointsForAverageLast5 { get; init; }
+    public float ClubPositionFantasyPointsAgainstAverageLast3 { get; init; }
+    public float ClubPositionFantasyPointsAgainstAverageLast5 { get; init; }
+    public float ClubPositionScoutOffensiveConcededAverageLast3 { get; init; }
+    public float ClubPositionScoutOffensiveConcededAverageLast5 { get; init; }
+    public float ClubPositionScoutDefensiveConcededAverageLast3 { get; init; }
+    public float ClubPositionScoutDefensiveConcededAverageLast5 { get; init; }
+    public float ClubPositionScoutNegativeConcededAverageLast3 { get; init; }
+    public float ClubPositionScoutNegativeConcededAverageLast5 { get; init; }
+    public float ClubPositionScoutBalanceConcededAverageLast3 { get; init; }
+    public float ClubPositionScoutBalanceConcededAverageLast5 { get; init; }
+    public float ClubPositionScoutGoalsConcededAverageLast3 { get; init; }
+    public float ClubPositionScoutGoalsConcededAverageLast5 { get; init; }
+    public float ClubPositionScoutAssistsConcededAverageLast3 { get; init; }
+    public float ClubPositionScoutAssistsConcededAverageLast5 { get; init; }
+    public float ClubPositionScoutTacklesConcededAverageLast3 { get; init; }
+    public float ClubPositionScoutTacklesConcededAverageLast5 { get; init; }
+    public float ClubExpectedPointsLast3 { get; init; }
+    public float ClubWinRateLast5 { get; init; }
+    public float ClubDrawRateLast5 { get; init; }
+    public float ClubLossRateLast5 { get; init; }
+    public float ClubExpectedPointsLast5 { get; init; }
+    public float ClubAttackStrengthLast3 { get; init; }
+    public float ClubAttackStrengthLast5 { get; init; }
+    public float ClubDefenseStrengthLast3 { get; init; }
+    public float ClubDefenseStrengthLast5 { get; init; }
+    public float OpponentMatchesSampleSize { get; init; }
+    public float OpponentPointsPerMatchLast3 { get; init; }
+    public float OpponentPointsPerMatchLast5 { get; init; }
+    public float OpponentVenuePointsPerMatchLast3 { get; init; }
+    public float OpponentVenuePointsPerMatchLast5 { get; init; }
+    public float OpponentGoalsForPerMatchLast3 { get; init; }
+    public float OpponentGoalsForPerMatchLast5 { get; init; }
+    public float OpponentGoalsAgainstPerMatchLast3 { get; init; }
+    public float OpponentGoalsAgainstPerMatchLast5 { get; init; }
+    public float OpponentGoalDifferencePerMatchLast3 { get; init; }
+    public float OpponentGoalDifferencePerMatchLast5 { get; init; }
+    public float OpponentVenueGoalsForPerMatchLast3 { get; init; }
+    public float OpponentVenueGoalsForPerMatchLast5 { get; init; }
+    public float OpponentVenueGoalsAgainstPerMatchLast3 { get; init; }
+    public float OpponentVenueGoalsAgainstPerMatchLast5 { get; init; }
+    public float OpponentCleanSheetRateLast3 { get; init; }
+    public float OpponentCleanSheetRateLast5 { get; init; }
+    public float OpponentFailedToScoreRateLast3 { get; init; }
+    public float OpponentFailedToScoreRateLast5 { get; init; }
+    public float OpponentFantasyPointsForAverageLast3 { get; init; }
+    public float OpponentFantasyPointsForAverageLast5 { get; init; }
+    public float OpponentFantasyPointsAgainstAverageLast3 { get; init; }
+    public float OpponentFantasyPointsAgainstAverageLast5 { get; init; }
+    public float OpponentScoutOffensiveConcededAverageLast3 { get; init; }
+    public float OpponentScoutOffensiveConcededAverageLast5 { get; init; }
+    public float OpponentScoutDefensiveConcededAverageLast3 { get; init; }
+    public float OpponentScoutDefensiveConcededAverageLast5 { get; init; }
+    public float OpponentScoutNegativeConcededAverageLast3 { get; init; }
+    public float OpponentScoutNegativeConcededAverageLast5 { get; init; }
+    public float OpponentScoutBalanceConcededAverageLast3 { get; init; }
+    public float OpponentScoutBalanceConcededAverageLast5 { get; init; }
+    public float OpponentScoutGoalsConcededAverageLast3 { get; init; }
+    public float OpponentScoutGoalsConcededAverageLast5 { get; init; }
+    public float OpponentScoutAssistsConcededAverageLast3 { get; init; }
+    public float OpponentScoutAssistsConcededAverageLast5 { get; init; }
+    public float OpponentScoutTacklesConcededAverageLast3 { get; init; }
+    public float OpponentScoutTacklesConcededAverageLast5 { get; init; }
+    public float OpponentPositionFantasyPointsForAverageLast3 { get; init; }
+    public float OpponentPositionFantasyPointsForAverageLast5 { get; init; }
+    public float OpponentPositionFantasyPointsAgainstAverageLast3 { get; init; }
+    public float OpponentPositionFantasyPointsAgainstAverageLast5 { get; init; }
+    public float OpponentPositionScoutOffensiveConcededAverageLast3 { get; init; }
+    public float OpponentPositionScoutOffensiveConcededAverageLast5 { get; init; }
+    public float OpponentPositionScoutDefensiveConcededAverageLast3 { get; init; }
+    public float OpponentPositionScoutDefensiveConcededAverageLast5 { get; init; }
+    public float OpponentPositionScoutNegativeConcededAverageLast3 { get; init; }
+    public float OpponentPositionScoutNegativeConcededAverageLast5 { get; init; }
+    public float OpponentPositionScoutBalanceConcededAverageLast3 { get; init; }
+    public float OpponentPositionScoutBalanceConcededAverageLast5 { get; init; }
+    public float OpponentPositionScoutGoalsConcededAverageLast3 { get; init; }
+    public float OpponentPositionScoutGoalsConcededAverageLast5 { get; init; }
+    public float OpponentPositionScoutAssistsConcededAverageLast3 { get; init; }
+    public float OpponentPositionScoutAssistsConcededAverageLast5 { get; init; }
+    public float OpponentPositionScoutTacklesConcededAverageLast3 { get; init; }
+    public float OpponentPositionScoutTacklesConcededAverageLast5 { get; init; }
+    public float OpponentExpectedPointsLast3 { get; init; }
+    public float OpponentWinRateLast5 { get; init; }
+    public float OpponentDrawRateLast5 { get; init; }
+    public float OpponentLossRateLast5 { get; init; }
+    public float OpponentExpectedPointsLast5 { get; init; }
+    public float OpponentAttackStrengthLast3 { get; init; }
+    public float OpponentAttackStrengthLast5 { get; init; }
+    public float OpponentDefenseStrengthLast3 { get; init; }
+    public float OpponentDefenseStrengthLast5 { get; init; }
+    public float AttackVsOpponentDefenseDeltaLast3 { get; init; }
+    public float AttackVsOpponentDefenseDeltaLast5 { get; init; }
+    public float PositionForVsOpponentConcededDeltaLast3 { get; init; }
+    public float PositionForVsOpponentConcededDeltaLast5 { get; init; }
+    public float GoalDifferenceDeltaLast3 { get; init; }
+    public float GoalDifferenceDeltaLast5 { get; init; }
     public float Label { get; init; }
 }

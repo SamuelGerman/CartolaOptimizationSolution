@@ -1,167 +1,270 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents a historical athlete-round row with full club, opponent and match context for supervised training.
+/// Represents a historical athlete-round row enriched with local athlete, club, opponent and match context for supervised training.
 /// </summary>
 public sealed class TrainingFullContextDatasetRow
 {
     public long AthleteRoundId { get; init; }
-
     public int RoundId { get; init; }
-
     public int AthleteCartolaId { get; init; }
-
     public string AthleteName { get; init; } = string.Empty;
-
     public string AthleteNickname { get; init; } = string.Empty;
-
     public int ClubCartolaId { get; init; }
-
     public string ClubName { get; init; } = string.Empty;
-
     public int PositionCartolaId { get; init; }
-
     public string PositionName { get; init; } = string.Empty;
-
     public int StatusCartolaId { get; init; }
-
     public string StatusName { get; init; } = string.Empty;
-
     public int GamesNum { get; init; }
-
     public int HomeGamesNum { get; init; }
-
     public int AwayGamesNum { get; init; }
-
+    public int GamesAtVenueNum { get; init; }
     public decimal MovingAverage { get; init; }
-
     public decimal AverageScore { get; init; }
-
     public decimal HomeAverageScore { get; init; }
-
     public decimal AwayAverageScore { get; init; }
-
+    public decimal ContextualAverageScore { get; init; }
     public decimal PriceNum { get; init; }
-
     public decimal VariationNum { get; init; }
-
+    public bool HasAthleteContext { get; init; }
     public decimal TeamAverageScore { get; init; }
-
+    public decimal TeamHomeAverageCurrent { get; init; }
+    public decimal TeamHomeAveragePrevious { get; init; }
+    public decimal TeamAwayAverageCurrent { get; init; }
+    public decimal TeamAwayAveragePrevious { get; init; }
+    public decimal TeamVenueAverageCurrent { get; init; }
+    public decimal TeamVenueAveragePrevious { get; init; }
     public decimal PointsPerCartoletaCurrent { get; init; }
-
+    public decimal PointsPerCartoletaPrevious { get; init; }
+    public decimal GrossOverallAverageCurrent { get; init; }
     public decimal GrossOverallMovingAverageCurrent { get; init; }
-
+    public decimal GrossOverallAveragePrevious { get; init; }
+    public decimal GrossOverallMovingAveragePrevious { get; init; }
+    public decimal NetOverallAverageCurrent { get; init; }
     public decimal NetOverallMovingAverageCurrent { get; init; }
-
+    public decimal NetOverallAveragePrevious { get; init; }
+    public decimal NetOverallMovingAveragePrevious { get; init; }
     public decimal ValuationCurrent { get; init; }
-
     public decimal MinimumToAppreciateCurrent { get; init; }
-
+    public decimal ValuationPrevious { get; init; }
+    public decimal MinimumToAppreciatePrevious { get; init; }
     public decimal IndexPointsPerCartoleta { get; init; }
-
+    public decimal IndexOffensiveUsage { get; init; }
+    public decimal IndexOffensiveRepresentation { get; init; }
+    public decimal IndexPointsRepresentation { get; init; }
     public decimal IndexOffensiveEfficiency { get; init; }
-
     public decimal IndexDefensiveEfficiency { get; init; }
-
+    public decimal IndexTackleDuelPercent { get; init; }
     public decimal IndexShotsPerGame { get; init; }
-
     public decimal IndexShotsPerGoal { get; init; }
-
     public bool IsHomeMatch { get; init; }
-
     public int ClubTablePosition { get; init; }
-
     public int OpponentClubCartolaId { get; init; }
-
     public string OpponentClubName { get; init; } = string.Empty;
-
     public int OpponentClubTablePosition { get; init; }
-
+    public int TablePositionDelta { get; init; }
     public string ClubRecentForm { get; init; } = string.Empty;
-
     public string OpponentRecentForm { get; init; } = string.Empty;
-
-    public decimal ClubWinProbability { get; init; }
-
-    public decimal ClubDrawProbability { get; init; }
-
-    public decimal ClubLoseProbability { get; init; }
-
-    public decimal ClubOverallAverage { get; init; }
-
-    public decimal ClubMovingAverage { get; init; }
-
-    public decimal ClubExpectedPoints { get; init; }
-
-    public decimal ClubPreviousOverallAverage { get; init; }
-
-    public decimal ClubRankingsHomeAverage { get; init; }
-
-    public decimal ClubRankingsAwayAverage { get; init; }
-
-    public decimal ClubHistoricalWinRate { get; init; }
-
-    public decimal ClubFavoriteWinProbability { get; init; }
-
-    public int ClubForecastExpectedResult { get; init; }
-
-    public int ClubForecastRiskScore { get; init; }
-
-    public decimal ClubPositionDistributionValue { get; init; }
-
-    public decimal ClubAverageInsightConfidence { get; init; }
-
-    public int ClubPositiveInsightNet { get; init; }
-
-    public int ClubTeamTipsCount { get; init; }
-
-    public int ClubMatchTipsCount { get; init; }
-
-    public decimal ClubPositionPointsConcededAverage { get; init; }
-
-    public decimal ClubPositionPointsConqueredAverage { get; init; }
-
-    public decimal OpponentWinProbability { get; init; }
-
-    public decimal OpponentDrawProbability { get; init; }
-
-    public decimal OpponentLoseProbability { get; init; }
-
-    public decimal OpponentOverallAverage { get; init; }
-
-    public decimal OpponentMovingAverage { get; init; }
-
-    public decimal OpponentExpectedPoints { get; init; }
-
-    public decimal OpponentPreviousOverallAverage { get; init; }
-
-    public decimal OpponentRankingsHomeAverage { get; init; }
-
-    public decimal OpponentRankingsAwayAverage { get; init; }
-
-    public decimal OpponentHistoricalWinRate { get; init; }
-
-    public decimal OpponentFavoriteWinProbability { get; init; }
-
-    public int OpponentForecastExpectedResult { get; init; }
-
-    public int OpponentForecastRiskScore { get; init; }
-
-    public decimal OpponentPositionDistributionValue { get; init; }
-
-    public decimal OpponentAverageInsightConfidence { get; init; }
-
-    public int OpponentPositiveInsightNet { get; init; }
-
-    public int OpponentTeamTipsCount { get; init; }
-
-    public int OpponentMatchTipsCount { get; init; }
-
-    public decimal OpponentPositionPointsConcededAverage { get; init; }
-
-    public decimal OpponentPositionPointsConqueredAverage { get; init; }
-
+    public decimal ClubRecentFormPoints { get; init; }
+    public decimal OpponentRecentFormPoints { get; init; }
+    public decimal RecentFormPointsDelta { get; init; }
+    public decimal ScoreLast1 { get; init; }
+    public decimal ScoreAverageLast3 { get; init; }
+    public decimal ScoreAverageLast5 { get; init; }
+    public decimal ScoreEwmaLast3 { get; init; }
+    public decimal ScoreEwmaLast5 { get; init; }
+    public decimal ScoreStdLast5 { get; init; }
+    public decimal ScoreFloorLast5 { get; init; }
+    public decimal ScoreCeilingLast5 { get; init; }
+    public decimal ScoreHitRateOver3Last5 { get; init; }
+    public decimal ScoreHitRateOver5Last5 { get; init; }
+    public decimal ScoreHitRateOver8Last5 { get; init; }
+    public decimal ScoreNegativeRateLast5 { get; init; }
+    public decimal ScoreTrendLast3VsPrev3 { get; init; }
+    public decimal HomeScoreAverageLast5 { get; init; }
+    public decimal AwayScoreAverageLast5 { get; init; }
+    public decimal VenueScoreAverageLast5 { get; init; }
+    public decimal HomeScoreEwmaLast3 { get; init; }
+    public decimal AwayScoreEwmaLast3 { get; init; }
+    public decimal VenueScoreEwmaLast3 { get; init; }
+    public decimal ScoutOffensiveSumLast3 { get; init; }
+    public decimal ScoutOffensiveSumLast5 { get; init; }
+    public decimal ScoutOffensiveAverageLast3 { get; init; }
+    public decimal ScoutOffensiveAverageLast5 { get; init; }
+    public decimal ScoutOffensiveEwmaLast3 { get; init; }
+    public decimal ScoutOffensiveEwmaLast5 { get; init; }
+    public decimal ScoutDefensiveSumLast3 { get; init; }
+    public decimal ScoutDefensiveSumLast5 { get; init; }
+    public decimal ScoutDefensiveAverageLast3 { get; init; }
+    public decimal ScoutDefensiveAverageLast5 { get; init; }
+    public decimal ScoutDefensiveEwmaLast3 { get; init; }
+    public decimal ScoutDefensiveEwmaLast5 { get; init; }
+    public decimal ScoutNegativeSumLast3 { get; init; }
+    public decimal ScoutNegativeSumLast5 { get; init; }
+    public decimal ScoutNegativeAverageLast3 { get; init; }
+    public decimal ScoutNegativeAverageLast5 { get; init; }
+    public decimal ScoutNegativeEwmaLast3 { get; init; }
+    public decimal ScoutNegativeEwmaLast5 { get; init; }
+    public decimal ScoutBalanceSumLast3 { get; init; }
+    public decimal ScoutBalanceSumLast5 { get; init; }
+    public decimal ScoutBalanceAverageLast3 { get; init; }
+    public decimal ScoutBalanceAverageLast5 { get; init; }
+    public decimal ScoutBalanceEwmaLast3 { get; init; }
+    public decimal ScoutBalanceEwmaLast5 { get; init; }
+    public decimal ScoutGoalsAverageLast3 { get; init; }
+    public decimal ScoutGoalsAverageLast5 { get; init; }
+    public decimal ScoutAssistsAverageLast3 { get; init; }
+    public decimal ScoutAssistsAverageLast5 { get; init; }
+    public decimal ScoutTacklesAverageLast3 { get; init; }
+    public decimal ScoutTacklesAverageLast5 { get; init; }
+    public decimal ScoutCleanSheetRateLast3 { get; init; }
+    public decimal ScoutCleanSheetRateLast5 { get; init; }
+    public decimal PlayRateLast5 { get; init; }
+    public decimal RoundsSinceLastInGame { get; init; }
+    public decimal StatusStabilityLast5 { get; init; }
+    public decimal StatusChangeFlag { get; init; }
+    public decimal EmpiricalPlayRateForCurrentStatus { get; init; }
+    public decimal PriceTrendLast3 { get; init; }
+    public decimal PriceVolatilityLast5 { get; init; }
+    public decimal HistoricalPointsPerCartoletaLast3 { get; init; }
+    public decimal HistoricalPointsPerCartoletaLast5 { get; init; }
+    public decimal PositionRelativePriceSignal { get; init; }
+    public decimal PriceDeltaVsHistoricalAverage { get; init; }
+    public int ClubMatchesSampleSize { get; init; }
+    public decimal ClubPointsPerMatchLast3 { get; init; }
+    public decimal ClubPointsPerMatchLast5 { get; init; }
+    public decimal ClubVenuePointsPerMatchLast3 { get; init; }
+    public decimal ClubVenuePointsPerMatchLast5 { get; init; }
+    public decimal ClubGoalsForPerMatchLast3 { get; init; }
+    public decimal ClubGoalsForPerMatchLast5 { get; init; }
+    public decimal ClubGoalsAgainstPerMatchLast3 { get; init; }
+    public decimal ClubGoalsAgainstPerMatchLast5 { get; init; }
+    public decimal ClubGoalDifferencePerMatchLast3 { get; init; }
+    public decimal ClubGoalDifferencePerMatchLast5 { get; init; }
+    public decimal ClubVenueGoalsForPerMatchLast3 { get; init; }
+    public decimal ClubVenueGoalsForPerMatchLast5 { get; init; }
+    public decimal ClubVenueGoalsAgainstPerMatchLast3 { get; init; }
+    public decimal ClubVenueGoalsAgainstPerMatchLast5 { get; init; }
+    public decimal ClubCleanSheetRateLast3 { get; init; }
+    public decimal ClubCleanSheetRateLast5 { get; init; }
+    public decimal ClubFailedToScoreRateLast3 { get; init; }
+    public decimal ClubFailedToScoreRateLast5 { get; init; }
+    public decimal ClubFantasyPointsForAverageLast3 { get; init; }
+    public decimal ClubFantasyPointsForAverageLast5 { get; init; }
+    public decimal ClubFantasyPointsAgainstAverageLast3 { get; init; }
+    public decimal ClubFantasyPointsAgainstAverageLast5 { get; init; }
+    public decimal ClubScoutOffensiveConcededAverageLast3 { get; init; }
+    public decimal ClubScoutOffensiveConcededAverageLast5 { get; init; }
+    public decimal ClubScoutDefensiveConcededAverageLast3 { get; init; }
+    public decimal ClubScoutDefensiveConcededAverageLast5 { get; init; }
+    public decimal ClubScoutNegativeConcededAverageLast3 { get; init; }
+    public decimal ClubScoutNegativeConcededAverageLast5 { get; init; }
+    public decimal ClubScoutBalanceConcededAverageLast3 { get; init; }
+    public decimal ClubScoutBalanceConcededAverageLast5 { get; init; }
+    public decimal ClubScoutGoalsConcededAverageLast3 { get; init; }
+    public decimal ClubScoutGoalsConcededAverageLast5 { get; init; }
+    public decimal ClubScoutAssistsConcededAverageLast3 { get; init; }
+    public decimal ClubScoutAssistsConcededAverageLast5 { get; init; }
+    public decimal ClubScoutTacklesConcededAverageLast3 { get; init; }
+    public decimal ClubScoutTacklesConcededAverageLast5 { get; init; }
+    public decimal ClubPositionFantasyPointsForAverageLast3 { get; init; }
+    public decimal ClubPositionFantasyPointsForAverageLast5 { get; init; }
+    public decimal ClubPositionFantasyPointsAgainstAverageLast3 { get; init; }
+    public decimal ClubPositionFantasyPointsAgainstAverageLast5 { get; init; }
+    public decimal ClubPositionScoutOffensiveConcededAverageLast3 { get; init; }
+    public decimal ClubPositionScoutOffensiveConcededAverageLast5 { get; init; }
+    public decimal ClubPositionScoutDefensiveConcededAverageLast3 { get; init; }
+    public decimal ClubPositionScoutDefensiveConcededAverageLast5 { get; init; }
+    public decimal ClubPositionScoutNegativeConcededAverageLast3 { get; init; }
+    public decimal ClubPositionScoutNegativeConcededAverageLast5 { get; init; }
+    public decimal ClubPositionScoutBalanceConcededAverageLast3 { get; init; }
+    public decimal ClubPositionScoutBalanceConcededAverageLast5 { get; init; }
+    public decimal ClubPositionScoutGoalsConcededAverageLast3 { get; init; }
+    public decimal ClubPositionScoutGoalsConcededAverageLast5 { get; init; }
+    public decimal ClubPositionScoutAssistsConcededAverageLast3 { get; init; }
+    public decimal ClubPositionScoutAssistsConcededAverageLast5 { get; init; }
+    public decimal ClubPositionScoutTacklesConcededAverageLast3 { get; init; }
+    public decimal ClubPositionScoutTacklesConcededAverageLast5 { get; init; }
+    public decimal ClubExpectedPointsLast3 { get; init; }
+    public decimal ClubWinRateLast5 { get; init; }
+    public decimal ClubDrawRateLast5 { get; init; }
+    public decimal ClubLossRateLast5 { get; init; }
+    public decimal ClubExpectedPointsLast5 { get; init; }
+    public decimal ClubAttackStrengthLast3 { get; init; }
+    public decimal ClubAttackStrengthLast5 { get; init; }
+    public decimal ClubDefenseStrengthLast3 { get; init; }
+    public decimal ClubDefenseStrengthLast5 { get; init; }
+    public int OpponentMatchesSampleSize { get; init; }
+    public decimal OpponentPointsPerMatchLast3 { get; init; }
+    public decimal OpponentPointsPerMatchLast5 { get; init; }
+    public decimal OpponentVenuePointsPerMatchLast3 { get; init; }
+    public decimal OpponentVenuePointsPerMatchLast5 { get; init; }
+    public decimal OpponentGoalsForPerMatchLast3 { get; init; }
+    public decimal OpponentGoalsForPerMatchLast5 { get; init; }
+    public decimal OpponentGoalsAgainstPerMatchLast3 { get; init; }
+    public decimal OpponentGoalsAgainstPerMatchLast5 { get; init; }
+    public decimal OpponentGoalDifferencePerMatchLast3 { get; init; }
+    public decimal OpponentGoalDifferencePerMatchLast5 { get; init; }
+    public decimal OpponentVenueGoalsForPerMatchLast3 { get; init; }
+    public decimal OpponentVenueGoalsForPerMatchLast5 { get; init; }
+    public decimal OpponentVenueGoalsAgainstPerMatchLast3 { get; init; }
+    public decimal OpponentVenueGoalsAgainstPerMatchLast5 { get; init; }
+    public decimal OpponentCleanSheetRateLast3 { get; init; }
+    public decimal OpponentCleanSheetRateLast5 { get; init; }
+    public decimal OpponentFailedToScoreRateLast3 { get; init; }
+    public decimal OpponentFailedToScoreRateLast5 { get; init; }
+    public decimal OpponentFantasyPointsForAverageLast3 { get; init; }
+    public decimal OpponentFantasyPointsForAverageLast5 { get; init; }
+    public decimal OpponentFantasyPointsAgainstAverageLast3 { get; init; }
+    public decimal OpponentFantasyPointsAgainstAverageLast5 { get; init; }
+    public decimal OpponentScoutOffensiveConcededAverageLast3 { get; init; }
+    public decimal OpponentScoutOffensiveConcededAverageLast5 { get; init; }
+    public decimal OpponentScoutDefensiveConcededAverageLast3 { get; init; }
+    public decimal OpponentScoutDefensiveConcededAverageLast5 { get; init; }
+    public decimal OpponentScoutNegativeConcededAverageLast3 { get; init; }
+    public decimal OpponentScoutNegativeConcededAverageLast5 { get; init; }
+    public decimal OpponentScoutBalanceConcededAverageLast3 { get; init; }
+    public decimal OpponentScoutBalanceConcededAverageLast5 { get; init; }
+    public decimal OpponentScoutGoalsConcededAverageLast3 { get; init; }
+    public decimal OpponentScoutGoalsConcededAverageLast5 { get; init; }
+    public decimal OpponentScoutAssistsConcededAverageLast3 { get; init; }
+    public decimal OpponentScoutAssistsConcededAverageLast5 { get; init; }
+    public decimal OpponentScoutTacklesConcededAverageLast3 { get; init; }
+    public decimal OpponentScoutTacklesConcededAverageLast5 { get; init; }
+    public decimal OpponentPositionFantasyPointsForAverageLast3 { get; init; }
+    public decimal OpponentPositionFantasyPointsForAverageLast5 { get; init; }
+    public decimal OpponentPositionFantasyPointsAgainstAverageLast3 { get; init; }
+    public decimal OpponentPositionFantasyPointsAgainstAverageLast5 { get; init; }
+    public decimal OpponentPositionScoutOffensiveConcededAverageLast3 { get; init; }
+    public decimal OpponentPositionScoutOffensiveConcededAverageLast5 { get; init; }
+    public decimal OpponentPositionScoutDefensiveConcededAverageLast3 { get; init; }
+    public decimal OpponentPositionScoutDefensiveConcededAverageLast5 { get; init; }
+    public decimal OpponentPositionScoutNegativeConcededAverageLast3 { get; init; }
+    public decimal OpponentPositionScoutNegativeConcededAverageLast5 { get; init; }
+    public decimal OpponentPositionScoutBalanceConcededAverageLast3 { get; init; }
+    public decimal OpponentPositionScoutBalanceConcededAverageLast5 { get; init; }
+    public decimal OpponentPositionScoutGoalsConcededAverageLast3 { get; init; }
+    public decimal OpponentPositionScoutGoalsConcededAverageLast5 { get; init; }
+    public decimal OpponentPositionScoutAssistsConcededAverageLast3 { get; init; }
+    public decimal OpponentPositionScoutAssistsConcededAverageLast5 { get; init; }
+    public decimal OpponentPositionScoutTacklesConcededAverageLast3 { get; init; }
+    public decimal OpponentPositionScoutTacklesConcededAverageLast5 { get; init; }
+    public decimal OpponentExpectedPointsLast3 { get; init; }
+    public decimal OpponentWinRateLast5 { get; init; }
+    public decimal OpponentDrawRateLast5 { get; init; }
+    public decimal OpponentLossRateLast5 { get; init; }
+    public decimal OpponentExpectedPointsLast5 { get; init; }
+    public decimal OpponentAttackStrengthLast3 { get; init; }
+    public decimal OpponentAttackStrengthLast5 { get; init; }
+    public decimal OpponentDefenseStrengthLast3 { get; init; }
+    public decimal OpponentDefenseStrengthLast5 { get; init; }
+    public decimal AttackVsOpponentDefenseDeltaLast3 { get; init; }
+    public decimal AttackVsOpponentDefenseDeltaLast5 { get; init; }
+    public decimal PositionForVsOpponentConcededDeltaLast3 { get; init; }
+    public decimal PositionForVsOpponentConcededDeltaLast5 { get; init; }
+    public decimal GoalDifferenceDeltaLast3 { get; init; }
+    public decimal GoalDifferenceDeltaLast5 { get; init; }
     public decimal TargetScore { get; init; }
-
     public bool TargetWasInGame { get; init; }
 }

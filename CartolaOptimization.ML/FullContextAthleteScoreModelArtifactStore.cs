@@ -45,6 +45,7 @@ public sealed class FullContextAthleteScoreModelArtifactStore(
         {
             ModelVersion = metadata.ModelVersion,
             DatasetKey = metadata.DatasetKey,
+            TrainerName = metadata.TrainerName,
             TrainedAtUtc = metadata.TrainedAtUtc,
             FromRound = metadata.FromRound,
             ToRound = metadata.ToRound,

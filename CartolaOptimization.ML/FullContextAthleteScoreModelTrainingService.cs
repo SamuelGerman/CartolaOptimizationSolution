@@ -4,6 +4,7 @@ using CartolaOptimization.Domain.Constants;
 using CartolaOptimization.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.ML;
+using Microsoft.ML.Trainers.LightGbm;
 
 namespace CartolaOptimization.ML;
 
@@ -13,6 +14,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
     Microsoft.Extensions.Options.IOptions<FullContextAthleteScoreModelOptions> options) : IFullContextAthleteScoreModelTrainingService
 {
     private const string DatasetKey = "full-context";
+    private const string TrainerName = "LightGBM";
     private readonly FullContextAthleteScoreModelOptions options = options.Value;
 
     public async Task<AthleteScoreModelTrainingResult> TrainAsync(
@@ -35,7 +37,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
 
         if (distinctRounds.Length < 2)
         {
-            throw new InvalidOperationException("At least two distinct historical closed rounds with complete club and opponent context are required to train and validate the v1 full-context athlete-score model.");
+            throw new InvalidOperationException("At least two distinct historical closed rounds with valid local full-context derived from athlete and match history are required to train and validate the v1 full-context athlete-score model.");
         }
 
         if (validationRounds >= distinctRounds.Length)
@@ -75,6 +77,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
         {
             ModelVersion = options.ModelVersion,
             DatasetKey = DatasetKey,
+            TrainerName = TrainerName,
             TrainedAtUtc = DateTime.UtcNow,
             FromRound = fromRound,
             ToRound = toRound,
@@ -94,7 +97,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
 
         return new AthleteScoreModelTrainingResult
         {
-            Message = $"Model '{options.ModelVersion}' trained successfully with temporal validation across the last {validationRounds} round(s).",
+            Message = $"Model '{options.ModelVersion}' trained successfully with the {TrainerName} regressor and temporal validation across the last {validationRounds} round(s).",
             ModelInfo = artifactStore.ToModelInfo(metadata),
         };
     }
@@ -107,73 +110,20 @@ public sealed class FullContextAthleteScoreModelTrainingService(
 
     private static IEstimator<ITransformer> BuildPipeline(MLContext mlContext)
     {
-        var numericFeatures = new[]
+        var excludedNumericFeatures = new HashSet<string>(StringComparer.Ordinal)
         {
-            nameof(FullContextAthleteScoreTrainingRow.RoundId),
-            nameof(FullContextAthleteScoreTrainingRow.GamesNum),
-            nameof(FullContextAthleteScoreTrainingRow.HomeGamesNum),
-            nameof(FullContextAthleteScoreTrainingRow.AwayGamesNum),
-            nameof(FullContextAthleteScoreTrainingRow.MovingAverage),
-            nameof(FullContextAthleteScoreTrainingRow.AverageScore),
-            nameof(FullContextAthleteScoreTrainingRow.HomeAverageScore),
-            nameof(FullContextAthleteScoreTrainingRow.AwayAverageScore),
-            nameof(FullContextAthleteScoreTrainingRow.PriceNum),
-            nameof(FullContextAthleteScoreTrainingRow.VariationNum),
-            nameof(FullContextAthleteScoreTrainingRow.TeamAverageScore),
-            nameof(FullContextAthleteScoreTrainingRow.PointsPerCartoletaCurrent),
-            nameof(FullContextAthleteScoreTrainingRow.GrossOverallMovingAverageCurrent),
-            nameof(FullContextAthleteScoreTrainingRow.NetOverallMovingAverageCurrent),
-            nameof(FullContextAthleteScoreTrainingRow.ValuationCurrent),
-            nameof(FullContextAthleteScoreTrainingRow.MinimumToAppreciateCurrent),
-            nameof(FullContextAthleteScoreTrainingRow.IndexPointsPerCartoleta),
-            nameof(FullContextAthleteScoreTrainingRow.IndexOffensiveEfficiency),
-            nameof(FullContextAthleteScoreTrainingRow.IndexDefensiveEfficiency),
-            nameof(FullContextAthleteScoreTrainingRow.IndexShotsPerGame),
-            nameof(FullContextAthleteScoreTrainingRow.IndexShotsPerGoal),
-            nameof(FullContextAthleteScoreTrainingRow.IsHomeMatch),
-            nameof(FullContextAthleteScoreTrainingRow.ClubTablePosition),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentClubTablePosition),
-            nameof(FullContextAthleteScoreTrainingRow.ClubWinProbability),
-            nameof(FullContextAthleteScoreTrainingRow.ClubDrawProbability),
-            nameof(FullContextAthleteScoreTrainingRow.ClubLoseProbability),
-            nameof(FullContextAthleteScoreTrainingRow.ClubOverallAverage),
-            nameof(FullContextAthleteScoreTrainingRow.ClubMovingAverage),
-            nameof(FullContextAthleteScoreTrainingRow.ClubExpectedPoints),
-            nameof(FullContextAthleteScoreTrainingRow.ClubPreviousOverallAverage),
-            nameof(FullContextAthleteScoreTrainingRow.ClubRankingsHomeAverage),
-            nameof(FullContextAthleteScoreTrainingRow.ClubRankingsAwayAverage),
-            nameof(FullContextAthleteScoreTrainingRow.ClubHistoricalWinRate),
-            nameof(FullContextAthleteScoreTrainingRow.ClubFavoriteWinProbability),
-            nameof(FullContextAthleteScoreTrainingRow.ClubForecastExpectedResult),
-            nameof(FullContextAthleteScoreTrainingRow.ClubForecastRiskScore),
-            nameof(FullContextAthleteScoreTrainingRow.ClubPositionDistributionValue),
-            nameof(FullContextAthleteScoreTrainingRow.ClubAverageInsightConfidence),
-            nameof(FullContextAthleteScoreTrainingRow.ClubPositiveInsightNet),
-            nameof(FullContextAthleteScoreTrainingRow.ClubTeamTipsCount),
-            nameof(FullContextAthleteScoreTrainingRow.ClubMatchTipsCount),
-            nameof(FullContextAthleteScoreTrainingRow.ClubPositionPointsConcededAverage),
-            nameof(FullContextAthleteScoreTrainingRow.ClubPositionPointsConqueredAverage),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentWinProbability),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentDrawProbability),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentLoseProbability),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentOverallAverage),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentMovingAverage),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentExpectedPoints),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentPreviousOverallAverage),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentRankingsHomeAverage),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentRankingsAwayAverage),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentHistoricalWinRate),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentFavoriteWinProbability),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentForecastExpectedResult),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentForecastRiskScore),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentPositionDistributionValue),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentAverageInsightConfidence),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentPositiveInsightNet),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentTeamTipsCount),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentMatchTipsCount),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentPositionPointsConcededAverage),
-            nameof(FullContextAthleteScoreTrainingRow.OpponentPositionPointsConqueredAverage),
+            nameof(FullContextAthleteScoreTrainingRow.Label),
+            nameof(FullContextAthleteScoreTrainingRow.ClubCartolaId),
+            nameof(FullContextAthleteScoreTrainingRow.OpponentClubCartolaId),
+            nameof(FullContextAthleteScoreTrainingRow.PositionCartolaId),
+            nameof(FullContextAthleteScoreTrainingRow.StatusCartolaId),
         };
+
+        var numericFeatures = typeof(FullContextAthleteScoreTrainingRow)
+            .GetProperties()
+            .Where(item => item.PropertyType == typeof(float) && !excludedNumericFeatures.Contains(item.Name))
+            .Select(item => item.Name)
+            .ToArray();
 
         return mlContext.Transforms.Categorical.OneHotEncoding(new[]
             {
@@ -181,8 +131,6 @@ public sealed class FullContextAthleteScoreModelTrainingService(
                 new InputOutputColumnPair("OpponentClubEncoded", nameof(FullContextAthleteScoreTrainingRow.OpponentClubCartolaId)),
                 new InputOutputColumnPair("PositionEncoded", nameof(FullContextAthleteScoreTrainingRow.PositionCartolaId)),
                 new InputOutputColumnPair("StatusEncoded", nameof(FullContextAthleteScoreTrainingRow.StatusCartolaId)),
-                new InputOutputColumnPair("ClubRecentFormEncoded", nameof(FullContextAthleteScoreTrainingRow.ClubRecentForm)),
-                new InputOutputColumnPair("OpponentRecentFormEncoded", nameof(FullContextAthleteScoreTrainingRow.OpponentRecentForm)),
             })
             .Append(mlContext.Transforms.Concatenate(
                 "Features",
@@ -192,12 +140,16 @@ public sealed class FullContextAthleteScoreModelTrainingService(
                         "OpponentClubEncoded",
                         "PositionEncoded",
                         "StatusEncoded",
-                        "ClubRecentFormEncoded",
-                        "OpponentRecentFormEncoded",
                     ]).ToArray()))
-            .Append(mlContext.Regression.Trainers.Sdca(
-                labelColumnName: nameof(FullContextAthleteScoreTrainingRow.Label),
-                featureColumnName: "Features"));
+            .Append(mlContext.Regression.Trainers.LightGbm(new LightGbmRegressionTrainer.Options
+            {
+                LabelColumnName = nameof(FullContextAthleteScoreTrainingRow.Label),
+                FeatureColumnName = "Features",
+                NumberOfIterations = 300,
+                LearningRate = 0.05,
+                NumberOfLeaves = 63,
+                MinimumExampleCountPerLeaf = 10,
+            }));
     }
 
     private static async Task<List<FullContextAthleteScoreTrainingRow>> QueryTrainingRowsAsync(
@@ -243,13 +195,12 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             .Distinct()
             .ToArray();
 
-        var completeClubRounds = await FullContextFeatureResolver.LoadCompleteClubRoundsAsync(dbContext, rounds, cancellationToken);
-        var matchByRoundAndClubId = await FullContextFeatureResolver.LoadMatchesByRoundAndClubIdAsync(dbContext, rounds, cancellationToken);
+        var lookup = await FullContextFeatureResolver.LoadFeatureLookupAsync(dbContext, rounds, cancellationToken);
 
         var rows = new List<FullContextAthleteScoreTrainingRow>(athleteRounds.Count);
         foreach (var athleteRound in athleteRounds)
         {
-            if (FullContextFeatureResolver.TryBuildTrainingRow(athleteRound, completeClubRounds, matchByRoundAndClubId, out var row))
+            if (FullContextFeatureResolver.TryBuildTrainingRow(athleteRound, lookup, out var row))
             {
                 rows.Add(row);
             }

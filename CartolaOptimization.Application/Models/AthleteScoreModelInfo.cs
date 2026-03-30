@@ -9,6 +9,8 @@ public sealed class AthleteScoreModelInfo
 
     public string DatasetKey { get; init; } = string.Empty;
 
+    public string TrainerName { get; init; } = string.Empty;
+
     public DateTime TrainedAtUtc { get; init; }
 
     public int? FromRound { get; init; }

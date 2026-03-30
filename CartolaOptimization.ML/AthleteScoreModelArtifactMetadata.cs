@@ -6,6 +6,8 @@ internal sealed class AthleteScoreModelArtifactMetadata
 
     public string DatasetKey { get; init; } = "athlete-only";
 
+    public string TrainerName { get; init; } = string.Empty;
+
     public DateTime TrainedAtUtc { get; init; }
 
     public int? FromRound { get; init; }
