@@ -59,6 +59,7 @@ public sealed class AthleteScoreModelArtifactStore(
             RSquared = metadata.RSquared,
             ModelArtifactPath = metadata.ModelArtifactPath,
             MetadataArtifactPath = metadata.MetadataArtifactPath,
+            PositionDiagnostics = metadata.PositionDiagnostics,
         };
 
     private string GetArtifactsDirectory()

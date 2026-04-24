@@ -36,4 +36,6 @@ public sealed class AthleteScoreModelInfo
     public string ModelArtifactPath { get; init; } = string.Empty;
 
     public string MetadataArtifactPath { get; init; } = string.Empty;
+
+    public IReadOnlyList<AthleteScorePositionDiagnostics> PositionDiagnostics { get; init; } = [];
 }

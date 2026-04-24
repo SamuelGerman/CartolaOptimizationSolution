@@ -20,6 +20,22 @@ public sealed class TrainingFullContextDatasetRow
     public int HomeGamesNum { get; init; }
     public int AwayGamesNum { get; init; }
     public int GamesAtVenueNum { get; init; }
+    public int PlayedMatchesSampleSize { get; init; }
+    public int PlayedMatchesSampleSizeLast5 { get; init; }
+    public int ObservationCountLast3 { get; init; }
+    public int ObservationCountLast5 { get; init; }
+    public int PreviousObservationCountLast3 { get; init; }
+    public int HomeObservationCountLast5 { get; init; }
+    public int AwayObservationCountLast5 { get; init; }
+    public int VenueObservationCountLast5 { get; init; }
+    public int StatusMatchedObservationCountLast5 { get; init; }
+    public decimal HistoryCoverageLast3 { get; init; }
+    public decimal HistoryCoverageLast5 { get; init; }
+    public decimal HomeHistoryCoverageLast5 { get; init; }
+    public decimal AwayHistoryCoverageLast5 { get; init; }
+    public decimal VenueHistoryCoverageLast5 { get; init; }
+    public decimal CurrentStatusCoverageLast5 { get; init; }
+    public bool IsColdStartAthlete { get; init; }
     public decimal MovingAverage { get; init; }
     public decimal AverageScore { get; init; }
     public decimal HomeAverageScore { get; init; }

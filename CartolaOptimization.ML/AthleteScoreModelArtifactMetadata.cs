@@ -33,4 +33,6 @@ internal sealed class AthleteScoreModelArtifactMetadata
     public string ModelArtifactPath { get; init; } = string.Empty;
 
     public string MetadataArtifactPath { get; init; } = string.Empty;
+
+    public IReadOnlyList<CartolaOptimization.Application.Models.AthleteScorePositionDiagnostics> PositionDiagnostics { get; init; } = [];
 }

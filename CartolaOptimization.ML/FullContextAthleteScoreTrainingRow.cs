@@ -11,6 +11,22 @@ internal sealed class FullContextAthleteScoreTrainingRow
     public float HomeGamesNum { get; init; }
     public float AwayGamesNum { get; init; }
     public float GamesAtVenueNum { get; init; }
+    public float PlayedMatchesSampleSize { get; init; }
+    public float PlayedMatchesSampleSizeLast5 { get; init; }
+    public float ObservationCountLast3 { get; init; }
+    public float ObservationCountLast5 { get; init; }
+    public float PreviousObservationCountLast3 { get; init; }
+    public float HomeObservationCountLast5 { get; init; }
+    public float AwayObservationCountLast5 { get; init; }
+    public float VenueObservationCountLast5 { get; init; }
+    public float StatusMatchedObservationCountLast5 { get; init; }
+    public float HistoryCoverageLast3 { get; init; }
+    public float HistoryCoverageLast5 { get; init; }
+    public float HomeHistoryCoverageLast5 { get; init; }
+    public float AwayHistoryCoverageLast5 { get; init; }
+    public float VenueHistoryCoverageLast5 { get; init; }
+    public float CurrentStatusCoverageLast5 { get; init; }
+    public float IsColdStartAthlete { get; init; }
     public float MovingAverage { get; init; }
     public float AverageScore { get; init; }
     public float HomeAverageScore { get; init; }

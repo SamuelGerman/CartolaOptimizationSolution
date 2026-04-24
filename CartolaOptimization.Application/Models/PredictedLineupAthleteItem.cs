@@ -31,5 +31,7 @@ public sealed class PredictedLineupAthleteItem
 
     public decimal PredictedScore { get; init; }
 
+    public decimal PredictionConfidence { get; init; }
+
     public string PredictionNotes { get; init; } = string.Empty;
 }

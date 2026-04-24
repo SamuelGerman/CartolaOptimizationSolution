@@ -53,5 +53,7 @@ public sealed class AthleteScorePredictionItem
 
     public decimal PredictedScore { get; init; }
 
+    public decimal PredictionConfidence { get; init; }
+
     public string PredictionNotes { get; init; } = string.Empty;
 }

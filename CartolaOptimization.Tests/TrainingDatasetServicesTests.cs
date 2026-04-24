@@ -411,6 +411,31 @@ public sealed class TrainingDatasetServicesTests
         Assert.Single(dataset.Rows);
 
         var row = dataset.Rows.Single();
+        Assert.Equal(3, row.GamesNum);
+        Assert.Equal(2, row.HomeGamesNum);
+        Assert.Equal(1, row.AwayGamesNum);
+        Assert.Equal(1, row.GamesAtVenueNum);
+        Assert.Equal(3, row.PlayedMatchesSampleSize);
+        Assert.Equal(3, row.PlayedMatchesSampleSizeLast5);
+        Assert.Equal(3, row.ObservationCountLast3);
+        Assert.Equal(3, row.ObservationCountLast5);
+        Assert.Equal(0, row.PreviousObservationCountLast3);
+        Assert.Equal(2, row.HomeObservationCountLast5);
+        Assert.Equal(1, row.AwayObservationCountLast5);
+        Assert.Equal(1, row.VenueObservationCountLast5);
+        Assert.Equal(3, row.StatusMatchedObservationCountLast5);
+        Assert.Equal(1m, row.HistoryCoverageLast3);
+        Assert.Equal(0.6m, row.HistoryCoverageLast5);
+        Assert.Equal(0.4m, row.HomeHistoryCoverageLast5);
+        Assert.Equal(0.2m, row.AwayHistoryCoverageLast5);
+        Assert.Equal(0.2m, row.VenueHistoryCoverageLast5);
+        Assert.Equal(0.6m, row.CurrentStatusCoverageLast5);
+        Assert.False(row.IsColdStartAthlete);
+        Assert.Equal(4.5m, row.MovingAverage);
+        Assert.Equal(4m, row.AverageScore);
+        Assert.Equal(4m, row.HomeAverageScore);
+        Assert.Equal(4m, row.AwayAverageScore);
+        Assert.Equal(4m, row.ContextualAverageScore);
         Assert.Equal(4m, row.ScoreAverageLast3);
         Assert.Equal(4.5m, row.ScoreEwmaLast3);
         Assert.Equal(4m, row.ScoreTrendLast3VsPrev3);
@@ -449,7 +474,7 @@ public sealed class TrainingDatasetServicesTests
         Assert.Equal(1m, row.StatusStabilityLast5);
         Assert.Equal(0m, row.StatusChangeFlag);
         Assert.Equal(1m, row.EmpiricalPlayRateForCurrentStatus);
-        Assert.Equal(1.5m, row.PriceTrendLast3);
+        Assert.Equal(0.75m, row.PriceTrendLast3);
         Assert.Equal(0.8165m, Math.Round(row.PriceVolatilityLast5, 4));
         Assert.Equal(0.4315m, Math.Round(row.HistoricalPointsPerCartoletaLast3, 4));
         Assert.Equal(0.4315m, Math.Round(row.HistoricalPointsPerCartoletaLast5, 4));
@@ -551,11 +576,84 @@ public sealed class TrainingDatasetServicesTests
         Assert.Single(dataset.Rows);
 
         var row = dataset.Rows.Single();
+        Assert.Equal(1, row.PlayedMatchesSampleSize);
+        Assert.Equal(1, row.PlayedMatchesSampleSizeLast5);
+        Assert.Equal(3, row.ObservationCountLast3);
+        Assert.Equal(3, row.ObservationCountLast5);
+        Assert.Equal(0.6m, row.HistoryCoverageLast5);
+        Assert.Equal(0.2m, row.CurrentStatusCoverageLast5);
+        Assert.True(row.IsColdStartAthlete);
         Assert.Equal(0.3333m, Math.Round(row.PlayRateLast5, 4));
         Assert.Equal(3m, row.RoundsSinceLastInGame);
         Assert.Equal(0.3333m, Math.Round(row.StatusStabilityLast5, 4));
         Assert.Equal(1m, row.StatusChangeFlag);
         Assert.Equal(1m, row.EmpiricalPlayRateForCurrentStatus);
+    }
+
+    [Fact]
+    public async Task TrainingDatasetDiagnosticsService_FullContextDataset_AppliesShrinkageAndIgnoresTargetRoundStoredAggregates()
+    {
+        await using var dbContext = TestDbContextFactory.Create();
+        var clubA = new Club(0, 293, "CAP", "athletico-pr", "Athletico-PR", "https://example.com/cap.png");
+        var clubB = new Club(0, 262, "FLA", "flamengo", "Flamengo", "https://example.com/fla.png");
+        var position = new Position(0, 3, "Zagueiro", "zag");
+        var status = new AthleteStatus(0, 7, "Provavel");
+        var targetAthlete = new Athlete(0, 1001, "Atleta A", "A");
+        var peerAthlete = new Athlete(0, 1002, "Atleta B", "B");
+
+        dbContext.Clubs.AddRange(clubA, clubB);
+        dbContext.Positions.Add(position);
+        dbContext.AthleteStatuses.Add(status);
+        dbContext.Athletes.AddRange(targetAthlete, peerAthlete);
+        await dbContext.SaveChangesAsync();
+
+        dbContext.Matches.AddRange(
+            new Match(0, 9301, 1, DateTime.UtcNow.AddDays(-28), "Arena", true, clubA.Id, 8, "VEV", 1, clubB.Id, 14, "DED", 0),
+            new Match(0, 9302, 2, DateTime.UtcNow.AddDays(-21), "Arena", true, clubA.Id, 7, "VEV", 1, clubB.Id, 13, "DED", 0),
+            new Match(0, 9303, 3, DateTime.UtcNow.AddDays(-14), "Arena", true, clubA.Id, 6, "VEV", 2, clubB.Id, 12, "DED", 0),
+            new Match(0, 9304, 4, DateTime.UtcNow.AddDays(-7), "Arena", true, clubA.Id, 5, "VEV", 1, clubB.Id, 11, "DED", 0));
+
+        dbContext.AthleteRounds.AddRange(
+            new AthleteRound(0, 1, targetAthlete.Id, clubA.Id, position.Id, status.Id, 1, 1, 0, 10m, 10m, 10m, 10m, 10m, 0m, 15m, true)
+            {
+                DataPhase = RoundDataPhaseValues.HistoricalClosed,
+                Scouts = [],
+            },
+            new AthleteRound(0, 1, peerAthlete.Id, clubA.Id, position.Id, status.Id, 1, 1, 0, 2m, 2m, 2m, 2m, 2m, 0m, 8m, true)
+            {
+                DataPhase = RoundDataPhaseValues.HistoricalClosed,
+                Scouts = [],
+            },
+            new AthleteRound(0, 2, peerAthlete.Id, clubA.Id, position.Id, status.Id, 2, 2, 0, 4m, 4m, 4m, 4m, 4m, 0m, 9m, true)
+            {
+                DataPhase = RoundDataPhaseValues.HistoricalClosed,
+                Scouts = [],
+            },
+            new AthleteRound(0, 3, peerAthlete.Id, clubA.Id, position.Id, status.Id, 3, 3, 0, 6m, 6m, 6m, 6m, 6m, 0m, 10m, true)
+            {
+                DataPhase = RoundDataPhaseValues.HistoricalClosed,
+                Scouts = [],
+            },
+            new AthleteRound(0, 4, targetAthlete.Id, clubA.Id, position.Id, status.Id, 99, 99, 99, 4m, 99m, 99m, 99m, 99m, 0m, 16m, true)
+            {
+                DataPhase = RoundDataPhaseValues.HistoricalClosed,
+                Scouts = [],
+            });
+        await dbContext.SaveChangesAsync();
+
+        var service = new TrainingDatasetDiagnosticsService(dbContext);
+        var dataset = await service.GetFullContextDatasetAsync(4, 4, take: 10);
+
+        Assert.Single(dataset.Rows);
+
+        var row = dataset.Rows.Single();
+        Assert.Equal(1, row.GamesNum);
+        Assert.NotEqual(99m, row.AverageScore);
+        Assert.NotEqual(99m, row.MovingAverage);
+        Assert.Equal(6.1429m, Math.Round(row.AverageScore, 4));
+        Assert.Equal(6.6464m, Math.Round(row.MovingAverage, 4));
+        Assert.True(row.AverageScore < 10m);
+        Assert.True(row.MovingAverage < 10m);
     }
 
     private static async Task<(Club Club, Position Position, AthleteStatus Status, Athlete[] Athletes)> SeedTrainingBaseAsync(AppDbContext dbContext)

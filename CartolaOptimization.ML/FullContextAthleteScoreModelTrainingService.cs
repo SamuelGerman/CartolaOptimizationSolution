@@ -69,6 +69,11 @@ public sealed class FullContextAthleteScoreModelTrainingService(
         var model = pipeline.Fit(trainData);
         var predictions = model.Transform(holdoutData);
         var metrics = mlContext.Regression.Evaluate(predictions, labelColumnName: nameof(FullContextAthleteScoreTrainingRow.Label), scoreColumnName: "Score");
+        var holdoutScores = mlContext.Data
+            .CreateEnumerable<AthleteScorePredictionOutput>(predictions, reuseRowObject: false)
+            .Select(item => item.Score)
+            .ToList();
+        var positionDiagnostics = BuildPositionDiagnostics(trainingRows, holdoutRows, holdoutScores);
 
         Directory.CreateDirectory(Path.GetDirectoryName(artifactStore.GetModelPath())!);
         mlContext.Model.Save(model, trainData.Schema, artifactStore.GetModelPath());
@@ -91,6 +96,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             RSquared = metrics.RSquared,
             ModelArtifactPath = artifactStore.GetModelPath(),
             MetadataArtifactPath = artifactStore.GetMetadataPath(),
+            PositionDiagnostics = positionDiagnostics,
         };
 
         await artifactStore.SaveMetadataAsync(metadata, cancellationToken);
@@ -226,4 +232,96 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             (fromRound, toRound) = (toRound, fromRound);
         }
     }
+
+    private static IReadOnlyList<AthleteScorePositionDiagnostics> BuildPositionDiagnostics(
+        IReadOnlyCollection<FullContextAthleteScoreTrainingRow> trainingRows,
+        IReadOnlyList<FullContextAthleteScoreTrainingRow> holdoutRows,
+        IReadOnlyList<float> holdoutScores)
+    {
+        var trainingLookup = trainingRows
+            .GroupBy(item => item.PositionCartolaId)
+            .ToDictionary(
+                group => group.Key,
+                group => new
+                {
+                    Rows = group.Count(),
+                    MeanScore = group.Average(item => item.Label),
+                });
+
+        return holdoutRows
+            .Zip(holdoutScores, (row, score) => new { Row = row, PredictedScore = (double)score })
+            .GroupBy(item => item.Row.PositionCartolaId)
+            .OrderBy(group => group.Key)
+            .Select(group =>
+            {
+                var actualScores = group.Select(item => (double)item.Row.Label).ToArray();
+                var predictedScores = group.Select(item => item.PredictedScore).ToArray();
+                var validationRows = actualScores.Length;
+                var meanActualScore = actualScores.Average();
+                var meanPredictedScore = predictedScores.Average();
+                var actualStd = ComputeStandardDeviation(actualScores, meanActualScore);
+                var predictedStd = ComputeStandardDeviation(predictedScores, meanPredictedScore);
+                var slopeWeight = Math.Clamp(validationRows / 100d, 0d, 1d);
+                var targetSlope = predictedStd > 0.001d
+                    ? Math.Clamp(actualStd / predictedStd, 0.5d, 3d)
+                    : 1d;
+                var calibrationSlope = 1d + ((targetSlope - 1d) * slopeWeight);
+                var targetOffset = meanActualScore - (calibrationSlope * meanPredictedScore);
+                var calibrationOffset = targetOffset * slopeWeight;
+                var calibratedScores = predictedScores
+                    .Select(item => (calibrationSlope * item) + calibrationOffset)
+                    .ToArray();
+                var trainingStats = trainingLookup.GetValueOrDefault(group.Key);
+                var positionCartolaId = Convert.ToInt32(group.Key);
+                var (positionCode, positionName) = GetPositionLabelsSafe(positionCartolaId);
+
+                return new AthleteScorePositionDiagnostics
+                {
+                    PositionCartolaId = positionCartolaId,
+                    PositionCode = positionCode,
+                    PositionName = positionName,
+                    TrainingRows = trainingStats?.Rows ?? 0,
+                    ValidationRows = validationRows,
+                    TrainingMeanScore = trainingStats?.MeanScore ?? 0d,
+                    ValidationMeanActualScore = meanActualScore,
+                    ValidationMeanPredictedScore = meanPredictedScore,
+                    ValidationMeanPredictedScoreCalibrated = calibratedScores.Average(),
+                    ValidationMeanAbsoluteError = actualScores
+                        .Zip(predictedScores, (actual, predicted) => Math.Abs(actual - predicted))
+                        .Average(),
+                    ValidationRootMeanSquaredError = Math.Sqrt(actualScores
+                        .Zip(predictedScores, (actual, predicted) => Math.Pow(actual - predicted, 2))
+                        .Average()),
+                    ValidationBias = meanPredictedScore - meanActualScore,
+                    CalibrationSlope = calibrationSlope,
+                    CalibrationOffset = calibrationOffset,
+                };
+            })
+            .ToList();
+    }
+
+    private static double ComputeStandardDeviation(IReadOnlyCollection<double> values, double mean)
+    {
+        if (values.Count == 0)
+        {
+            return 0d;
+        }
+
+        return Math.Sqrt(values
+            .Select(item => Math.Pow(item - mean, 2))
+            .Average());
+    }
+
+    private static (string PositionCode, string PositionName) GetPositionLabelsSafe(int positionCartolaId)
+        => positionCartolaId switch
+        {
+            1 => ("GOL", "Goleiro"),
+            2 => ("LAT", "Lateral"),
+            3 => ("ZAG", "Zagueiro"),
+            4 => ("MEI", "Meia"),
+            5 => ("ATA", "Atacante"),
+            6 => ("TEC", "Tecnico"),
+            _ => ($"P{positionCartolaId}", $"Posicao {positionCartolaId}"),
+        };
+
 }

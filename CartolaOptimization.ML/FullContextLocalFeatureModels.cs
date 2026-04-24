@@ -8,6 +8,10 @@ internal sealed class FullContextFeatureLookup
 
     public required IReadOnlyDictionary<int, IReadOnlyList<AthleteHistoryObservation>> AthleteHistoryByAthleteId { get; init; }
 
+    public required IReadOnlyDictionary<int, IReadOnlyList<AthleteHistoryObservation>> PositionHistoryByPositionId { get; init; }
+
+    public required IReadOnlyList<AthleteHistoryObservation> GlobalAthleteHistory { get; init; }
+
     public required IReadOnlyDictionary<int, IReadOnlyList<ClubMatchHistoryPoint>> ClubMatchHistoryByClubId { get; init; }
 
     public required IReadOnlyDictionary<(int ClubId, int Round), decimal> FantasyPointsForByClubAndRound { get; init; }
@@ -51,6 +55,7 @@ internal sealed class FullContextFeatureLookup
 
 internal readonly record struct AthleteHistoryObservation(
     int RoundId,
+    int PositionId,
     bool? IsHomeMatch,
     int StatusId,
     bool WasInGame,
@@ -78,6 +83,31 @@ internal readonly record struct ClubMatchHistoryPoint(
     decimal GoalsAgainst);
 
 internal readonly record struct AthleteHistorySnapshot(
+    decimal GamesNumPrior,
+    decimal HomeGamesNumPrior,
+    decimal AwayGamesNumPrior,
+    decimal VenueGamesNumPrior,
+    decimal PlayedMatchesSampleSize,
+    decimal PlayedMatchesSampleSizeLast5,
+    decimal ObservationCountLast3,
+    decimal ObservationCountLast5,
+    decimal PreviousObservationCountLast3,
+    decimal HomeObservationCountLast5,
+    decimal AwayObservationCountLast5,
+    decimal VenueObservationCountLast5,
+    decimal StatusMatchedObservationCountLast5,
+    decimal HistoryCoverageLast3,
+    decimal HistoryCoverageLast5,
+    decimal HomeHistoryCoverageLast5,
+    decimal AwayHistoryCoverageLast5,
+    decimal VenueHistoryCoverageLast5,
+    decimal CurrentStatusCoverageLast5,
+    decimal IsColdStartAthlete,
+    decimal MovingAveragePrior,
+    decimal AverageScorePrior,
+    decimal HomeAverageScorePrior,
+    decimal AwayAverageScorePrior,
+    decimal VenueAverageScorePrior,
     decimal ScoreLast1,
     decimal ScoreAverageLast3,
     decimal ScoreAverageLast5,
@@ -140,6 +170,25 @@ internal readonly record struct AthleteHistorySnapshot(
     decimal HistoricalPointsPerCartoletaLast5,
     decimal PositionRelativePriceSignal,
     decimal PriceDeltaVsHistoricalAverage);
+
+internal readonly record struct AthleteHistoryPrior(
+    AthleteHistorySnapshot Snapshot,
+    decimal HistoricalAveragePrice,
+    int PlayedCount,
+    int PlayedLast5Count,
+    int PlayedHomeCount,
+    int PlayedAwayCount,
+    int PlayedVenueCount,
+    int Last3Count,
+    int Last5Count,
+    int Previous3Count,
+    int HomeLast5Count,
+    int AwayLast5Count,
+    int VenueLast5Count,
+    int HomeLast3Count,
+    int AwayLast3Count,
+    int VenueLast3Count,
+    int StatusMatchedLast5Count);
 
 internal readonly record struct LocalClubContextSnapshot(
     int MatchesSampleSize,
@@ -213,6 +262,8 @@ internal static class FullContextHistoricalFeatureCalculator
 {
     internal static AthleteHistorySnapshot BuildAthleteHistorySnapshot(
         IReadOnlyDictionary<int, IReadOnlyList<AthleteHistoryObservation>> historyByAthleteId,
+        IReadOnlyDictionary<int, IReadOnlyList<AthleteHistoryObservation>> positionHistoryByPositionId,
+        IReadOnlyList<AthleteHistoryObservation> globalAthleteHistory,
         IReadOnlyDictionary<(int PositionId, int Round), decimal> averagePriceByPositionAndRound,
         int athleteId,
         int currentStatusId,
@@ -229,6 +280,21 @@ internal static class FullContextHistoricalFeatureCalculator
         var prior = observations
             .Where(item => item.RoundId < targetRound)
             .OrderByDescending(item => item.RoundId)
+            .ToList();
+        var playedPrior = prior
+            .Where(item => item.WasInGame)
+            .ToList();
+        var playedPriorHome = playedPrior
+            .Where(item => item.IsHomeMatch is true)
+            .ToList();
+        var playedPriorAway = playedPrior
+            .Where(item => item.IsHomeMatch is false)
+            .ToList();
+        var playedPriorVenue = playedPrior
+            .Where(item => item.IsHomeMatch == targetIsHomeMatch)
+            .ToList();
+        var playedPriorLast5 = playedPrior
+            .Take(5)
             .ToList();
 
         var last3 = prior.Take(3).ToList();
@@ -256,8 +322,32 @@ internal static class FullContextHistoricalFeatureCalculator
                 .Select(item => item.Value));
         var historicalAveragePrice = Average(prior.Select(item => item.Price));
         var priceTrendLast3 = ComputePriceTrendLast3(last3.Select(item => item.Price));
-
-        return new AthleteHistorySnapshot(
+        var rawSnapshot = new AthleteHistorySnapshot(
+            GamesNumPrior: playedPrior.Count,
+            HomeGamesNumPrior: playedPriorHome.Count,
+            AwayGamesNumPrior: playedPriorAway.Count,
+            VenueGamesNumPrior: playedPriorVenue.Count,
+            PlayedMatchesSampleSize: playedPrior.Count,
+            PlayedMatchesSampleSizeLast5: playedPriorLast5.Count,
+            ObservationCountLast3: last3.Count,
+            ObservationCountLast5: last5.Count,
+            PreviousObservationCountLast3: previous3.Count,
+            HomeObservationCountLast5: homeLast5.Count,
+            AwayObservationCountLast5: awayLast5.Count,
+            VenueObservationCountLast5: venueLast5.Count,
+            StatusMatchedObservationCountLast5: statusMatchedLast5.Count,
+            HistoryCoverageLast3: Math.Min(1m, last3.Count / 3m),
+            HistoryCoverageLast5: Math.Min(1m, last5.Count / 5m),
+            HomeHistoryCoverageLast5: Math.Min(1m, homeLast5.Count / 5m),
+            AwayHistoryCoverageLast5: Math.Min(1m, awayLast5.Count / 5m),
+            VenueHistoryCoverageLast5: Math.Min(1m, venueLast5.Count / 5m),
+            CurrentStatusCoverageLast5: Math.Min(1m, statusMatchedLast5.Count / 5m),
+            IsColdStartAthlete: playedPrior.Count < 3 ? 1m : 0m,
+            MovingAveragePrior: Ewma(playedPriorLast5.Select(item => item.Score)),
+            AverageScorePrior: Average(playedPrior.Select(item => item.Score)),
+            HomeAverageScorePrior: Average(playedPriorHome.Select(item => item.Score)),
+            AwayAverageScorePrior: Average(playedPriorAway.Select(item => item.Score)),
+            VenueAverageScorePrior: Average(playedPriorVenue.Select(item => item.Score)),
             ScoreLast1: last5.FirstOrDefault().Score,
             ScoreAverageLast3: Average(last3.Select(item => item.Score)),
             ScoreAverageLast5: Average(last5.Select(item => item.Score)),
@@ -320,7 +410,314 @@ internal static class FullContextHistoricalFeatureCalculator
             HistoricalPointsPerCartoletaLast5: Average(last5.Select(item => SafeDivide(item.Score, item.Price))),
             PositionRelativePriceSignal: currentPrice - positionAveragePriceLast5,
             PriceDeltaVsHistoricalAverage: currentPrice - historicalAveragePrice);
+
+        var priorSnapshot = BuildAthleteHistoryPrior(
+            positionHistoryByPositionId,
+            globalAthleteHistory,
+            averagePriceByPositionAndRound,
+            currentStatusId,
+            currentPrice,
+            positionId,
+            targetRound,
+            targetIsHomeMatch);
+
+        return ApplyAthleteHistoryShrinkage(
+            rawSnapshot,
+            priorSnapshot,
+            playedPrior.Count,
+            playedPriorLast5.Count,
+            playedPriorHome.Count,
+            playedPriorAway.Count,
+            playedPriorVenue.Count,
+            last3.Count,
+            last5.Count,
+            previous3.Count,
+            homeLast5.Count,
+            awayLast5.Count,
+            venueLast5.Count,
+            homeLast3.Count,
+            awayLast3.Count,
+            venueLast3.Count,
+            statusMatchedLast5.Count,
+            currentPrice,
+            historicalAveragePrice);
     }
+
+    private static AthleteHistoryPrior BuildAthleteHistoryPrior(
+        IReadOnlyDictionary<int, IReadOnlyList<AthleteHistoryObservation>> positionHistoryByPositionId,
+        IReadOnlyList<AthleteHistoryObservation> globalAthleteHistory,
+        IReadOnlyDictionary<(int PositionId, int Round), decimal> averagePriceByPositionAndRound,
+        int currentStatusId,
+        decimal currentPrice,
+        int positionId,
+        int targetRound,
+        bool targetIsHomeMatch)
+    {
+        var positionObservations = positionHistoryByPositionId.TryGetValue(positionId, out var history)
+            ? history.Where(item => item.RoundId < targetRound).OrderByDescending(item => item.RoundId).ToList()
+            : [];
+        var globalObservations = globalAthleteHistory
+            .Where(item => item.RoundId < targetRound)
+            .OrderByDescending(item => item.RoundId)
+            .ToList();
+
+        return positionObservations.Count > 0
+            ? CreateAthletePriorFromObservations(positionObservations, averagePriceByPositionAndRound, currentStatusId, currentPrice, positionId, targetRound, targetIsHomeMatch)
+            : CreateAthletePriorFromObservations(globalObservations, averagePriceByPositionAndRound, currentStatusId, currentPrice, positionId, targetRound, targetIsHomeMatch);
+    }
+
+    private static AthleteHistoryPrior CreateAthletePriorFromObservations(
+        IReadOnlyList<AthleteHistoryObservation> observations,
+        IReadOnlyDictionary<(int PositionId, int Round), decimal> averagePriceByPositionAndRound,
+        int currentStatusId,
+        decimal currentPrice,
+        int positionId,
+        int targetRound,
+        bool targetIsHomeMatch)
+    {
+        var played = observations.Where(item => item.WasInGame).ToList();
+        var playedHome = played.Where(item => item.IsHomeMatch is true).ToList();
+        var playedAway = played.Where(item => item.IsHomeMatch is false).ToList();
+        var playedVenue = played.Where(item => item.IsHomeMatch == targetIsHomeMatch).ToList();
+        var playedLast5 = played.Take(5).ToList();
+        var last3 = observations.Take(3).ToList();
+        var last5 = observations.Take(5).ToList();
+        var previous3 = observations.Skip(3).Take(3).ToList();
+        var homeLast5 = observations.Where(item => item.IsHomeMatch is true).Take(5).ToList();
+        var awayLast5 = observations.Where(item => item.IsHomeMatch is false).Take(5).ToList();
+        var venueLast5 = observations.Where(item => item.IsHomeMatch == targetIsHomeMatch).Take(5).ToList();
+        var homeLast3 = observations.Where(item => item.IsHomeMatch is true).Take(3).ToList();
+        var awayLast3 = observations.Where(item => item.IsHomeMatch is false).Take(3).ToList();
+        var venueLast3 = observations.Where(item => item.IsHomeMatch == targetIsHomeMatch).Take(3).ToList();
+        var statusMatchedLast5 = last5.Where(item => item.StatusId == currentStatusId).ToList();
+        var lastInGameRound = observations.FirstOrDefault(item => item.WasInGame).RoundId;
+        var roundsSinceLastInGame = lastInGameRound > 0 ? targetRound - lastInGameRound : observations.Count;
+        var positionAveragePriceLast5 = Average(
+            averagePriceByPositionAndRound
+                .Where(item => item.Key.PositionId == positionId && item.Key.Round < targetRound)
+                .OrderByDescending(item => item.Key.Round)
+                .Take(5)
+                .Select(item => item.Value));
+        var historicalAveragePrice = Average(observations.Select(item => item.Price));
+        var empiricalPlayRateForCurrentStatus = statusMatchedLast5.Count > 0
+            ? Rate(statusMatchedLast5.Select(item => item.WasInGame))
+            : Rate(last5.Select(item => item.WasInGame));
+
+        return new AthleteHistoryPrior(
+            new AthleteHistorySnapshot(
+                GamesNumPrior: played.Count,
+                HomeGamesNumPrior: playedHome.Count,
+                AwayGamesNumPrior: playedAway.Count,
+                VenueGamesNumPrior: playedVenue.Count,
+                PlayedMatchesSampleSize: played.Count,
+                PlayedMatchesSampleSizeLast5: playedLast5.Count,
+                ObservationCountLast3: last3.Count,
+                ObservationCountLast5: last5.Count,
+                PreviousObservationCountLast3: previous3.Count,
+                HomeObservationCountLast5: homeLast5.Count,
+                AwayObservationCountLast5: awayLast5.Count,
+                VenueObservationCountLast5: venueLast5.Count,
+                StatusMatchedObservationCountLast5: statusMatchedLast5.Count,
+                HistoryCoverageLast3: Math.Min(1m, last3.Count / 3m),
+                HistoryCoverageLast5: Math.Min(1m, last5.Count / 5m),
+                HomeHistoryCoverageLast5: Math.Min(1m, homeLast5.Count / 5m),
+                AwayHistoryCoverageLast5: Math.Min(1m, awayLast5.Count / 5m),
+                VenueHistoryCoverageLast5: Math.Min(1m, venueLast5.Count / 5m),
+                CurrentStatusCoverageLast5: Math.Min(1m, statusMatchedLast5.Count / 5m),
+                IsColdStartAthlete: played.Count < 3 ? 1m : 0m,
+                MovingAveragePrior: Ewma(playedLast5.Select(item => item.Score)),
+                AverageScorePrior: Average(played.Select(item => item.Score)),
+                HomeAverageScorePrior: Average(playedHome.Select(item => item.Score)),
+                AwayAverageScorePrior: Average(playedAway.Select(item => item.Score)),
+                VenueAverageScorePrior: Average(playedVenue.Select(item => item.Score)),
+                ScoreLast1: last5.FirstOrDefault().Score,
+                ScoreAverageLast3: Average(last3.Select(item => item.Score)),
+                ScoreAverageLast5: Average(last5.Select(item => item.Score)),
+                ScoreEwmaLast3: Ewma(last3.Select(item => item.Score)),
+                ScoreEwmaLast5: Ewma(last5.Select(item => item.Score)),
+                ScoreStdLast5: StandardDeviation(last5.Select(item => item.Score)),
+                ScoreFloorLast5: Min(last5.Select(item => item.Score)),
+                ScoreCeilingLast5: Max(last5.Select(item => item.Score)),
+                ScoreHitRateOver3Last5: Rate(last5.Select(item => item.Score > 3m)),
+                ScoreHitRateOver5Last5: Rate(last5.Select(item => item.Score > 5m)),
+                ScoreHitRateOver8Last5: Rate(last5.Select(item => item.Score > 8m)),
+                ScoreNegativeRateLast5: Rate(last5.Select(item => item.Score < 0m)),
+                ScoreTrendLast3VsPrev3: Average(last3.Select(item => item.Score)) - Average(previous3.Select(item => item.Score)),
+                HomeScoreAverageLast5: Average(homeLast5.Select(item => item.Score)),
+                AwayScoreAverageLast5: Average(awayLast5.Select(item => item.Score)),
+                VenueScoreAverageLast5: Average(venueLast5.Select(item => item.Score)),
+                HomeScoreEwmaLast3: Ewma(homeLast3.Select(item => item.Score)),
+                AwayScoreEwmaLast3: Ewma(awayLast3.Select(item => item.Score)),
+                VenueScoreEwmaLast3: Ewma(venueLast3.Select(item => item.Score)),
+                ScoutOffensiveSumLast3: Sum(last3.Select(item => item.OffensiveScoutScore)),
+                ScoutOffensiveSumLast5: Sum(last5.Select(item => item.OffensiveScoutScore)),
+                ScoutOffensiveAverageLast3: Average(last3.Select(item => item.OffensiveScoutScore)),
+                ScoutOffensiveAverageLast5: Average(last5.Select(item => item.OffensiveScoutScore)),
+                ScoutOffensiveEwmaLast3: Ewma(last3.Select(item => item.OffensiveScoutScore)),
+                ScoutOffensiveEwmaLast5: Ewma(last5.Select(item => item.OffensiveScoutScore)),
+                ScoutDefensiveSumLast3: Sum(last3.Select(item => item.DefensiveScoutScore)),
+                ScoutDefensiveSumLast5: Sum(last5.Select(item => item.DefensiveScoutScore)),
+                ScoutDefensiveAverageLast3: Average(last3.Select(item => item.DefensiveScoutScore)),
+                ScoutDefensiveAverageLast5: Average(last5.Select(item => item.DefensiveScoutScore)),
+                ScoutDefensiveEwmaLast3: Ewma(last3.Select(item => item.DefensiveScoutScore)),
+                ScoutDefensiveEwmaLast5: Ewma(last5.Select(item => item.DefensiveScoutScore)),
+                ScoutNegativeSumLast3: Sum(last3.Select(item => item.NegativeScoutScore)),
+                ScoutNegativeSumLast5: Sum(last5.Select(item => item.NegativeScoutScore)),
+                ScoutNegativeAverageLast3: Average(last3.Select(item => item.NegativeScoutScore)),
+                ScoutNegativeAverageLast5: Average(last5.Select(item => item.NegativeScoutScore)),
+                ScoutNegativeEwmaLast3: Ewma(last3.Select(item => item.NegativeScoutScore)),
+                ScoutNegativeEwmaLast5: Ewma(last5.Select(item => item.NegativeScoutScore)),
+                ScoutBalanceSumLast3: Sum(last3.Select(item => item.BalanceScoutScore)),
+                ScoutBalanceSumLast5: Sum(last5.Select(item => item.BalanceScoutScore)),
+                ScoutBalanceAverageLast3: Average(last3.Select(item => item.BalanceScoutScore)),
+                ScoutBalanceAverageLast5: Average(last5.Select(item => item.BalanceScoutScore)),
+                ScoutBalanceEwmaLast3: Ewma(last3.Select(item => item.BalanceScoutScore)),
+                ScoutBalanceEwmaLast5: Ewma(last5.Select(item => item.BalanceScoutScore)),
+                ScoutGoalsAverageLast3: Average(last3.Select(item => item.GoalsCount)),
+                ScoutGoalsAverageLast5: Average(last5.Select(item => item.GoalsCount)),
+                ScoutAssistsAverageLast3: Average(last3.Select(item => item.AssistsCount)),
+                ScoutAssistsAverageLast5: Average(last5.Select(item => item.AssistsCount)),
+                ScoutTacklesAverageLast3: Average(last3.Select(item => item.TacklesCount)),
+                ScoutTacklesAverageLast5: Average(last5.Select(item => item.TacklesCount)),
+                ScoutCleanSheetRateLast3: Rate(last3.Select(item => item.CleanSheetCount > 0m)),
+                ScoutCleanSheetRateLast5: Rate(last5.Select(item => item.CleanSheetCount > 0m)),
+                PlayRateLast5: Rate(last5.Select(item => item.WasInGame)),
+                RoundsSinceLastInGame: roundsSinceLastInGame,
+                StatusStabilityLast5: Rate(last5.Select(item => item.StatusId == currentStatusId)),
+                StatusChangeFlag: observations.Count > 0 && observations[0].StatusId != currentStatusId ? 1m : 0m,
+                EmpiricalPlayRateForCurrentStatus: empiricalPlayRateForCurrentStatus,
+                PriceTrendLast3: ComputePriceTrendLast3(last3.Select(item => item.Price)),
+                PriceVolatilityLast5: StandardDeviation(last5.Select(item => item.Price)),
+                HistoricalPointsPerCartoletaLast3: Average(last3.Select(item => SafeDivide(item.Score, item.Price))),
+                HistoricalPointsPerCartoletaLast5: Average(last5.Select(item => SafeDivide(item.Score, item.Price))),
+                PositionRelativePriceSignal: currentPrice - positionAveragePriceLast5,
+                PriceDeltaVsHistoricalAverage: currentPrice - historicalAveragePrice),
+            historicalAveragePrice,
+            played.Count,
+            playedLast5.Count,
+            playedHome.Count,
+            playedAway.Count,
+            playedVenue.Count,
+            last3.Count,
+            last5.Count,
+            previous3.Count,
+            homeLast5.Count,
+            awayLast5.Count,
+            venueLast5.Count,
+            homeLast3.Count,
+            awayLast3.Count,
+            venueLast3.Count,
+            statusMatchedLast5.Count);
+    }
+
+    private static AthleteHistorySnapshot ApplyAthleteHistoryShrinkage(
+        AthleteHistorySnapshot raw,
+        AthleteHistoryPrior prior,
+        int playedCount,
+        int playedLast5Count,
+        int playedHomeCount,
+        int playedAwayCount,
+        int playedVenueCount,
+        int last3Count,
+        int last5Count,
+        int previous3Count,
+        int homeLast5Count,
+        int awayLast5Count,
+        int venueLast5Count,
+        int homeLast3Count,
+        int awayLast3Count,
+        int venueLast3Count,
+        int statusMatchedLast5Count,
+        decimal currentPrice,
+        decimal historicalAveragePrice)
+        => new(
+            raw.GamesNumPrior,
+            raw.HomeGamesNumPrior,
+            raw.AwayGamesNumPrior,
+            raw.VenueGamesNumPrior,
+            raw.PlayedMatchesSampleSize,
+            raw.PlayedMatchesSampleSizeLast5,
+            raw.ObservationCountLast3,
+            raw.ObservationCountLast5,
+            raw.PreviousObservationCountLast3,
+            raw.HomeObservationCountLast5,
+            raw.AwayObservationCountLast5,
+            raw.VenueObservationCountLast5,
+            raw.StatusMatchedObservationCountLast5,
+            raw.HistoryCoverageLast3,
+            raw.HistoryCoverageLast5,
+            raw.HomeHistoryCoverageLast5,
+            raw.AwayHistoryCoverageLast5,
+            raw.VenueHistoryCoverageLast5,
+            raw.CurrentStatusCoverageLast5,
+            raw.IsColdStartAthlete,
+            Shrink(raw.MovingAveragePrior, playedLast5Count, prior.Snapshot.MovingAveragePrior, 4),
+            Shrink(raw.AverageScorePrior, playedCount, prior.Snapshot.AverageScorePrior, 6),
+            Shrink(raw.HomeAverageScorePrior, playedHomeCount, prior.Snapshot.HomeAverageScorePrior, 4),
+            Shrink(raw.AwayAverageScorePrior, playedAwayCount, prior.Snapshot.AwayAverageScorePrior, 4),
+            Shrink(raw.VenueAverageScorePrior, playedVenueCount, prior.Snapshot.VenueAverageScorePrior, 4),
+            Shrink(raw.ScoreLast1, last5Count > 0 ? 1 : 0, prior.Snapshot.ScoreAverageLast3, 2),
+            Shrink(raw.ScoreAverageLast3, last3Count, prior.Snapshot.ScoreAverageLast3, 3),
+            Shrink(raw.ScoreAverageLast5, last5Count, prior.Snapshot.ScoreAverageLast5, 5),
+            Shrink(raw.ScoreEwmaLast3, last3Count, prior.Snapshot.ScoreEwmaLast3, 3),
+            Shrink(raw.ScoreEwmaLast5, last5Count, prior.Snapshot.ScoreEwmaLast5, 5),
+            Shrink(raw.ScoreStdLast5, last5Count, prior.Snapshot.ScoreStdLast5, 4),
+            Shrink(raw.ScoreFloorLast5, last5Count, prior.Snapshot.ScoreFloorLast5, 4),
+            Shrink(raw.ScoreCeilingLast5, last5Count, prior.Snapshot.ScoreCeilingLast5, 4),
+            Shrink(raw.ScoreHitRateOver3Last5, last5Count, prior.Snapshot.ScoreHitRateOver3Last5, 5),
+            Shrink(raw.ScoreHitRateOver5Last5, last5Count, prior.Snapshot.ScoreHitRateOver5Last5, 5),
+            Shrink(raw.ScoreHitRateOver8Last5, last5Count, prior.Snapshot.ScoreHitRateOver8Last5, 5),
+            Shrink(raw.ScoreNegativeRateLast5, last5Count, prior.Snapshot.ScoreNegativeRateLast5, 5),
+            Shrink(raw.ScoreTrendLast3VsPrev3, Math.Min(last3Count, previous3Count), prior.Snapshot.ScoreTrendLast3VsPrev3, 4),
+            Shrink(raw.HomeScoreAverageLast5, homeLast5Count, prior.Snapshot.HomeScoreAverageLast5, 4),
+            Shrink(raw.AwayScoreAverageLast5, awayLast5Count, prior.Snapshot.AwayScoreAverageLast5, 4),
+            Shrink(raw.VenueScoreAverageLast5, venueLast5Count, prior.Snapshot.VenueScoreAverageLast5, 4),
+            Shrink(raw.HomeScoreEwmaLast3, homeLast3Count, prior.Snapshot.HomeScoreEwmaLast3, 3),
+            Shrink(raw.AwayScoreEwmaLast3, awayLast3Count, prior.Snapshot.AwayScoreEwmaLast3, 3),
+            Shrink(raw.VenueScoreEwmaLast3, venueLast3Count, prior.Snapshot.VenueScoreEwmaLast3, 3),
+            raw.ScoutOffensiveSumLast3,
+            raw.ScoutOffensiveSumLast5,
+            Shrink(raw.ScoutOffensiveAverageLast3, last3Count, prior.Snapshot.ScoutOffensiveAverageLast3, 3),
+            Shrink(raw.ScoutOffensiveAverageLast5, last5Count, prior.Snapshot.ScoutOffensiveAverageLast5, 5),
+            Shrink(raw.ScoutOffensiveEwmaLast3, last3Count, prior.Snapshot.ScoutOffensiveEwmaLast3, 3),
+            Shrink(raw.ScoutOffensiveEwmaLast5, last5Count, prior.Snapshot.ScoutOffensiveEwmaLast5, 5),
+            raw.ScoutDefensiveSumLast3,
+            raw.ScoutDefensiveSumLast5,
+            Shrink(raw.ScoutDefensiveAverageLast3, last3Count, prior.Snapshot.ScoutDefensiveAverageLast3, 3),
+            Shrink(raw.ScoutDefensiveAverageLast5, last5Count, prior.Snapshot.ScoutDefensiveAverageLast5, 5),
+            Shrink(raw.ScoutDefensiveEwmaLast3, last3Count, prior.Snapshot.ScoutDefensiveEwmaLast3, 3),
+            Shrink(raw.ScoutDefensiveEwmaLast5, last5Count, prior.Snapshot.ScoutDefensiveEwmaLast5, 5),
+            raw.ScoutNegativeSumLast3,
+            raw.ScoutNegativeSumLast5,
+            Shrink(raw.ScoutNegativeAverageLast3, last3Count, prior.Snapshot.ScoutNegativeAverageLast3, 3),
+            Shrink(raw.ScoutNegativeAverageLast5, last5Count, prior.Snapshot.ScoutNegativeAverageLast5, 5),
+            Shrink(raw.ScoutNegativeEwmaLast3, last3Count, prior.Snapshot.ScoutNegativeEwmaLast3, 3),
+            Shrink(raw.ScoutNegativeEwmaLast5, last5Count, prior.Snapshot.ScoutNegativeEwmaLast5, 5),
+            raw.ScoutBalanceSumLast3,
+            raw.ScoutBalanceSumLast5,
+            Shrink(raw.ScoutBalanceAverageLast3, last3Count, prior.Snapshot.ScoutBalanceAverageLast3, 3),
+            Shrink(raw.ScoutBalanceAverageLast5, last5Count, prior.Snapshot.ScoutBalanceAverageLast5, 5),
+            Shrink(raw.ScoutBalanceEwmaLast3, last3Count, prior.Snapshot.ScoutBalanceEwmaLast3, 3),
+            Shrink(raw.ScoutBalanceEwmaLast5, last5Count, prior.Snapshot.ScoutBalanceEwmaLast5, 5),
+            Shrink(raw.ScoutGoalsAverageLast3, last3Count, prior.Snapshot.ScoutGoalsAverageLast3, 3),
+            Shrink(raw.ScoutGoalsAverageLast5, last5Count, prior.Snapshot.ScoutGoalsAverageLast5, 5),
+            Shrink(raw.ScoutAssistsAverageLast3, last3Count, prior.Snapshot.ScoutAssistsAverageLast3, 3),
+            Shrink(raw.ScoutAssistsAverageLast5, last5Count, prior.Snapshot.ScoutAssistsAverageLast5, 5),
+            Shrink(raw.ScoutTacklesAverageLast3, last3Count, prior.Snapshot.ScoutTacklesAverageLast3, 3),
+            Shrink(raw.ScoutTacklesAverageLast5, last5Count, prior.Snapshot.ScoutTacklesAverageLast5, 5),
+            Shrink(raw.ScoutCleanSheetRateLast3, last3Count, prior.Snapshot.ScoutCleanSheetRateLast3, 3),
+            Shrink(raw.ScoutCleanSheetRateLast5, last5Count, prior.Snapshot.ScoutCleanSheetRateLast5, 5),
+            Shrink(raw.PlayRateLast5, last5Count, prior.Snapshot.PlayRateLast5, 5),
+            raw.RoundsSinceLastInGame,
+            Shrink(raw.StatusStabilityLast5, last5Count, prior.Snapshot.StatusStabilityLast5, 5),
+            raw.StatusChangeFlag,
+            Shrink(raw.EmpiricalPlayRateForCurrentStatus, statusMatchedLast5Count, prior.Snapshot.EmpiricalPlayRateForCurrentStatus, 4),
+            Shrink(raw.PriceTrendLast3, last3Count, 0m, 3),
+            Shrink(raw.PriceVolatilityLast5, last5Count, prior.Snapshot.PriceVolatilityLast5, 5),
+            Shrink(raw.HistoricalPointsPerCartoletaLast3, last3Count, prior.Snapshot.HistoricalPointsPerCartoletaLast3, 3),
+            Shrink(raw.HistoricalPointsPerCartoletaLast5, last5Count, prior.Snapshot.HistoricalPointsPerCartoletaLast5, 5),
+            raw.PositionRelativePriceSignal,
+            currentPrice - Shrink(historicalAveragePrice, playedCount, prior.HistoricalAveragePrice, 5));
 
     internal static LocalClubContextSnapshot BuildLocalClubContextSnapshot(
         IReadOnlyDictionary<int, IReadOnlyList<ClubMatchHistoryPoint>> clubHistoryByClubId,
@@ -504,6 +901,16 @@ internal static class FullContextHistoricalFeatureCalculator
 
     private static decimal SafeDivide(decimal numerator, decimal denominator)
         => denominator == 0m ? 0m : numerator / denominator;
+
+    private static decimal Shrink(decimal observed, int sampleSize, decimal prior, int priorWeight)
+    {
+        if (sampleSize <= 0)
+        {
+            return prior;
+        }
+
+        return ((observed * sampleSize) + (prior * priorWeight)) / (sampleSize + priorWeight);
+    }
 
     private static decimal ComputePriceTrendLast3(IEnumerable<decimal> values)
     {

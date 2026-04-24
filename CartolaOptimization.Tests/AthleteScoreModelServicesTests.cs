@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
+using System.Text.Json.Nodes;
 
 namespace CartolaOptimization.Tests;
 
@@ -577,6 +578,8 @@ public sealed class AthleteScoreModelServicesTests
             Assert.Equal(2, metadata.ValidationRows);
             Assert.Equal(2, metadata.TrainingDistinctRounds);
             Assert.Equal(1, metadata.ValidationDistinctRounds);
+            Assert.NotEmpty(metadata.PositionDiagnostics);
+            Assert.All(metadata.PositionDiagnostics, item => Assert.True(item.CalibrationSlope > 0d));
         }
         finally
         {
@@ -628,6 +631,9 @@ public sealed class AthleteScoreModelServicesTests
             Assert.NotNull(athlete.ClubWinProbability);
             Assert.NotNull(athlete.OpponentWinProbability);
             Assert.NotEqual(0m, athlete.PredictedScore);
+            Assert.InRange(athlete.PredictionConfidence, 0.05m, 0.99m);
+            Assert.True(athlete.MovingAverage > 0m);
+            Assert.True(athlete.AverageScore > 0m);
         }
         finally
         {
@@ -664,6 +670,128 @@ public sealed class AthleteScoreModelServicesTests
             Assert.Contains("latest persisted athlete baselines before round 4", result.PredictionNotes, StringComparison.OrdinalIgnoreCase);
             Assert.All(result.Athletes, item => Assert.Equal(3, item.BaselineRound));
             Assert.All(result.Athletes, item => Assert.NotNull(item.OpponentClubCartolaId));
+            Assert.All(result.Athletes, item => Assert.InRange(item.PredictionConfidence, 0.05m, 0.99m));
+        }
+        finally
+        {
+            DeleteArtifactDirectory(artifactDirectory);
+        }
+    }
+
+    [Fact]
+    public async Task GetPredictedScoresAsync_FullContext_IgnoresStoredCurrentRoundAggregatesThatCouldLeak()
+    {
+        var dbContextFactory = CreateDbContextFactory();
+        var artifactDirectory = CreateArtifactDirectory();
+        try
+        {
+            await SeedFullContextTrainingDataAsync(await dbContextFactory.CreateDbContextAsync(), includeCurrentRoundAthleteBaselines: true);
+
+            var store = CreateFullContextArtifactStore(artifactDirectory);
+            var trainingService = new FullContextAthleteScoreModelTrainingService(
+                dbContextFactory,
+                store,
+                Options.Create(new FullContextAthleteScoreModelOptions
+                {
+                    ArtifactsDirectory = artifactDirectory,
+                    ModelVersion = "athlete-score-v1-full-context",
+                }));
+            await trainingService.TrainAsync(fromRound: 1, toRound: 3, validationRounds: 1);
+
+            var predictionService = new FullContextAthleteScorePredictionService(dbContextFactory, store);
+            var before = await predictionService.GetPredictedScoresAsync(round: 4, statusCartolaId: 7, clubCartolaId: 293, positionCartolaId: 3, take: 10);
+            var predictedScoreBefore = before.Athletes.Single(item => item.AthleteCartolaId == 1001).PredictedScore;
+
+            await using (var dbContext = await dbContextFactory.CreateDbContextAsync())
+            {
+                var currentBaseline = await dbContext.AthleteRounds.SingleAsync(item =>
+                    item.RoundId == 4 &&
+                    item.DataPhase == RoundDataPhaseValues.CurrentOpen &&
+                    item.Athlete.CartolaId == 1001);
+
+                currentBaseline.GamesNum = 999;
+                currentBaseline.HomeGamesNum = 999;
+                currentBaseline.AwayGamesNum = 999;
+                currentBaseline.MovingAverage = 999m;
+                currentBaseline.AverageScoreNum = 999m;
+                currentBaseline.HomeAverageScore = 999m;
+                currentBaseline.AwayAverageScore = 999m;
+                await dbContext.SaveChangesAsync();
+            }
+
+            var after = await predictionService.GetPredictedScoresAsync(round: 4, statusCartolaId: 7, clubCartolaId: 293, positionCartolaId: 3, take: 10);
+            var predictedScoreAfter = after.Athletes.Single(item => item.AthleteCartolaId == 1001).PredictedScore;
+
+            Assert.Equal(Math.Round(predictedScoreBefore, 6), Math.Round(predictedScoreAfter, 6));
+        }
+        finally
+        {
+            DeleteArtifactDirectory(artifactDirectory);
+        }
+    }
+
+    [Fact]
+    public async Task GetPredictedScoresAsync_FullContext_AppliesPositionCalibrationStoredInMetadata()
+    {
+        var dbContextFactory = CreateDbContextFactory();
+        var artifactDirectory = CreateArtifactDirectory();
+        try
+        {
+            await SeedFullContextTrainingDataAsync(await dbContextFactory.CreateDbContextAsync(), includeCurrentRoundAthleteBaselines: true);
+
+            var store = CreateFullContextArtifactStore(artifactDirectory);
+            var trainingService = new FullContextAthleteScoreModelTrainingService(
+                dbContextFactory,
+                store,
+                Options.Create(new FullContextAthleteScoreModelOptions
+                {
+                    ArtifactsDirectory = artifactDirectory,
+                    ModelVersion = "athlete-score-v1-full-context",
+                }));
+            await trainingService.TrainAsync(fromRound: 1, toRound: 3, validationRounds: 1);
+
+            var predictionService = new FullContextAthleteScorePredictionService(dbContextFactory, store);
+            var before = await predictionService.GetPredictedScoresAsync(
+                round: 4,
+                statusCartolaId: 7,
+                clubCartolaId: 293,
+                positionCartolaId: 3,
+                take: 10);
+            var predictedScoreBefore = before.Athletes.Single(item => item.AthleteCartolaId == 1001).PredictedScore;
+
+            var metadataPath = store.GetMetadataPath();
+            var metadataJson = JsonNode.Parse(await File.ReadAllTextAsync(metadataPath))!.AsObject();
+            metadataJson["PositionDiagnostics"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["PositionCartolaId"] = 3,
+                    ["PositionCode"] = "ZAG",
+                    ["PositionName"] = "Zagueiro",
+                    ["TrainingRows"] = 2,
+                    ["ValidationRows"] = 1,
+                    ["TrainingMeanScore"] = 4.0,
+                    ["ValidationMeanActualScore"] = 4.0,
+                    ["ValidationMeanPredictedScore"] = 1.0,
+                    ["ValidationMeanPredictedScoreCalibrated"] = 6.0,
+                    ["ValidationMeanAbsoluteError"] = 3.0,
+                    ["ValidationRootMeanSquaredError"] = 3.0,
+                    ["ValidationBias"] = -3.0,
+                    ["CalibrationSlope"] = 1.0,
+                    ["CalibrationOffset"] = 5.0,
+                },
+            };
+            await File.WriteAllTextAsync(metadataPath, metadataJson.ToJsonString());
+
+            var after = await predictionService.GetPredictedScoresAsync(
+                round: 4,
+                statusCartolaId: 7,
+                clubCartolaId: 293,
+                positionCartolaId: 3,
+                take: 10);
+            var predictedScoreAfter = after.Athletes.Single(item => item.AthleteCartolaId == 1001).PredictedScore;
+
+            Assert.True(predictedScoreAfter > predictedScoreBefore + 4m);
         }
         finally
         {

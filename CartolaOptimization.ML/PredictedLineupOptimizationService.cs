@@ -183,6 +183,7 @@ public sealed class PredictedLineupOptimizationService(
                 BaselineDataPhase = item.BaselineDataPhase,
                 PriceNum = item.PriceNum,
                 PredictedScore = item.PredictedScore,
+                PredictionConfidence = item.PredictionConfidence,
                 PredictionNotes = item.PredictionNotes,
             })
             .ToList();

@@ -133,8 +133,8 @@ public sealed class FullContextAthleteScorePredictionService(
                 BaselineRound = candidate.Baseline.RoundId,
                 BaselineDataPhase = candidate.Baseline.DataPhase,
                 PriceNum = candidate.Baseline.PriceNum,
-                MovingAverage = candidate.Baseline.MovingAverage,
-                AverageScore = candidate.Baseline.AverageScoreNum,
+                MovingAverage = Math.Round((decimal)candidate.Input.MovingAverage, 2, MidpointRounding.AwayFromZero),
+                AverageScore = Math.Round((decimal)candidate.Input.AverageScore, 2, MidpointRounding.AwayFromZero),
                 IsHomeMatch = candidate.IsHomeMatch,
                 ClubTablePosition = candidate.ClubTablePosition,
                 OpponentClubCartolaId = candidate.OpponentClubCartolaId,
@@ -144,7 +144,8 @@ public sealed class FullContextAthleteScorePredictionService(
                 ClubExpectedPoints = candidate.ClubExpectedPoints,
                 OpponentWinProbability = candidate.OpponentWinProbability,
                 OpponentExpectedPoints = candidate.OpponentExpectedPoints,
-                PredictedScore = Math.Round(Clamp((decimal)prediction.Score, -10m, 30m), 2, MidpointRounding.AwayFromZero),
+                PredictedScore = Math.Round(ApplyPositionCalibration(prediction.Score, candidate.Baseline.Position.CartolaId, metadata), 2, MidpointRounding.AwayFromZero),
+                PredictionConfidence = ComputePredictionConfidence(candidate.Input),
                 PredictionNotes = itemPredictionNotes,
             })
             .OrderByDescending(item => item.PredictedScore)
@@ -178,6 +179,49 @@ public sealed class FullContextAthleteScorePredictionService(
 
     private static decimal Clamp(decimal value, decimal min, decimal max)
         => value < min ? min : value > max ? max : value;
+
+    private static decimal ApplyPositionCalibration(float rawScore, int positionCartolaId, AthleteScoreModelArtifactMetadata metadata)
+    {
+        var diagnostics = metadata.PositionDiagnostics
+            .FirstOrDefault(item => item.PositionCartolaId == positionCartolaId);
+
+        var calibratedScore = diagnostics is null
+            ? (decimal)rawScore
+            : (decimal)((rawScore * diagnostics.CalibrationSlope) + diagnostics.CalibrationOffset);
+
+        return Clamp(calibratedScore, -10m, 30m);
+    }
+
+    private static decimal ComputePredictionConfidence(FullContextAthleteScorePredictionInput input)
+    {
+        var experience = Clamp((decimal)input.PlayedMatchesSampleSize / 10m, 0m, 1m);
+        var recentCoverageLast3 = Clamp((decimal)input.HistoryCoverageLast3, 0m, 1m);
+        var recentCoverageLast5 = Clamp((decimal)input.HistoryCoverageLast5, 0m, 1m);
+        var venueCoverage = Clamp((decimal)input.VenueHistoryCoverageLast5, 0m, 1m);
+        var statusCoverage = Clamp((decimal)input.CurrentStatusCoverageLast5, 0m, 1m);
+        var availability = Clamp((((decimal)input.PlayRateLast5 + (decimal)input.EmpiricalPlayRateForCurrentStatus) / 2m), 0m, 1m);
+        var clubContextCoverage = Clamp((decimal)input.ClubMatchesSampleSize / 5m, 0m, 1m);
+        var opponentContextCoverage = Clamp((decimal)input.OpponentMatchesSampleSize / 5m, 0m, 1m);
+        var athleteContextPresence = Clamp((decimal)input.HasAthleteContext, 0m, 1m);
+
+        var confidence =
+            0.15m +
+            (experience * 0.20m) +
+            (recentCoverageLast3 * 0.15m) +
+            (recentCoverageLast5 * 0.10m) +
+            (venueCoverage * 0.10m) +
+            (statusCoverage * 0.10m) +
+            (availability * 0.10m) +
+            (clubContextCoverage * 0.05m) +
+            (opponentContextCoverage * 0.05m) +
+            (athleteContextPresence * 0.05m);
+
+        confidence -= Clamp((decimal)input.IsColdStartAthlete, 0m, 1m) * 0.08m;
+        confidence -= Clamp((decimal)input.StatusChangeFlag, 0m, 1m) * 0.04m;
+        confidence -= Clamp((decimal)input.RoundsSinceLastInGame / 20m, 0m, 0.05m);
+
+        return Math.Round(Clamp(confidence, 0.05m, 0.99m), 4, MidpointRounding.AwayFromZero);
+    }
 
     private static async Task<List<AthleteRound>> LoadLatestPersistedBaselinesAsync(
         AppDbContext dbContext,
