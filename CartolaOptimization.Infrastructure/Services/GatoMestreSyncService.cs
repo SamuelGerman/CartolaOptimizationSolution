@@ -414,6 +414,17 @@ public sealed class GatoMestreSyncService(
         CancellationToken cancellationToken)
     {
         var positions = await dbContext.Positions.ToDictionaryAsync(position => position.CartolaId, cancellationToken);
+
+        // Pre-load home club IDs for the requested round so we can determine the correct
+        // position-stats slice (home vs away) when the confrontation endpoint returns a
+        // round mismatch (e.g. historical rounds where proxima-rodada is no longer available).
+        var homeClubIds = (await dbContext.Matches
+            .AsNoTracking()
+            .Where(m => m.Round == requestedRound)
+            .Select(m => m.HomeClubId)
+            .ToListAsync(cancellationToken))
+            .ToHashSet();
+
         var clubIdByAbbreviation = clubs.Values
             .Where(club => !string.IsNullOrWhiteSpace(club.Abreviation))
             .GroupBy(club => Normalize(club.Abreviation))
@@ -461,16 +472,15 @@ public sealed class GatoMestreSyncService(
             if (confrontation.Round != requestedRound)
             {
                 dataAvailable = false;
-                note = $"The confrontation endpoint currently exposes round {confrontation.Round}, so club round data was not synchronized for requested round {requestedRound}.";
-                await RemoveExistingClubRoundAsync(requestedRound, club.Id, cancellationToken);
 
                 if (!mismatchWarningLogged)
                 {
+                    note = $"The confrontation endpoint exposes round {confrontation.Round} instead of {requestedRound}. Match-specific probabilities are zeroed; cumulative team stats are still persisted.";
                     var mismatchException = new DataCollectionIntegrityException(
                         sourceSystem: "GatoMestre",
                         stepName: "Upsert club rounds",
                         errorLocation: "GatoMestreSyncService.UpsertClubRoundsAsync",
-                        message: $"The confrontation payload returned round '{confrontation.Round}' while the synchronization requested round '{requestedRound}'.",
+                        message: $"The confrontation payload returned round '{confrontation.Round}' while the synchronization requested round '{requestedRound}'. Saving club round with zeroed match probabilities and cumulative team stats.",
                         contextData: new Dictionary<string, object?>
                         {
                             ["clubCartolaId"] = club.CartolaId,
@@ -482,6 +492,117 @@ public sealed class GatoMestreSyncService(
                     mismatchWarningLogged = true;
                 }
 
+                // Still persist the club round using cumulative stats from the block.
+                // Match-specific fields (win/draw/loss probability, expected points) are zeroed
+                // because they are unavailable for historical rounds via the proxima-rodada endpoint.
+                var mismatchedBlock = ResolveClubBlock(confrontation, club.CartolaId);
+                if (mismatchedBlock is null)
+                {
+                    await RemoveExistingClubRoundAsync(requestedRound, club.Id, cancellationToken);
+                    continue;
+                }
+
+                // Determine the correct position-stats slice from Cartola match data.
+                var isHomeTeam = homeClubIds.Contains(club.Id);
+                var historicalPositionStats = isHomeTeam
+                    ? mismatchedBlock.PositionStats.Home
+                    : mismatchedBlock.PositionStats.Away;
+
+                var existingMismatchedRound = await dbContext.ClubRounds
+                    .Include(r => r.PositionStats)
+                    .Include(r => r.Context)
+                    .FirstOrDefaultAsync(r => r.Round == requestedRound && r.ClubId == club.Id, cancellationToken);
+
+                if (existingMismatchedRound is null)
+                {
+                    existingMismatchedRound = new ClubRound(
+                        0, requestedRound, club.Id,
+                        0m, 0m, 0m,
+                        mismatchedBlock.OverallAverage, mismatchedBlock.MovingAverage, 0m)
+                    {
+                        PositionStats = [],
+                    };
+                    dbContext.ClubRounds.Add(existingMismatchedRound);
+                }
+
+                existingMismatchedRound.WinProbability = 0m;
+                existingMismatchedRound.DrawProbability = 0m;
+                existingMismatchedRound.LoseProbability = 0m;
+                existingMismatchedRound.OverallAverage = mismatchedBlock.OverallAverage;
+                existingMismatchedRound.MovingAverage = mismatchedBlock.MovingAverage;
+                existingMismatchedRound.ExpectedPoints = 0m;
+
+                existingMismatchedRound.PositionStats ??= [];
+                dbContext.ClubRoundPositions.RemoveRange(existingMismatchedRound.PositionStats);
+                existingMismatchedRound.PositionStats.Clear();
+
+                foreach (var positionStat in historicalPositionStats.OrderBy(s => s.PositionId))
+                {
+                    if (!positions.TryGetValue(positionStat.PositionId, out var position))
+                    {
+                        continue;
+                    }
+
+                    existingMismatchedRound.PositionStats.Add(new ClubRoundPosition(
+                        0, existingMismatchedRound.Id, position.Id,
+                        positionStat.PointsConcededAverage,
+                        positionStat.PointsConqueredAverage,
+                        0m)
+                    {
+                        ClubRound = existingMismatchedRound,
+                        Position = position,
+                    });
+
+                    processedPositionStats++;
+                }
+
+                var mismatchRanking = rankingsByClubCartolaId.GetValueOrDefault(club.CartolaId);
+
+                existingMismatchedRound.Context ??= new ClubRoundContext
+                {
+                    ClubRound = existingMismatchedRound,
+                    ForecastRiskLevel = string.Empty,
+                };
+
+                existingMismatchedRound.Context.PreviousOverallAverage = mismatchedBlock.PreviousOverallAverage;
+                existingMismatchedRound.Context.RankingsOverallAverage = mismatchRanking is not null ? GetSnapshotValue(mismatchRanking.Averages.Overall.Total) : existingMismatchedRound.Context.RankingsOverallAverage;
+                existingMismatchedRound.Context.RankingsMovingAverage = mismatchRanking is not null ? GetSnapshotValue(mismatchRanking.Averages.Overall.Moving) : existingMismatchedRound.Context.RankingsMovingAverage;
+                existingMismatchedRound.Context.RankingsHomeAverage = mismatchRanking is not null ? GetSnapshotValue(mismatchRanking.Averages.Home.Total) : existingMismatchedRound.Context.RankingsHomeAverage;
+                existingMismatchedRound.Context.RankingsHomeMovingAverage = mismatchRanking is not null ? GetSnapshotValue(mismatchRanking.Averages.Home.Moving) : existingMismatchedRound.Context.RankingsHomeMovingAverage;
+                existingMismatchedRound.Context.RankingsAwayAverage = mismatchRanking is not null ? GetSnapshotValue(mismatchRanking.Averages.Away.Total) : existingMismatchedRound.Context.RankingsAwayAverage;
+                existingMismatchedRound.Context.RankingsAwayMovingAverage = mismatchRanking is not null ? GetSnapshotValue(mismatchRanking.Averages.Away.Moving) : existingMismatchedRound.Context.RankingsAwayMovingAverage;
+                existingMismatchedRound.Context.GeneralPointsConcededAverage = mismatchedBlock.PointsBalance.OverallPointsConcededAverage;
+                existingMismatchedRound.Context.GeneralPointsConqueredAverage = mismatchedBlock.PointsBalance.OverallPointsConqueredAverage;
+                existingMismatchedRound.Context.HomePointsConcededAverage = mismatchedBlock.PointsBalance.HomePointsConcededAverage;
+                existingMismatchedRound.Context.HomePointsConqueredAverage = mismatchedBlock.PointsBalance.HomePointsConqueredAverage;
+                existingMismatchedRound.Context.AwayPointsConcededAverage = mismatchedBlock.PointsBalance.AwayPointsConcededAverage;
+                existingMismatchedRound.Context.AwayPointsConqueredAverage = mismatchedBlock.PointsBalance.AwayPointsConqueredAverage;
+                existingMismatchedRound.Context.HistoricalWinRate = mismatchedBlock.Performance.Wins.Rate.Overall;
+                existingMismatchedRound.Context.HistoricalDrawRate = mismatchedBlock.Performance.Draws.Rate.Overall;
+                existingMismatchedRound.Context.HistoricalLossRate = mismatchedBlock.Performance.Losses.Rate.Overall;
+                existingMismatchedRound.Context.FavoriteWinProbability = 0m;
+                existingMismatchedRound.Context.FavoriteDrawProbability = 0m;
+                existingMismatchedRound.Context.FavoriteLoseProbability = 0m;
+                existingMismatchedRound.Context.ForecastExpectedResult = 0;
+                existingMismatchedRound.Context.ForecastRiskLevel = string.Empty;
+                existingMismatchedRound.Context.TeamTipsCount = 0;
+                existingMismatchedRound.Context.HotTeamTipsCount = 0;
+                existingMismatchedRound.Context.MatchTipsCount = 0;
+                existingMismatchedRound.Context.HotMatchTipsCount = 0;
+                existingMismatchedRound.Context.InsightCount = 0;
+                existingMismatchedRound.Context.HotInsightCount = 0;
+                existingMismatchedRound.Context.AverageInsightConfidence = 0m;
+                existingMismatchedRound.Context.PositiveInsightCount = 0;
+                existingMismatchedRound.Context.NegativeInsightCount = 0;
+
+                TrainingReadinessEvaluator.ApplyClubRoundReadiness(existingMismatchedRound);
+
+                if (existingMismatchedRound.IsTrainingEligible)
+                {
+                    availableClubIds.Add(existingMismatchedRound.ClubId);
+                }
+
+                processedClubRounds++;
                 continue;
             }
 
