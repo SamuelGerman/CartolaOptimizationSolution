@@ -22,6 +22,17 @@ public sealed class TrainingDatasetPreparationService(
     {
         NormalizeRange(ref fromRound, ref toRound);
 
+        // Resolve the current open round from the most recent Cartola baseline sync so that
+        // rounds below it that still carry Unknown or empty DataPhase can be promoted to
+        // HistoricalClosed.  This handles AthleteRound rows that were created by the Gato
+        // Mestre sync for athletes absent from the Cartola pontuados payload.
+        var latestKnownCurrentRound = await dbContext.AthleteRounds
+            .AsNoTracking()
+            .Where(r => r.DataPhase == RoundDataPhaseValues.CurrentOpen)
+            .Select(r => r.RoundId)
+            .OrderByDescending(r => r)
+            .FirstOrDefaultAsync(cancellationToken);
+
         var clubRounds = await dbContext.ClubRounds
             .Include(round => round.PositionStats)
             .Where(round => round.Round >= fromRound && round.Round <= toRound)
@@ -43,9 +54,16 @@ public sealed class TrainingDatasetPreparationService(
 
         foreach (var athleteRound in athleteRounds)
         {
-            if (string.IsNullOrWhiteSpace(athleteRound.DataPhase))
+            var phaseUnknownOrEmpty = string.IsNullOrWhiteSpace(athleteRound.DataPhase) ||
+                                      string.Equals(athleteRound.DataPhase, RoundDataPhaseValues.Unknown, StringComparison.OrdinalIgnoreCase);
+
+            if (phaseUnknownOrEmpty)
             {
-                athleteRound.DataPhase = RoundDataPhaseValues.Unknown;
+                // Promote to HistoricalClosed when a reliable current-round baseline exists
+                // and confirms this round has already been finalized.
+                athleteRound.DataPhase = latestKnownCurrentRound > 0 && athleteRound.RoundId < latestKnownCurrentRound
+                    ? RoundDataPhaseValues.HistoricalClosed
+                    : RoundDataPhaseValues.Unknown;
             }
 
             TrainingReadinessEvaluator.ApplyAthleteReadiness(
