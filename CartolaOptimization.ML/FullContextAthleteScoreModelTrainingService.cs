@@ -1,8 +1,10 @@
+using System.Reflection;
 using CartolaOptimization.Application.Interfaces;
 using CartolaOptimization.Application.Models;
 using CartolaOptimization.Domain.Constants;
 using CartolaOptimization.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.ML;
 using Microsoft.ML.Trainers.LightGbm;
 
@@ -11,7 +13,8 @@ namespace CartolaOptimization.ML;
 public sealed class FullContextAthleteScoreModelTrainingService(
     IDbContextFactory<AppDbContext> dbContextFactory,
     FullContextAthleteScoreModelArtifactStore artifactStore,
-    Microsoft.Extensions.Options.IOptions<FullContextAthleteScoreModelOptions> options) : IFullContextAthleteScoreModelTrainingService
+    Microsoft.Extensions.Options.IOptions<FullContextAthleteScoreModelOptions> options,
+    ILogger<FullContextAthleteScoreModelTrainingService> logger) : IFullContextAthleteScoreModelTrainingService
 {
     private const string DatasetKey = "full-context";
     private const string TrainerName = "LightGBM";
@@ -89,28 +92,54 @@ public sealed class FullContextAthleteScoreModelTrainingService(
         var fullPipeline = BuildPipeline(mlContext, allowedNumericFeatures: null);
         var fullModel = fullPipeline.Fit(trainData);
 
-        // Compute permutation feature importance on holdout data.
-        var importanceRanking = ComputeFeatureImportances(mlContext, fullModel, holdoutData, allNumericFeatureNames);
+        // Compute permutation feature importance by manually shuffling each feature and measuring R² drop.
+        // This avoids the ML.NET PFI API which requires a specific transformer type.
+        List<(string FeatureName, double MeanRSquaredDrop, double RSquaredDropStdDev, bool IsNumeric)> importanceRanking;
+        try
+        {
+            importanceRanking = ComputeFeatureImportances(mlContext, fullModel, holdoutRows, allNumericFeatureNames);
+            logger.LogInformation("Permutation feature importance computed for {FeatureCount} feature groups.", importanceRanking.Count);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Permutation feature importance computation failed ({ExceptionType}: {Message}). " +
+                "Training will complete without feature importance data.",
+                ex.GetType().Name, ex.Message);
+            importanceRanking = [];
+        }
 
         // Phase 2 (optional): retrain using only the top-N numeric features when requested.
-        ITransformer model;
+        ITransformer model = fullModel; // default: use the full model trained in phase 1
         IReadOnlySet<string>? allowedNumericFeatures = null;
 
         if (topNFeatures.HasValue)
         {
-            var selectedNumericFeatures = importanceRanking
-                .Where(item => item.IsNumeric)
-                .Take(topNFeatures.Value)
-                .Select(item => item.FeatureName)
-                .ToHashSet(StringComparer.Ordinal);
+            if (importanceRanking.Count == 0)
+            {
+                logger.LogWarning(
+                    "topNFeatures={TopNFeatures} was requested but the feature importance ranking is empty. " +
+                    "Falling back to all {Count} numeric features.",
+                    topNFeatures.Value, allNumericFeatureNames.Length);
+            }
+            else
+            {
+                var selectedNumericFeatures = importanceRanking
+                    .Where(item => item.IsNumeric)
+                    .Take(topNFeatures.Value)
+                    .Select(item => item.FeatureName)
+                    .ToHashSet(StringComparer.Ordinal);
 
-            allowedNumericFeatures = selectedNumericFeatures;
-            var filteredPipeline = BuildPipeline(mlContext, allowedNumericFeatures);
-            model = filteredPipeline.Fit(trainData);
-        }
-        else
-        {
-            model = fullModel;
+                if (selectedNumericFeatures.Count > 0)
+                {
+                    allowedNumericFeatures = selectedNumericFeatures;
+                    var filteredPipeline = BuildPipeline(mlContext, allowedNumericFeatures);
+                    model = filteredPipeline.Fit(trainData);
+                    logger.LogInformation(
+                        "Retrained with top {Selected}/{Total} numeric features (topNFeatures={TopN}).",
+                        selectedNumericFeatures.Count, allNumericFeatureNames.Length, topNFeatures.Value);
+                }
+            }
         }
 
         var predictions = model.Transform(holdoutData);
@@ -242,64 +271,127 @@ public sealed class FullContextAthleteScoreModelTrainingService(
     }
 
     /// <summary>
-    /// Runs permutation feature importance on the holdout data and returns the results ranked from most
-    /// to least important (most negative MeanRSquaredDrop first).
-    /// Slots belonging to one-hot encoded categorical groups are aggregated into a single entry per group.
+    /// Computes permutation feature importance by shuffling each feature's values in a holdout sample
+    /// and measuring the resulting drop in R². Works with any <see cref="ITransformer"/> without
+    /// requiring ML.NET's internal PFI API, which imposes type constraints on the model.
     /// </summary>
+    /// <remarks>
+    /// Algorithm: for each feature, randomly permute its values across sample rows, re-score with the
+    /// full model and measure R² change (permuted − baseline). A more negative delta means the feature
+    /// was important: scrambling it hurt the model more.
+    /// Categorical features (club, opponent, position, status) are permuted by shuffling their raw
+    /// CartolaId column so the one-hot encoding is reshuffled consistently.
+    /// </remarks>
     private static List<(string FeatureName, double MeanRSquaredDrop, double RSquaredDropStdDev, bool IsNumeric)>
         ComputeFeatureImportances(
             MLContext mlContext,
             ITransformer model,
-            IDataView holdoutData,
+            IReadOnlyList<FullContextAthleteScoreTrainingRow> holdoutRows,
             string[] numericFeatureNames)
     {
-        var numericFeatureSet = new HashSet<string>(numericFeatureNames, StringComparer.Ordinal);
+        if (holdoutRows.Count == 0)
+        {
+            return [];
+        }
 
-        var pfi = mlContext.Regression.PermutationFeatureImportance(
-            model,
-            holdoutData,
-            labelColumnName: nameof(FullContextAthleteScoreTrainingRow.Label),
-            numberOfExamplesToUse: 300,
-            permutationCount: 3);
+        // Cap the sample size so PFI completes in seconds rather than minutes.
+        var rng = new Random(42);
+        var sample = holdoutRows.Count > 200
+            ? holdoutRows.OrderBy(_ => rng.Next()).Take(200).ToList()
+            : holdoutRows.ToList();
 
-        // Group encoded categorical slots (e.g. "ClubEncoded.0", "ClubEncoded.17") under their prefix.
-        return pfi
-            .GroupBy(kvp => ResolveFeatureGroupName(kvp.Key))
-            .Select(group =>
+        // Pre-cache PropertyInfo objects — one reflection lookup per feature name, not per row.
+        var propByName = typeof(FullContextAthleteScoreTrainingRow)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .ToDictionary(p => p.Name, StringComparer.Ordinal);
+
+        // MemberwiseClone is protected on System.Object; call it via reflection to clone immutable rows.
+        var cloneMethod = typeof(object)
+            .GetMethod("MemberwiseClone", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        // Baseline R² on the unmodified sample.
+        var baselineR2 = EvaluateR2(mlContext, model, sample);
+
+        var results = new List<(string FeatureName, double MeanRSquaredDrop, double RSquaredDropStdDev, bool IsNumeric)>(numericFeatureNames.Length + 4);
+
+        // ── Numeric features ──────────────────────────────────────────────────────────────────────
+        foreach (var featureName in numericFeatureNames)
+        {
+            var prop = propByName[featureName];
+
+            // Single permutation run (sufficient for relative ranking with the current data volume).
+            var values = sample.Select(r => (float)prop.GetValue(r)!).ToArray();
+            FisherYatesShuffle(values, rng);
+
+            var permuted = new List<FullContextAthleteScoreTrainingRow>(sample.Count);
+            for (var i = 0; i < sample.Count; i++)
             {
-                var featureName = group.Key;
-                var isNumeric = numericFeatureSet.Contains(featureName);
+                var clone = (FullContextAthleteScoreTrainingRow)cloneMethod.Invoke(sample[i], null)!;
+                prop.SetValue(clone, values[i]);
+                permuted.Add(clone);
+            }
 
-                // Sum the R² drops across all slots in the group (for scalars the group has one entry).
-                var meanDrop = group.Sum(kvp => kvp.Value.RSquared.Mean);
+            var permutedR2 = EvaluateR2(mlContext, model, permuted);
+            var r2Drop = permutedR2 - baselineR2; // negative → feature was important
+            results.Add((featureName, r2Drop, 0d, IsNumeric: true));
+        }
 
-                // Combine per-slot standard deviations assuming independence: σ_total = √(Σ σ_i²).
-                var stdDev = Math.Sqrt(group.Sum(kvp =>
-                    kvp.Value.RSquared.StandardDeviation * kvp.Value.RSquared.StandardDeviation));
+        // ── Categorical encoded groups ─────────────────────────────────────────────────────────────
+        // Permute the raw CartolaId column; the pipeline's OneHotEncoding reshuffles the encoding
+        // consistently, so the measured drop reflects the true importance of the categorical group.
+        var categoricalItems = new[]
+        {
+            ("ClubEncoded", nameof(FullContextAthleteScoreTrainingRow.ClubCartolaId)),
+            ("OpponentClubEncoded", nameof(FullContextAthleteScoreTrainingRow.OpponentClubCartolaId)),
+            ("PositionEncoded", nameof(FullContextAthleteScoreTrainingRow.PositionCartolaId)),
+            ("StatusEncoded", nameof(FullContextAthleteScoreTrainingRow.StatusCartolaId)),
+        };
 
-                return (featureName, meanDrop, stdDev, isNumeric);
-            })
-            .OrderBy(item => item.meanDrop) // most negative first = most important
+        foreach (var (groupName, rawColName) in categoricalItems)
+        {
+            var prop = propByName[rawColName];
+            var values = sample.Select(r => (float)prop.GetValue(r)!).ToArray();
+            FisherYatesShuffle(values, rng);
+
+            var permuted = new List<FullContextAthleteScoreTrainingRow>(sample.Count);
+            for (var i = 0; i < sample.Count; i++)
+            {
+                var clone = (FullContextAthleteScoreTrainingRow)cloneMethod.Invoke(sample[i], null)!;
+                prop.SetValue(clone, values[i]);
+                permuted.Add(clone);
+            }
+
+            var permutedR2 = EvaluateR2(mlContext, model, permuted);
+            results.Add((groupName, permutedR2 - baselineR2, 0d, IsNumeric: false));
+        }
+
+        return results
+            .OrderBy(item => item.Item2) // most negative MeanRSquaredDrop first = most important
             .ToList();
     }
 
-    /// <summary>
-    /// Maps a PFI slot key to a logical feature group name.
-    /// Slots belonging to one-hot encoded prefixes (e.g. "ClubEncoded.0") are mapped to the prefix.
-    /// All other keys (scalar numeric features) are returned unchanged.
-    /// </summary>
-    private static string ResolveFeatureGroupName(string slotKey)
+    /// <summary>Scores <paramref name="rows"/> with <paramref name="model"/> and returns the R² metric.</summary>
+    private static double EvaluateR2(
+        MLContext mlContext,
+        ITransformer model,
+        IEnumerable<FullContextAthleteScoreTrainingRow> rows)
     {
-        foreach (var prefix in EncodedPrefixes)
-        {
-            if (slotKey == prefix ||
-                slotKey.StartsWith(prefix + ".", StringComparison.Ordinal))
-            {
-                return prefix;
-            }
-        }
+        var dataView = mlContext.Data.LoadFromEnumerable(rows);
+        var predictions = model.Transform(dataView);
+        return mlContext.Regression.Evaluate(
+            predictions,
+            labelColumnName: nameof(FullContextAthleteScoreTrainingRow.Label),
+            scoreColumnName: "Score").RSquared;
+    }
 
-        return slotKey;
+    /// <summary>In-place Fisher-Yates shuffle.</summary>
+    private static void FisherYatesShuffle<T>(T[] array, Random rng)
+    {
+        for (var i = array.Length - 1; i > 0; i--)
+        {
+            var j = rng.Next(i + 1);
+            (array[i], array[j]) = (array[j], array[i]);
+        }
     }
 
     private static async Task<List<FullContextAthleteScoreTrainingRow>> QueryTrainingRowsAsync(
