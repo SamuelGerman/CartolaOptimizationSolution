@@ -172,6 +172,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             .Include(item => item.Status)
             .Where(item =>
                 item.DataPhase == RoundDataPhaseValues.HistoricalClosed &&
+                item.WasInGame &&
                 item.ClubId != 0 &&
                 item.PositionId != 0 &&
                 item.StatusId != 0);
@@ -263,7 +264,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
                 var predictedStd = ComputeStandardDeviation(predictedScores, meanPredictedScore);
                 var slopeWeight = Math.Clamp(validationRows / 100d, 0d, 1d);
                 var targetSlope = predictedStd > 0.001d
-                    ? Math.Clamp(actualStd / predictedStd, 0.5d, 3d)
+                    ? Math.Clamp(actualStd / predictedStd, 0.7d, 1.5d)
                     : 1d;
                 var calibrationSlope = 1d + ((targetSlope - 1d) * slopeWeight);
                 var targetOffset = meanActualScore - (calibrationSlope * meanPredictedScore);

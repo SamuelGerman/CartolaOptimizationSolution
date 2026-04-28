@@ -88,6 +88,8 @@ public sealed class FullContextAthleteScorePredictionService(
                 $"No athlete baseline rows were found for round {round}. Synchronize the current Cartola round or ensure at least one earlier persisted athlete round exists.");
         }
 
+        await InjectHistoricalContextFallbackAsync(dbContext, baselines, round, cancellationToken);
+
         var lookup = await FullContextFeatureResolver.LoadFeatureLookupAsync(dbContext, [round], cancellationToken);
 
         var candidates = new List<FullContextPredictionCandidate>(baselines.Count);
@@ -192,6 +194,23 @@ public sealed class FullContextAthleteScorePredictionService(
         return Clamp(calibratedScore, -10m, 30m);
     }
 
+    /// <summary>
+    /// Estimates the probability that the athlete will participate in the target round.
+    /// The model is trained on athletes who played (WasInGame = true) and therefore
+    /// predicts score conditional on participation. Multiplying by play probability
+    /// converts the conditional prediction to an unconditional expected value.
+    /// </summary>
+    private static decimal ComputePlayProbability(FullContextAthleteScorePredictionInput input)
+    {
+        var rateLast5 = Clamp((decimal)input.PlayRateLast5, 0m, 1m);
+        var empiricalRate = Clamp((decimal)input.EmpiricalPlayRateForCurrentStatus, 0m, 1m);
+
+        // Weight recent form more heavily (60%) than status empirical rate (40%).
+        // Floor at 0.10 — even uncertain athletes have some chance of participating.
+        var blended = (rateLast5 * 0.6m) + (empiricalRate * 0.4m);
+        return Clamp(blended, 0.10m, 1.0m);
+    }
+
     private static decimal ComputePredictionConfidence(FullContextAthleteScorePredictionInput input)
     {
         var experience = Clamp((decimal)input.PlayedMatchesSampleSize / 10m, 0m, 1m);
@@ -221,6 +240,53 @@ public sealed class FullContextAthleteScorePredictionService(
         confidence -= Clamp((decimal)input.RoundsSinceLastInGame / 20m, 0m, 0.05m);
 
         return Math.Round(Clamp(confidence, 0.05m, 0.99m), 4, MidpointRounding.AwayFromZero);
+    }
+
+    /// <summary>
+    /// When the current round has no GatoMestre context (e.g. data not yet published for an upcoming round),
+    /// inject the most recent historical context for each athlete so the model receives realistic
+    /// team-stat features instead of all-zero inputs that fall outside the training distribution.
+    /// </summary>
+    private static async Task InjectHistoricalContextFallbackAsync(
+        AppDbContext dbContext,
+        IReadOnlyList<AthleteRound> baselines,
+        int round,
+        CancellationToken cancellationToken)
+    {
+        var missingContextAthleteIds = baselines
+            .Where(item => item.Context is null)
+            .Select(item => item.AthleteId)
+            .ToHashSet();
+
+        if (missingContextAthleteIds.Count == 0)
+        {
+            return;
+        }
+
+        var historicalWithContext = await dbContext.AthleteRounds
+            .AsNoTracking()
+            .Include(item => item.Context)
+            .Where(item =>
+                missingContextAthleteIds.Contains(item.AthleteId) &&
+                item.Context != null &&
+                item.RoundId < round &&
+                item.DataPhase == RoundDataPhaseValues.HistoricalClosed)
+            .OrderByDescending(item => item.RoundId)
+            .ThenByDescending(item => item.Id)
+            .ToListAsync(cancellationToken);
+
+        var latestContextByAthleteId = historicalWithContext
+            .GroupBy(item => item.AthleteId)
+            .ToDictionary(group => group.Key, group => group.First().Context!);
+
+        foreach (var baseline in baselines)
+        {
+            if (baseline.Context is null &&
+                latestContextByAthleteId.TryGetValue(baseline.AthleteId, out var fallbackContext))
+            {
+                baseline.Context = fallbackContext;
+            }
+        }
     }
 
     private static async Task<List<AthleteRound>> LoadLatestPersistedBaselinesAsync(
