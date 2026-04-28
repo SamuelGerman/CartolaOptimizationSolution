@@ -29,6 +29,9 @@ public sealed class PredictedLineupAthleteItem
 
     public decimal PriceNum { get; init; }
 
+    /// <inheritdoc cref="AthleteScorePredictionItem.PlayedMatchesSampleSize"/>
+    public int? PlayedMatchesSampleSize { get; init; }
+
     public decimal PredictedScore { get; init; }
 
     public decimal PredictionConfidence { get; init; }

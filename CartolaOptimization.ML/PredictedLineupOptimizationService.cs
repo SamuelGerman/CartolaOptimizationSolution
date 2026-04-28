@@ -93,12 +93,18 @@ public sealed class PredictedLineupOptimizationService(
             MaxPredictionCandidates,
             cancellationToken);
 
+        // Compute Bayesian shrinkage scores per position.
+        // Athletes with few games played have their prediction pulled toward the position mean,
+        // preventing outlier performances from a single game from dominating the optimizer.
+        // Score used only for internal ranking/selection; displayed PredictedScore remains the raw model output.
+        var shrunkScores = ComputeShrunkScores(predictions.Athletes);
+
         var candidatesByPosition = predictions.Athletes
             .GroupBy(item => item.PositionCartolaId)
             .ToDictionary(
                 group => group.Key,
                 group => group
-                    .OrderByDescending(item => item.PredictedScore)
+                    .OrderByDescending(item => shrunkScores[item.AthleteCartolaId])
                     .ThenBy(item => item.PriceNum)
                     .ThenBy(item => item.AthleteName)
                     .ToList());
@@ -128,7 +134,8 @@ public sealed class PredictedLineupOptimizationService(
                     options = BuildPositionOptions(
                         requirement,
                         candidatesByPosition[requirement.PositionCartolaId],
-                        budgetInCents);
+                        budgetInCents,
+                        item => shrunkScores[item.AthleteCartolaId]);
                     positionOptionCache[cacheKey] = options;
                 }
 
@@ -182,6 +189,7 @@ public sealed class PredictedLineupOptimizationService(
                 BaselineRound = item.BaselineRound,
                 BaselineDataPhase = item.BaselineDataPhase,
                 PriceNum = item.PriceNum,
+                PlayedMatchesSampleSize = item.PlayedMatchesSampleSize,
                 PredictedScore = item.PredictedScore,
                 PredictionConfidence = item.PredictionConfidence,
                 PredictionNotes = item.PredictionNotes,
@@ -191,6 +199,10 @@ public sealed class PredictedLineupOptimizationService(
         var totalCost = FromCents(optimalResult.TotalCostInCents);
         var usesFallbackBaselines = selectedAthletes.Any(item =>
             item.PredictionNotes.Contains("latest persisted athlete baseline", StringComparison.OrdinalIgnoreCase));
+
+        // TotalPredictedScore uses raw model predictions (not shrunk), to show an honest forecast.
+        // The optimizer internally used shrunk scores to avoid over-weighting low-sample athletes.
+        var totalActualPredictedScore = selectedAthletes.Sum(item => item.PredictedScore);
 
         return new PredictedLineupResult
         {
@@ -202,7 +214,7 @@ public sealed class PredictedLineupOptimizationService(
             Budget = request.Budget,
             TotalCost = totalCost,
             RemainingBudget = request.Budget - totalCost,
-            TotalPredictedScore = Math.Round(optimalResult.TotalScore, 2, MidpointRounding.AwayFromZero),
+            TotalPredictedScore = Math.Round(totalActualPredictedScore, 2, MidpointRounding.AwayFromZero),
             TotalPlayers = selectedAthletes.Count,
             TotalProbableAthletesEvaluated = predictions.TotalAthletesConsidered,
             ProbableStatusCartolaId = ProbableStatusCartolaId,
@@ -300,10 +312,10 @@ public sealed class PredictedLineupOptimizationService(
 
         if (autoSelectFormation)
         {
-            return $"Optimization considered only provavel athletes, automatically selected the supported Cartola formation {formationDescription}, and {baselineNotes}.";
+            return $"Optimization considered only provavel athletes, automatically selected the supported Cartola formation {formationDescription}, {baselineNotes}, and applied Bayesian shrinkage to penalize athletes with few games played.";
         }
 
-        return $"Optimization considered only provavel athletes, respected the requested formation {formationDescription}, and {baselineNotes}.";
+        return $"Optimization considered only provavel athletes, respected the requested formation {formationDescription}, {baselineNotes}, and applied Bayesian shrinkage to penalize athletes with few games played.";
     }
 
     private static string DescribeFormation(IReadOnlyList<PredictedLineupPositionRequirement> formation)
@@ -335,10 +347,45 @@ public sealed class PredictedLineupOptimizationService(
         .Where(item => item.Quantity > 0)
         .ToList();
 
+    /// <summary>
+    /// Applies Bayesian (James-Stein) shrinkage to each athlete's predicted score.
+    /// Athletes with few played rounds have their prediction pulled toward the position mean,
+    /// preventing a single outstanding game from biasing the optimizer.
+    /// Formula: shrunk = (n / (n + k)) * predicted + (k / (n + k)) * positionMean
+    /// where n = PlayedMatchesSampleSize, k = smoothing constant.
+    /// When PlayedMatchesSampleSize is not set (null), no shrinkage is applied.
+    /// </summary>
+    private static IReadOnlyDictionary<int, decimal> ComputeShrunkScores(
+        IReadOnlyCollection<AthleteScorePredictionItem> athletes,
+        decimal k = 5m)
+    {
+        var positionMeans = athletes
+            .GroupBy(item => item.PositionCartolaId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Average(item => item.PredictedScore));
+
+        return athletes.ToDictionary(
+            item => item.AthleteCartolaId,
+            item =>
+            {
+                if (item.PlayedMatchesSampleSize is null)
+                {
+                    return item.PredictedScore;
+                }
+
+                var n = (decimal)item.PlayedMatchesSampleSize.Value;
+                var weight = n / (n + k);
+                var positionMean = positionMeans.GetValueOrDefault(item.PositionCartolaId, item.PredictedScore);
+                return (weight * item.PredictedScore) + ((1m - weight) * positionMean);
+            });
+    }
+
     private static IReadOnlyList<PositionBudgetOption> BuildPositionOptions(
         PredictedLineupPositionRequirement requirement,
         IReadOnlyList<AthleteScorePredictionItem> candidates,
-        int budgetInCents)
+        int budgetInCents,
+        Func<AthleteScorePredictionItem, decimal> scoreSelector)
     {
         var states = new PositionState?[requirement.Quantity + 1, budgetInCents + 1];
         states[0, 0] = PositionState.Empty;
@@ -362,7 +409,7 @@ public sealed class PredictedLineupOptimizationService(
                     }
 
                     var candidateState = new PositionState(
-                        previous.TotalScore + candidate.PredictedScore,
+                        previous.TotalScore + scoreSelector(candidate),
                         previous,
                         candidate);
 

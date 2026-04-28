@@ -135,6 +135,7 @@ public sealed class FullContextAthleteScorePredictionService(
                 BaselineRound = candidate.Baseline.RoundId,
                 BaselineDataPhase = candidate.Baseline.DataPhase,
                 PriceNum = candidate.Baseline.PriceNum,
+                PlayedMatchesSampleSize = (int)candidate.Input.PlayedMatchesSampleSize,
                 MovingAverage = Math.Round((decimal)candidate.Input.MovingAverage, 2, MidpointRounding.AwayFromZero),
                 AverageScore = Math.Round((decimal)candidate.Input.AverageScore, 2, MidpointRounding.AwayFromZero),
                 IsHomeMatch = candidate.IsHomeMatch,

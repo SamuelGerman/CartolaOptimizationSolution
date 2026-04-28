@@ -51,6 +51,13 @@ public sealed class AthleteScorePredictionItem
 
     public decimal? OpponentExpectedPoints { get; init; }
 
+    /// <summary>
+    /// Number of rounds in which this athlete actually played (WasInGame = true) prior to the target round.
+    /// Used to weight prediction reliability: a high score based on a single game is less trustworthy
+    /// than the same score built from many observations. Null when not available (older model versions).
+    /// </summary>
+    public int? PlayedMatchesSampleSize { get; init; }
+
     public decimal PredictedScore { get; init; }
 
     public decimal PredictionConfidence { get; init; }
