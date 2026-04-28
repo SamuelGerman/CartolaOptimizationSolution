@@ -17,14 +17,32 @@ public sealed class FullContextAthleteScoreModelTrainingService(
     private const string TrainerName = "LightGBM";
     private readonly FullContextAthleteScoreModelOptions options = options.Value;
 
+    /// <summary>
+    /// One-hot encoded column names. Their slots in the concatenated Features vector are identified
+    /// by prefix (e.g. "ClubEncoded.0", "ClubEncoded.1", …) and are always included in the model
+    /// regardless of the <paramref name="topNFeatures"/> cutoff.
+    /// </summary>
+    private static readonly HashSet<string> EncodedPrefixes = new(StringComparer.Ordinal)
+    {
+        "ClubEncoded",
+        "OpponentClubEncoded",
+        "PositionEncoded",
+        "StatusEncoded",
+    };
+
     public async Task<AthleteScoreModelTrainingResult> TrainAsync(
         int? fromRound = null,
         int? toRound = null,
         int validationRounds = 1,
+        int? topNFeatures = null,
         CancellationToken cancellationToken = default)
     {
         NormalizeOptionalRange(ref fromRound, ref toRound);
         validationRounds = Math.Max(1, validationRounds);
+        if (topNFeatures.HasValue)
+        {
+            topNFeatures = Math.Max(1, topNFeatures.Value);
+        }
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
@@ -65,15 +83,62 @@ public sealed class FullContextAthleteScoreModelTrainingService(
         var trainData = mlContext.Data.LoadFromEnumerable(trainingRows);
         var holdoutData = mlContext.Data.LoadFromEnumerable(holdoutRows);
 
-        var pipeline = BuildPipeline(mlContext);
-        var model = pipeline.Fit(trainData);
+        var allNumericFeatureNames = GetNumericFeatureNames(allowedFeatures: null);
+
+        // Phase 1: train on all features so PFI evaluates relative importance on the full model.
+        var fullPipeline = BuildPipeline(mlContext, allowedNumericFeatures: null);
+        var fullModel = fullPipeline.Fit(trainData);
+
+        // Compute permutation feature importance on holdout data.
+        var importanceRanking = ComputeFeatureImportances(mlContext, fullModel, holdoutData, allNumericFeatureNames);
+
+        // Phase 2 (optional): retrain using only the top-N numeric features when requested.
+        ITransformer model;
+        IReadOnlySet<string>? allowedNumericFeatures = null;
+
+        if (topNFeatures.HasValue)
+        {
+            var selectedNumericFeatures = importanceRanking
+                .Where(item => item.IsNumeric)
+                .Take(topNFeatures.Value)
+                .Select(item => item.FeatureName)
+                .ToHashSet(StringComparer.Ordinal);
+
+            allowedNumericFeatures = selectedNumericFeatures;
+            var filteredPipeline = BuildPipeline(mlContext, allowedNumericFeatures);
+            model = filteredPipeline.Fit(trainData);
+        }
+        else
+        {
+            model = fullModel;
+        }
+
         var predictions = model.Transform(holdoutData);
-        var metrics = mlContext.Regression.Evaluate(predictions, labelColumnName: nameof(FullContextAthleteScoreTrainingRow.Label), scoreColumnName: "Score");
+        var metrics = mlContext.Regression.Evaluate(
+            predictions,
+            labelColumnName: nameof(FullContextAthleteScoreTrainingRow.Label),
+            scoreColumnName: "Score");
         var holdoutScores = mlContext.Data
             .CreateEnumerable<AthleteScorePredictionOutput>(predictions, reuseRowObject: false)
             .Select(item => item.Score)
             .ToList();
         var positionDiagnostics = BuildPositionDiagnostics(trainingRows, holdoutRows, holdoutScores);
+
+        // Build the final feature importance list, tagging which features were kept in the model.
+        var activeNumericFeatureSet = allowedNumericFeatures
+            ?? new HashSet<string>(allNumericFeatureNames, StringComparer.Ordinal);
+
+        var featureImportances = importanceRanking
+            .Select((item, idx) => new AthleteScoreFeatureImportance
+            {
+                FeatureName = item.FeatureName,
+                MeanRSquaredDrop = item.MeanRSquaredDrop,
+                RSquaredDropStdDev = item.RSquaredDropStdDev,
+                Rank = idx + 1,
+                // Categorical encoded groups are always selected; numeric features only when in the top-N set.
+                IsSelected = !item.IsNumeric || activeNumericFeatureSet.Contains(item.FeatureName),
+            })
+            .ToList();
 
         Directory.CreateDirectory(Path.GetDirectoryName(artifactStore.GetModelPath())!);
         mlContext.Model.Save(model, trainData.Schema, artifactStore.GetModelPath());
@@ -97,6 +162,9 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             ModelArtifactPath = artifactStore.GetModelPath(),
             MetadataArtifactPath = artifactStore.GetMetadataPath(),
             PositionDiagnostics = positionDiagnostics,
+            TotalNumericFeatureCount = allNumericFeatureNames.Length,
+            ActiveNumericFeatureCount = allowedNumericFeatures?.Count ?? allNumericFeatureNames.Length,
+            FeatureImportances = featureImportances,
         };
 
         await artifactStore.SaveMetadataAsync(metadata, cancellationToken);
@@ -114,9 +182,13 @@ public sealed class FullContextAthleteScoreModelTrainingService(
         return metadata is null ? null : artifactStore.ToModelInfo(metadata);
     }
 
-    private static IEstimator<ITransformer> BuildPipeline(MLContext mlContext)
+    /// <summary>
+    /// Returns the names of numeric float feature columns, optionally restricted to an allowed set.
+    /// The five ID/label columns are always excluded.
+    /// </summary>
+    private static string[] GetNumericFeatureNames(IReadOnlySet<string>? allowedFeatures)
     {
-        var excludedNumericFeatures = new HashSet<string>(StringComparer.Ordinal)
+        var excluded = new HashSet<string>(StringComparer.Ordinal)
         {
             nameof(FullContextAthleteScoreTrainingRow.Label),
             nameof(FullContextAthleteScoreTrainingRow.ClubCartolaId),
@@ -125,11 +197,22 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             nameof(FullContextAthleteScoreTrainingRow.StatusCartolaId),
         };
 
-        var numericFeatures = typeof(FullContextAthleteScoreTrainingRow)
+        var all = typeof(FullContextAthleteScoreTrainingRow)
             .GetProperties()
-            .Where(item => item.PropertyType == typeof(float) && !excludedNumericFeatures.Contains(item.Name))
-            .Select(item => item.Name)
+            .Where(prop => prop.PropertyType == typeof(float) && !excluded.Contains(prop.Name))
+            .Select(prop => prop.Name)
             .ToArray();
+
+        return allowedFeatures is null
+            ? all
+            : all.Where(name => allowedFeatures.Contains(name)).ToArray();
+    }
+
+    private static IEstimator<ITransformer> BuildPipeline(
+        MLContext mlContext,
+        IReadOnlySet<string>? allowedNumericFeatures)
+    {
+        var numericFeatures = GetNumericFeatureNames(allowedNumericFeatures);
 
         return mlContext.Transforms.Categorical.OneHotEncoding(new[]
             {
@@ -156,6 +239,67 @@ public sealed class FullContextAthleteScoreModelTrainingService(
                 NumberOfLeaves = 63,
                 MinimumExampleCountPerLeaf = 10,
             }));
+    }
+
+    /// <summary>
+    /// Runs permutation feature importance on the holdout data and returns the results ranked from most
+    /// to least important (most negative MeanRSquaredDrop first).
+    /// Slots belonging to one-hot encoded categorical groups are aggregated into a single entry per group.
+    /// </summary>
+    private static List<(string FeatureName, double MeanRSquaredDrop, double RSquaredDropStdDev, bool IsNumeric)>
+        ComputeFeatureImportances(
+            MLContext mlContext,
+            ITransformer model,
+            IDataView holdoutData,
+            string[] numericFeatureNames)
+    {
+        var numericFeatureSet = new HashSet<string>(numericFeatureNames, StringComparer.Ordinal);
+
+        var pfi = mlContext.Regression.PermutationFeatureImportance(
+            model,
+            holdoutData,
+            labelColumnName: nameof(FullContextAthleteScoreTrainingRow.Label),
+            numberOfExamplesToUse: 300,
+            permutationCount: 3);
+
+        // Group encoded categorical slots (e.g. "ClubEncoded.0", "ClubEncoded.17") under their prefix.
+        return pfi
+            .GroupBy(kvp => ResolveFeatureGroupName(kvp.Key))
+            .Select(group =>
+            {
+                var featureName = group.Key;
+                var isNumeric = numericFeatureSet.Contains(featureName);
+
+                // Sum the R² drops across all slots in the group (for scalars the group has one entry).
+                var meanDrop = group.Sum(kvp => kvp.Value.RSquared.Mean);
+
+                // Combine per-slot standard deviations assuming independence: σ_total = √(Σ σ_i²).
+                var stdDev = Math.Sqrt(group.Sum(kvp =>
+                    kvp.Value.RSquared.StandardDeviation * kvp.Value.RSquared.StandardDeviation));
+
+                return (featureName, meanDrop, stdDev, isNumeric);
+            })
+            .OrderBy(item => item.meanDrop) // most negative first = most important
+            .ToList();
+    }
+
+    /// <summary>
+    /// Maps a PFI slot key to a logical feature group name.
+    /// Slots belonging to one-hot encoded prefixes (e.g. "ClubEncoded.0") are mapped to the prefix.
+    /// All other keys (scalar numeric features) are returned unchanged.
+    /// </summary>
+    private static string ResolveFeatureGroupName(string slotKey)
+    {
+        foreach (var prefix in EncodedPrefixes)
+        {
+            if (slotKey == prefix ||
+                slotKey.StartsWith(prefix + ".", StringComparison.Ordinal))
+            {
+                return prefix;
+            }
+        }
+
+        return slotKey;
     }
 
     private static async Task<List<FullContextAthleteScoreTrainingRow>> QueryTrainingRowsAsync(
@@ -324,5 +468,4 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             6 => ("TEC", "Tecnico"),
             _ => ($"P{positionCartolaId}", $"Posicao {positionCartolaId}"),
         };
-
 }

@@ -68,10 +68,18 @@ public sealed class TrainingDatasetController(
 
     /// <summary>
     /// Trains and persists the principal full-context athlete-score machine learning model.
+    /// Permutation feature importance is always computed after the initial training pass and stored in the model metadata.
+    /// When <paramref name="topNFeatures"/> is provided the model is then retrained using only the top-N numeric features,
+    /// which can reduce noise and improve generalisation when many features are redundant.
     /// </summary>
     /// <param name="fromRound">Optional initial round of the training window.</param>
     /// <param name="toRound">Optional final round of the training window.</param>
     /// <param name="validationRounds">Number of last rounds reserved for temporal validation. Defaults to one round.</param>
+    /// <param name="topNFeatures">
+    /// When specified, retrain the model using only the top-N most important numeric features (as ranked by
+    /// permutation feature importance on the holdout set). Categorical features (club, opponent, position,
+    /// status) are always included. Omit this parameter to train on all available features.
+    /// </param>
     /// <param name="cancellationToken">Cancellation token for the request.</param>
     /// <returns>The model metadata and validation metrics of the newly trained full-context artifact.</returns>
     [HttpPost("models/athlete-score-v1-full-context/train")]
@@ -80,12 +88,14 @@ public sealed class TrainingDatasetController(
         [FromQuery] int? fromRound,
         [FromQuery] int? toRound,
         [FromQuery] int validationRounds = 1,
+        [FromQuery] int? topNFeatures = null,
         CancellationToken cancellationToken = default)
     {
         var result = await fullContextAthleteScoreModelTrainingService.TrainAsync(
             fromRound,
             toRound,
             validationRounds,
+            topNFeatures,
             cancellationToken);
 
         return Ok(result);

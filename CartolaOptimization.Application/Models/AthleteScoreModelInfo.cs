@@ -38,4 +38,16 @@ public sealed class AthleteScoreModelInfo
     public string MetadataArtifactPath { get; init; } = string.Empty;
 
     public IReadOnlyList<AthleteScorePositionDiagnostics> PositionDiagnostics { get; init; } = [];
+
+    /// <summary>Total number of numeric features available before any top-N filter is applied.</summary>
+    public int TotalNumericFeatureCount { get; init; }
+
+    /// <summary>Number of numeric features actually used in the final trained model.</summary>
+    public int ActiveNumericFeatureCount { get; init; }
+
+    /// <summary>
+    /// Per-feature permutation importance ranked from most to least important.
+    /// Populated after every training run. Empty for artifacts trained before this feature was introduced.
+    /// </summary>
+    public IReadOnlyList<AthleteScoreFeatureImportance> FeatureImportances { get; init; } = [];
 }

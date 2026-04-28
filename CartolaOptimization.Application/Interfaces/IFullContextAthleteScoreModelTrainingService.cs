@@ -11,6 +11,7 @@ public interface IFullContextAthleteScoreModelTrainingService
         int? fromRound = null,
         int? toRound = null,
         int validationRounds = 1,
+        int? topNFeatures = null,
         CancellationToken cancellationToken = default);
 
     Task<AthleteScoreModelInfo?> GetCurrentModelInfoAsync(CancellationToken cancellationToken = default);
