@@ -7,6 +7,8 @@ using CartolaOptimization.ML;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using System.Text.Json.Nodes;
 
@@ -563,7 +565,9 @@ public sealed class AthleteScoreModelServicesTests
                 {
                     ArtifactsDirectory = artifactDirectory,
                     ModelVersion = "athlete-score-v1-full-context",
-                }));
+                    DefaultTopNFeatures = null, // use all features in unit tests for determinism
+                }),
+                NullLogger<FullContextAthleteScoreModelTrainingService>.Instance);
 
             var result = await service.TrainAsync(fromRound: 1, toRound: 3, validationRounds: 1);
             var metadata = await service.GetCurrentModelInfoAsync();
@@ -604,7 +608,9 @@ public sealed class AthleteScoreModelServicesTests
                 {
                     ArtifactsDirectory = artifactDirectory,
                     ModelVersion = "athlete-score-v1-full-context",
-                }));
+                    DefaultTopNFeatures = null, // use all features in unit tests for determinism
+                }),
+                NullLogger<FullContextAthleteScoreModelTrainingService>.Instance);
             await trainingService.TrainAsync(fromRound: 1, toRound: 3, validationRounds: 1);
 
             var predictionService = new FullContextAthleteScorePredictionService(dbContextFactory, store);
@@ -658,7 +664,9 @@ public sealed class AthleteScoreModelServicesTests
                 {
                     ArtifactsDirectory = artifactDirectory,
                     ModelVersion = "athlete-score-v1-full-context",
-                }));
+                    DefaultTopNFeatures = null, // use all features in unit tests for determinism
+                }),
+                NullLogger<FullContextAthleteScoreModelTrainingService>.Instance);
             await trainingService.TrainAsync(fromRound: 1, toRound: 3, validationRounds: 1);
 
             var predictionService = new FullContextAthleteScorePredictionService(dbContextFactory, store);
@@ -695,7 +703,9 @@ public sealed class AthleteScoreModelServicesTests
                 {
                     ArtifactsDirectory = artifactDirectory,
                     ModelVersion = "athlete-score-v1-full-context",
-                }));
+                    DefaultTopNFeatures = null, // use all features in unit tests for determinism
+                }),
+                NullLogger<FullContextAthleteScoreModelTrainingService>.Instance);
             await trainingService.TrainAsync(fromRound: 1, toRound: 3, validationRounds: 1);
 
             var predictionService = new FullContextAthleteScorePredictionService(dbContextFactory, store);
@@ -747,7 +757,9 @@ public sealed class AthleteScoreModelServicesTests
                 {
                     ArtifactsDirectory = artifactDirectory,
                     ModelVersion = "athlete-score-v1-full-context",
-                }));
+                    DefaultTopNFeatures = null, // use all features in unit tests for determinism
+                }),
+                NullLogger<FullContextAthleteScoreModelTrainingService>.Instance);
             await trainingService.TrainAsync(fromRound: 1, toRound: 3, validationRounds: 1);
 
             var predictionService = new FullContextAthleteScorePredictionService(dbContextFactory, store);

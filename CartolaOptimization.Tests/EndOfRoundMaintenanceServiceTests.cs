@@ -121,7 +121,7 @@ public sealed class EndOfRoundMaintenanceServiceTests
         Assert.Single(preparationService.RecomputeReadinessCalls);
         Assert.Equal((3, 4), preparationService.RecomputeReadinessCalls.Single());
         Assert.Single(trainingService.TrainCalls);
-        Assert.Equal((null, 4, 1), trainingService.TrainCalls.Single());
+        Assert.Equal((null, 4, 1, (int?)null), trainingService.TrainCalls.Single());
         Assert.NotNull(result.CartolaClosedRoundBackfill);
         Assert.Equal(2, result.CartolaClosedRoundBackfill!.RequestedRounds);
         Assert.NotNull(result.GatoMestreBackfill);

@@ -42,6 +42,10 @@ public sealed class FullContextAthleteScoreModelTrainingService(
     {
         NormalizeOptionalRange(ref fromRound, ref toRound);
         validationRounds = Math.Max(1, validationRounds);
+
+        // Fall back to the configured default when the caller does not supply an explicit value.
+        topNFeatures ??= options.DefaultTopNFeatures;
+
         if (topNFeatures.HasValue)
         {
             topNFeatures = Math.Max(1, topNFeatures.Value);

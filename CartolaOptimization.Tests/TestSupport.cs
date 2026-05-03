@@ -178,10 +178,10 @@ internal sealed class FakeAthleteContextAthleteScoreModelTrainingService : IAthl
 
 internal sealed class FakeFullContextAthleteScoreModelTrainingService : IFullContextAthleteScoreModelTrainingService
 {
-    public List<(int? FromRound, int? ToRound, int ValidationRounds)> TrainCalls { get; } = [];
+    public List<(int? FromRound, int? ToRound, int ValidationRounds, int? TopNFeatures)> TrainCalls { get; } = [];
 
-    public Func<int?, int?, int, CancellationToken, Task<AthleteScoreModelTrainingResult>> OnTrainAsync { get; init; } =
-        (fromRound, toRound, validationRounds, _) => Task.FromResult(new AthleteScoreModelTrainingResult
+    public Func<int?, int?, int, int?, CancellationToken, Task<AthleteScoreModelTrainingResult>> OnTrainAsync { get; init; } =
+        (fromRound, toRound, validationRounds, _, _) => Task.FromResult(new AthleteScoreModelTrainingResult
         {
             Message = "trained",
             ModelInfo = new AthleteScoreModelInfo
@@ -198,10 +198,15 @@ internal sealed class FakeFullContextAthleteScoreModelTrainingService : IFullCon
     public Func<CancellationToken, Task<AthleteScoreModelInfo?>> OnGetCurrentModelInfoAsync { get; init; } =
         _ => Task.FromResult<AthleteScoreModelInfo?>(null);
 
-    public Task<AthleteScoreModelTrainingResult> TrainAsync(int? fromRound = null, int? toRound = null, int validationRounds = 1, CancellationToken cancellationToken = default)
+    public Task<AthleteScoreModelTrainingResult> TrainAsync(
+        int? fromRound = null,
+        int? toRound = null,
+        int validationRounds = 1,
+        int? topNFeatures = null,
+        CancellationToken cancellationToken = default)
     {
-        TrainCalls.Add((fromRound, toRound, validationRounds));
-        return OnTrainAsync(fromRound, toRound, validationRounds, cancellationToken);
+        TrainCalls.Add((fromRound, toRound, validationRounds, topNFeatures));
+        return OnTrainAsync(fromRound, toRound, validationRounds, topNFeatures, cancellationToken);
     }
 
     public Task<AthleteScoreModelInfo?> GetCurrentModelInfoAsync(CancellationToken cancellationToken = default)
