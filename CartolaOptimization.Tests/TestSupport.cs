@@ -203,6 +203,7 @@ internal sealed class FakeFullContextAthleteScoreModelTrainingService : IFullCon
         int? toRound = null,
         int validationRounds = 1,
         int? topNFeatures = null,
+        LightGbmHyperparameters? hyperparameters = null,
         CancellationToken cancellationToken = default)
     {
         TrainCalls.Add((fromRound, toRound, validationRounds, topNFeatures));

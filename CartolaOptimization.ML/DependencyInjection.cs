@@ -19,6 +19,7 @@ public static class DependencyInjection
         services.AddScoped<IAthleteContextAthleteScoreModelTrainingService, AthleteContextAthleteScoreModelTrainingService>();
         services.AddScoped<IAthleteContextAthleteScorePredictionService, AthleteContextAthleteScorePredictionService>();
         services.AddScoped<IFullContextAthleteScoreModelTrainingService, FullContextAthleteScoreModelTrainingService>();
+        services.AddScoped<IFullContextAthleteScoreModelHyperparameterTuningService, FullContextAthleteScoreModelHyperparameterTuningService>();
         services.AddScoped<IFullContextAthleteScorePredictionService, FullContextAthleteScorePredictionService>();
         services.AddScoped<IPredictedLineupOptimizationService, PredictedLineupOptimizationService>();
         return services;

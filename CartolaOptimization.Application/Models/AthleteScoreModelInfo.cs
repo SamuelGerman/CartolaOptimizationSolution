@@ -50,4 +50,9 @@ public sealed class AthleteScoreModelInfo
     /// Populated after every training run. Empty for artifacts trained before this feature was introduced.
     /// </summary>
     public IReadOnlyList<AthleteScoreFeatureImportance> FeatureImportances { get; init; } = [];
+
+    /// <summary>
+    /// LightGBM hyperparameters that were active when this model artifact was trained.
+    /// </summary>
+    public LightGbmHyperparameters Hyperparameters { get; init; } = new();
 }

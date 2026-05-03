@@ -7,11 +7,17 @@ namespace CartolaOptimization.Application.Interfaces;
 /// </summary>
 public interface IFullContextAthleteScoreModelTrainingService
 {
+    /// <summary>
+    /// Trains and persists the full-context model. When <paramref name="hyperparameters"/> is
+    /// <c>null</c> the implementation falls back to the values configured in
+    /// <c>MachineLearning:FullContext:Hyperparameters</c>.
+    /// </summary>
     Task<AthleteScoreModelTrainingResult> TrainAsync(
         int? fromRound = null,
         int? toRound = null,
         int validationRounds = 1,
         int? topNFeatures = null,
+        LightGbmHyperparameters? hyperparameters = null,
         CancellationToken cancellationToken = default);
 
     Task<AthleteScoreModelInfo?> GetCurrentModelInfoAsync(CancellationToken cancellationToken = default);

@@ -14,7 +14,8 @@ namespace CartolaOptimization.Api.Controllers;
 public sealed class TrainingDatasetController(
     ITrainingDatasetDiagnosticsService trainingDatasetDiagnosticsService,
     IEndOfRoundMaintenanceService endOfRoundMaintenanceService,
-    IFullContextAthleteScoreModelTrainingService fullContextAthleteScoreModelTrainingService) : ControllerBase
+    IFullContextAthleteScoreModelTrainingService fullContextAthleteScoreModelTrainingService,
+    IFullContextAthleteScoreModelHyperparameterTuningService fullContextAthleteScoreModelHyperparameterTuningService) : ControllerBase
 {
     /// <summary>
     /// Returns an export-ready historical dataset slice that includes athlete, club, opponent and match context.
@@ -96,7 +97,7 @@ public sealed class TrainingDatasetController(
             toRound,
             validationRounds,
             topNFeatures,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         return Ok(result);
     }
@@ -133,6 +134,49 @@ public sealed class TrainingDatasetController(
         var result = await endOfRoundMaintenanceService.RunAsync(
             validationRounds,
             forceLatestClosedRound,
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Runs a random-search hyperparameter optimisation for the full-context LightGBM model using
+    /// temporal walk-forward cross-validation, then optionally retrains and persists the model with
+    /// the best combination found.
+    /// </summary>
+    /// <param name="fromRound">Optional earliest round to include in the search dataset.</param>
+    /// <param name="toRound">Optional latest round to include in the search dataset.</param>
+    /// <param name="numberOfTrials">
+    /// Number of random hyperparameter combinations to evaluate. More trials improve the chance of
+    /// finding the global optimum at the cost of longer runtime. Defaults to 30.
+    /// </param>
+    /// <param name="validationFolds">
+    /// Number of walk-forward cross-validation folds. Each fold holds out one additional round from
+    /// the tail of the dataset. Defaults to 3.
+    /// </param>
+    /// <param name="applyBest">
+    /// When <c>true</c> (default), retrains and persists the full-context model with the best
+    /// hyperparameter combination and the configured <c>DefaultTopNFeatures</c> feature selection.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>Search results including all trial CV scores, the best hyperparameters, and the final model info.</returns>
+    [HttpPost("models/athlete-score-v1-full-context/hyperparameter-search")]
+    [ProducesResponseType(typeof(HyperparameterSearchResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SearchFullContextHyperparameters(
+        [FromQuery] int? fromRound,
+        [FromQuery] int? toRound,
+        [FromQuery] int numberOfTrials = 30,
+        [FromQuery] int validationFolds = 3,
+        [FromQuery] bool applyBest = true,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await fullContextAthleteScoreModelHyperparameterTuningService.SearchAsync(
+            fromRound,
+            toRound,
+            numberOfTrials,
+            validationFolds,
+            applyBest,
             cancellationToken);
 
         return Ok(result);

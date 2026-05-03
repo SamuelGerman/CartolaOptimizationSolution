@@ -38,13 +38,15 @@ public sealed class FullContextAthleteScoreModelTrainingService(
         int? toRound = null,
         int validationRounds = 1,
         int? topNFeatures = null,
+        LightGbmHyperparameters? hyperparameters = null,
         CancellationToken cancellationToken = default)
     {
         NormalizeOptionalRange(ref fromRound, ref toRound);
         validationRounds = Math.Max(1, validationRounds);
 
-        // Fall back to the configured default when the caller does not supply an explicit value.
+        // Fall back to the configured defaults when the caller does not supply explicit values.
         topNFeatures ??= options.DefaultTopNFeatures;
+        hyperparameters ??= options.Hyperparameters;
 
         if (topNFeatures.HasValue)
         {
@@ -93,7 +95,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
         var allNumericFeatureNames = GetNumericFeatureNames(allowedFeatures: null);
 
         // Phase 1: train on all features so PFI evaluates relative importance on the full model.
-        var fullPipeline = BuildPipeline(mlContext, allowedNumericFeatures: null);
+        var fullPipeline = BuildPipeline(mlContext, allowedNumericFeatures: null, hyperparameters);
         var fullModel = fullPipeline.Fit(trainData);
 
         // Compute permutation feature importance by manually shuffling each feature and measuring R² drop.
@@ -137,7 +139,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
                 if (selectedNumericFeatures.Count > 0)
                 {
                     allowedNumericFeatures = selectedNumericFeatures;
-                    var filteredPipeline = BuildPipeline(mlContext, allowedNumericFeatures);
+                    var filteredPipeline = BuildPipeline(mlContext, allowedNumericFeatures, hyperparameters);
                     model = filteredPipeline.Fit(trainData);
                     logger.LogInformation(
                         "Retrained with top {Selected}/{Total} numeric features (topNFeatures={TopN}).",
@@ -198,6 +200,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             TotalNumericFeatureCount = allNumericFeatureNames.Length,
             ActiveNumericFeatureCount = allowedNumericFeatures?.Count ?? allNumericFeatureNames.Length,
             FeatureImportances = featureImportances,
+            Hyperparameters = hyperparameters,
         };
 
         await artifactStore.SaveMetadataAsync(metadata, cancellationToken);
@@ -219,7 +222,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
     /// Returns the names of numeric float feature columns, optionally restricted to an allowed set.
     /// The five ID/label columns are always excluded.
     /// </summary>
-    private static string[] GetNumericFeatureNames(IReadOnlySet<string>? allowedFeatures)
+    internal static string[] GetNumericFeatureNames(IReadOnlySet<string>? allowedFeatures)
     {
         var excluded = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -241,9 +244,10 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             : all.Where(name => allowedFeatures.Contains(name)).ToArray();
     }
 
-    private static IEstimator<ITransformer> BuildPipeline(
+    internal static IEstimator<ITransformer> BuildPipeline(
         MLContext mlContext,
-        IReadOnlySet<string>? allowedNumericFeatures)
+        IReadOnlySet<string>? allowedNumericFeatures,
+        LightGbmHyperparameters hyperparameters)
     {
         var numericFeatures = GetNumericFeatureNames(allowedNumericFeatures);
 
@@ -267,10 +271,15 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             {
                 LabelColumnName = nameof(FullContextAthleteScoreTrainingRow.Label),
                 FeatureColumnName = "Features",
-                NumberOfIterations = 300,
-                LearningRate = 0.05,
-                NumberOfLeaves = 63,
-                MinimumExampleCountPerLeaf = 10,
+                NumberOfIterations = hyperparameters.NumberOfIterations,
+                LearningRate = hyperparameters.LearningRate,
+                NumberOfLeaves = hyperparameters.NumberOfLeaves,
+                MinimumExampleCountPerLeaf = hyperparameters.MinimumExampleCountPerLeaf,
+                Booster = new GradientBooster.Options
+                {
+                    L1Regularization = hyperparameters.L1Regularization,
+                    L2Regularization = hyperparameters.L2Regularization,
+                },
             }));
     }
 
@@ -398,7 +407,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
         }
     }
 
-    private static async Task<List<FullContextAthleteScoreTrainingRow>> QueryTrainingRowsAsync(
+    internal static async Task<List<FullContextAthleteScoreTrainingRow>> QueryTrainingRowsAsync(
         AppDbContext dbContext,
         int? fromRound,
         int? toRound,

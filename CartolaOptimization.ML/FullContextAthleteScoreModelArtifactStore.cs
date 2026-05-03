@@ -63,6 +63,7 @@ public sealed class FullContextAthleteScoreModelArtifactStore(
             TotalNumericFeatureCount = metadata.TotalNumericFeatureCount,
             ActiveNumericFeatureCount = metadata.ActiveNumericFeatureCount,
             FeatureImportances = metadata.FeatureImportances,
+            Hyperparameters = metadata.Hyperparameters,
         };
 
     private string GetArtifactsDirectory()

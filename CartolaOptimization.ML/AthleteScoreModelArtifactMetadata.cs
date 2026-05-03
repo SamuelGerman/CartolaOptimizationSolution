@@ -47,4 +47,10 @@ internal sealed class AthleteScoreModelArtifactMetadata
     /// Populated after every training run. Empty for artifacts trained before this feature was introduced.
     /// </summary>
     public IReadOnlyList<CartolaOptimization.Application.Models.AthleteScoreFeatureImportance> FeatureImportances { get; init; } = [];
+
+    /// <summary>
+    /// LightGBM hyperparameters used when training this artifact.
+    /// Populated on every training run; reflects the effective values after config and override resolution.
+    /// </summary>
+    public CartolaOptimization.Application.Models.LightGbmHyperparameters Hyperparameters { get; init; } = new();
 }
