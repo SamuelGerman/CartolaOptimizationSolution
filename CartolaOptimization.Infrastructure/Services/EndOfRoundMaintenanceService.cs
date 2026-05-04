@@ -15,7 +15,8 @@ public sealed class EndOfRoundMaintenanceService(
     ICartolaSyncService cartolaSyncService,
     IGatoMestreSyncService gatoMestreSyncService,
     ITrainingDatasetPreparationService trainingDatasetPreparationService,
-    IFullContextAthleteScoreModelTrainingService fullContextAthleteScoreModelTrainingService) : IEndOfRoundMaintenanceService
+    IFullContextAthleteScoreModelTrainingService fullContextAthleteScoreModelTrainingService,
+    IPositionalAthleteScoreModelTrainingService positionalAthleteScoreModelTrainingService) : IEndOfRoundMaintenanceService
 {
     private const string StepStatusExecuted = "Executed";
     private const string StepStatusSkipped = "Skipped";
@@ -50,6 +51,7 @@ public sealed class EndOfRoundMaintenanceService(
             steps.Add(CreateSkippedStep("Enrich Gato Mestre historical rounds", "There is no closed round available yet because the market is still at round 1."));
             steps.Add(CreateSkippedStep("Recompute training readiness", "No historical closed round was refreshed in this execution."));
             steps.Add(CreateSkippedStep("Train full-context model", "At least two historical closed rounds are required before the primary full-context model can be trained."));
+            steps.Add(CreateSkippedStep("Train positional models", "At least two historical closed rounds are required before positional models can be trained."));
 
             return new EndOfRoundMaintenanceResult
             {
@@ -185,6 +187,37 @@ public sealed class EndOfRoundMaintenanceService(
             }
         }
 
+        PositionalAthleteScoreTrainingResult? positionalTrainingResult = null;
+
+        if (trainingResult is not null)
+        {
+            try
+            {
+                positionalTrainingResult = await positionalAthleteScoreModelTrainingService.TrainAllAsync(
+                    toRound: lastClosedRound,
+                    validationRounds: validationRounds,
+                    cancellationToken: cancellationToken);
+
+                steps.Add(new EndOfRoundMaintenanceStepResult
+                {
+                    Step = "Train positional models",
+                    Status = StepStatusExecuted,
+                    Reason = $"Trained {positionalTrainingResult.TrainedPositions} positional model(s); {positionalTrainingResult.SkippedPositions} skipped due to insufficient data.",
+                    Rounds = [lastClosedRound],
+                });
+            }
+            catch (InvalidOperationException exception)
+            {
+                steps.Add(CreateSkippedStep("Train positional models", exception.Message));
+            }
+        }
+        else
+        {
+            steps.Add(CreateSkippedStep(
+                "Train positional models",
+                "Positional model training is skipped because the primary full-context model was not retrained in this execution."));
+        }
+
         return new EndOfRoundMaintenanceResult
         {
             Message = BuildSummaryMessage(lastClosedRound, historicalDataUpdated, trainingResult is not null, cartolaBackfillFailed || gatoMestreBackfillFailed),
@@ -200,6 +233,7 @@ public sealed class EndOfRoundMaintenanceService(
             ReadinessRecompute = readinessResult,
             PrimaryModelTraining = trainingResult,
             PrimaryModelInfo = activeModelInfo,
+            PositionalModelTraining = positionalTrainingResult,
             Steps = steps,
         };
     }

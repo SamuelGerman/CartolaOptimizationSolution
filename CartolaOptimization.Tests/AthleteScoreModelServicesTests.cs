@@ -613,7 +613,7 @@ public sealed class AthleteScoreModelServicesTests
                 NullLogger<FullContextAthleteScoreModelTrainingService>.Instance);
             await trainingService.TrainAsync(fromRound: 1, toRound: 3, validationRounds: 1);
 
-            var predictionService = new FullContextAthleteScorePredictionService(dbContextFactory, store);
+            var predictionService = new FullContextAthleteScorePredictionService(dbContextFactory, store, CreatePositionalArtifactStore(artifactDirectory));
             var result = await predictionService.GetPredictedScoresAsync(
                 round: 4,
                 statusCartolaId: 7,
@@ -669,7 +669,7 @@ public sealed class AthleteScoreModelServicesTests
                 NullLogger<FullContextAthleteScoreModelTrainingService>.Instance);
             await trainingService.TrainAsync(fromRound: 1, toRound: 3, validationRounds: 1);
 
-            var predictionService = new FullContextAthleteScorePredictionService(dbContextFactory, store);
+            var predictionService = new FullContextAthleteScorePredictionService(dbContextFactory, store, CreatePositionalArtifactStore(artifactDirectory));
             var result = await predictionService.GetPredictedScoresAsync(round: 4, take: 10);
 
             Assert.Equal(2, result.TotalAthletesConsidered);
@@ -708,7 +708,7 @@ public sealed class AthleteScoreModelServicesTests
                 NullLogger<FullContextAthleteScoreModelTrainingService>.Instance);
             await trainingService.TrainAsync(fromRound: 1, toRound: 3, validationRounds: 1);
 
-            var predictionService = new FullContextAthleteScorePredictionService(dbContextFactory, store);
+            var predictionService = new FullContextAthleteScorePredictionService(dbContextFactory, store, CreatePositionalArtifactStore(artifactDirectory));
             var before = await predictionService.GetPredictedScoresAsync(round: 4, statusCartolaId: 7, clubCartolaId: 293, positionCartolaId: 3, take: 10);
             var predictedScoreBefore = before.Athletes.Single(item => item.AthleteCartolaId == 1001).PredictedScore;
 
@@ -762,7 +762,7 @@ public sealed class AthleteScoreModelServicesTests
                 NullLogger<FullContextAthleteScoreModelTrainingService>.Instance);
             await trainingService.TrainAsync(fromRound: 1, toRound: 3, validationRounds: 1);
 
-            var predictionService = new FullContextAthleteScorePredictionService(dbContextFactory, store);
+            var predictionService = new FullContextAthleteScorePredictionService(dbContextFactory, store, CreatePositionalArtifactStore(artifactDirectory));
             var before = await predictionService.GetPredictedScoresAsync(
                 round: 4,
                 statusCartolaId: 7,
@@ -811,6 +811,116 @@ public sealed class AthleteScoreModelServicesTests
         }
     }
 
+    [Fact]
+    public async Task TrainAllAsync_PersistsPositionalModelArtifactsForPositionsWithSufficientData()
+    {
+        var dbContextFactory = CreateDbContextFactory();
+        var artifactDirectory = CreateArtifactDirectory();
+        try
+        {
+            await SeedFullContextTrainingDataAsync(await dbContextFactory.CreateDbContextAsync(), includeCurrentRoundAthleteBaselines: false);
+
+            var positionalStore = CreatePositionalArtifactStore(artifactDirectory);
+            var service = new PositionalAthleteScoreModelTrainingService(
+                dbContextFactory,
+                positionalStore,
+                Options.Create(new PositionalAthleteScoreModelOptions
+                {
+                    ArtifactsDirectory = artifactDirectory,
+                    MinimumTrainingRows = 1,       // low threshold so test data passes
+                    DefaultTopNFeatures = null,    // use all features for determinism in tests
+                }),
+                NullLogger<PositionalAthleteScoreModelTrainingService>.Instance);
+
+            var result = await service.TrainAllAsync(fromRound: 1, toRound: 3, validationRounds: 1);
+
+            // Seed data has defenders (pos 3) and strikers (pos 5); other positions have 0 rows.
+            Assert.Contains("trained", result.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(2, result.TrainedPositions);
+            Assert.Equal(4, result.SkippedPositions);
+            Assert.True(positionalStore.ModelExists(3), "Zagueiro model artifact should exist.");
+            Assert.True(positionalStore.ModelExists(5), "Atacante model artifact should exist.");
+            Assert.False(positionalStore.ModelExists(1), "Goleiro model should NOT exist (no data).");
+
+            var zag = result.Positions.Single(p => p.PositionCartolaId == 3);
+            Assert.True(zag.Trained);
+            Assert.Equal("ZAG", zag.PositionCode);
+            Assert.NotNull(zag.ModelInfo);
+            Assert.Equal("positional-zag", zag.ModelInfo!.DatasetKey);
+            Assert.True(File.Exists(zag.ModelInfo.ModelArtifactPath));
+            Assert.True(File.Exists(zag.ModelInfo.MetadataArtifactPath));
+
+            var gol = result.Positions.Single(p => p.PositionCartolaId == 1);
+            Assert.False(gol.Trained);
+            Assert.NotNull(gol.SkipReason);
+        }
+        finally
+        {
+            DeleteArtifactDirectory(artifactDirectory);
+        }
+    }
+
+    [Fact]
+    public async Task GetPredictedScoresAsync_UsesPositionalModelWhenAvailable()
+    {
+        var dbContextFactory = CreateDbContextFactory();
+        var artifactDirectory = CreateArtifactDirectory();
+        try
+        {
+            await SeedFullContextTrainingDataAsync(await dbContextFactory.CreateDbContextAsync(), includeCurrentRoundAthleteBaselines: true);
+
+            // Train global model
+            var globalStore = CreateFullContextArtifactStore(artifactDirectory);
+            var globalTraining = new FullContextAthleteScoreModelTrainingService(
+                dbContextFactory,
+                globalStore,
+                Options.Create(new FullContextAthleteScoreModelOptions
+                {
+                    ArtifactsDirectory = artifactDirectory,
+                    ModelVersion = "athlete-score-v1-full-context",
+                    DefaultTopNFeatures = null,
+                }),
+                NullLogger<FullContextAthleteScoreModelTrainingService>.Instance);
+            await globalTraining.TrainAsync(fromRound: 1, toRound: 3, validationRounds: 1);
+
+            // Train positional models
+            var positionalStore = CreatePositionalArtifactStore(artifactDirectory);
+            var positionalTraining = new PositionalAthleteScoreModelTrainingService(
+                dbContextFactory,
+                positionalStore,
+                Options.Create(new PositionalAthleteScoreModelOptions
+                {
+                    ArtifactsDirectory = artifactDirectory,
+                    MinimumTrainingRows = 1,
+                    DefaultTopNFeatures = null,
+                }),
+                NullLogger<PositionalAthleteScoreModelTrainingService>.Instance);
+            await positionalTraining.TrainAllAsync(fromRound: 1, toRound: 3, validationRounds: 1);
+
+            // Predict using positional routing
+            var predictionService = new FullContextAthleteScorePredictionService(
+                dbContextFactory, globalStore, positionalStore);
+            var result = await predictionService.GetPredictedScoresAsync(
+                round: 4,
+                statusCartolaId: 7,
+                clubCartolaId: 293,
+                positionCartolaId: 3,
+                take: 10);
+
+            Assert.Equal(4, result.Round);
+            Assert.Equal("athlete-score-v1-full-context", result.ModelVersion);
+            Assert.Equal(1, result.TotalAthletesConsidered);
+            Assert.Single(result.Athletes);
+            Assert.NotEqual(0m, result.Athletes.Single().PredictedScore);
+            // Positional model was used — note should mention it
+            Assert.Contains("Position-specific models were applied", result.PredictionNotes, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            DeleteArtifactDirectory(artifactDirectory);
+        }
+    }
+
     private static AthleteScoreModelArtifactStore CreateArtifactStore(string artifactDirectory)
         => new(
             new FakeHostEnvironment(artifactDirectory),
@@ -836,6 +946,16 @@ public sealed class AthleteScoreModelServicesTests
             {
                 ArtifactsDirectory = artifactDirectory,
                 ModelVersion = "athlete-score-v1-full-context",
+            }));
+
+    private static PositionalAthleteScoreModelArtifactStore CreatePositionalArtifactStore(string artifactDirectory)
+        => new(
+            new FakeHostEnvironment(artifactDirectory),
+            Options.Create(new PositionalAthleteScoreModelOptions
+            {
+                ArtifactsDirectory = artifactDirectory,
+                MinimumTrainingRows = 1,
+                DefaultTopNFeatures = null,
             }));
 
     private static SharedContextFactory CreateDbContextFactory()

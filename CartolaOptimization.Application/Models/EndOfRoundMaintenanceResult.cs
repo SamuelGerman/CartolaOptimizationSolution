@@ -35,5 +35,7 @@ public sealed class EndOfRoundMaintenanceResult
 
     public AthleteScoreModelInfo? AthleteContextModelInfo { get; init; }
 
+    public PositionalAthleteScoreTrainingResult? PositionalModelTraining { get; init; }
+
     public IReadOnlyCollection<EndOfRoundMaintenanceStepResult> Steps { get; init; } = Array.Empty<EndOfRoundMaintenanceStepResult>();
 }

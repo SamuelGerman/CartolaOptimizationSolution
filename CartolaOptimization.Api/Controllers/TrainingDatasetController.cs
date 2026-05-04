@@ -15,7 +15,8 @@ public sealed class TrainingDatasetController(
     ITrainingDatasetDiagnosticsService trainingDatasetDiagnosticsService,
     IEndOfRoundMaintenanceService endOfRoundMaintenanceService,
     IFullContextAthleteScoreModelTrainingService fullContextAthleteScoreModelTrainingService,
-    IFullContextAthleteScoreModelHyperparameterTuningService fullContextAthleteScoreModelHyperparameterTuningService) : ControllerBase
+    IFullContextAthleteScoreModelHyperparameterTuningService fullContextAthleteScoreModelHyperparameterTuningService,
+    IPositionalAthleteScoreModelTrainingService positionalAthleteScoreModelTrainingService) : ControllerBase
 {
     /// <summary>
     /// Returns an export-ready historical dataset slice that includes athlete, club, opponent and match context.
@@ -114,6 +115,47 @@ public sealed class TrainingDatasetController(
     {
         var result = await fullContextAthleteScoreModelTrainingService.GetCurrentModelInfoAsync(cancellationToken);
         return result is null ? NotFound() : Ok(result);
+    }
+
+    /// <summary>
+    /// Trains and persists a separate LightGBM athlete-score model for each Cartola position
+    /// (GOL, LAT, ZAG, MEI, ATA, TEC) using the same full-context feature set as the global model.
+    /// Positions with fewer rows than the configured minimum threshold are skipped automatically.
+    /// </summary>
+    /// <param name="fromRound">Optional initial round of the training window.</param>
+    /// <param name="toRound">Optional final round of the training window.</param>
+    /// <param name="validationRounds">Number of last rounds reserved for temporal validation. Defaults to one round.</param>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>Per-position training outcomes including model metrics and any skip reasons.</returns>
+    [HttpPost("models/athlete-score-v1-positional/train")]
+    [ProducesResponseType(typeof(PositionalAthleteScoreTrainingResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> TrainPositionalAthleteScoreModels(
+        [FromQuery] int? fromRound,
+        [FromQuery] int? toRound,
+        [FromQuery] int validationRounds = 1,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await positionalAthleteScoreModelTrainingService.TrainAllAsync(
+            fromRound,
+            toRound,
+            validationRounds,
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Returns metadata for all persisted positional athlete-score model artifacts.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>A list of model info entries ordered by position; empty when no positional artifacts have been trained yet.</returns>
+    [HttpGet("models/athlete-score-v1-positional")]
+    [ProducesResponseType(typeof(IReadOnlyList<AthleteScoreModelInfo>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPositionalAthleteScoreModelInfos(CancellationToken cancellationToken = default)
+    {
+        var result = await positionalAthleteScoreModelTrainingService.GetAllModelInfosAsync(cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>

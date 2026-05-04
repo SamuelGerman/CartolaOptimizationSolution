@@ -11,9 +11,11 @@ public static class DependencyInjection
         services.Configure<AthleteScoreModelOptions>(configuration.GetSection("MachineLearning"));
         services.Configure<AthleteContextAthleteScoreModelOptions>(configuration.GetSection("MachineLearning:AthleteContext"));
         services.Configure<FullContextAthleteScoreModelOptions>(configuration.GetSection("MachineLearning:FullContext"));
+        services.Configure<PositionalAthleteScoreModelOptions>(configuration.GetSection("MachineLearning:Positional"));
         services.AddSingleton<AthleteScoreModelArtifactStore>();
         services.AddSingleton<AthleteContextAthleteScoreModelArtifactStore>();
         services.AddSingleton<FullContextAthleteScoreModelArtifactStore>();
+        services.AddSingleton<PositionalAthleteScoreModelArtifactStore>();
         services.AddScoped<IAthleteScoreModelTrainingService, AthleteScoreModelTrainingService>();
         services.AddScoped<IAthleteScorePredictionService, AthleteScorePredictionService>();
         services.AddScoped<IAthleteContextAthleteScoreModelTrainingService, AthleteContextAthleteScoreModelTrainingService>();
@@ -21,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<IFullContextAthleteScoreModelTrainingService, FullContextAthleteScoreModelTrainingService>();
         services.AddScoped<IFullContextAthleteScoreModelHyperparameterTuningService, FullContextAthleteScoreModelHyperparameterTuningService>();
         services.AddScoped<IFullContextAthleteScorePredictionService, FullContextAthleteScorePredictionService>();
+        services.AddScoped<IPositionalAthleteScoreModelTrainingService, PositionalAthleteScoreModelTrainingService>();
         services.AddScoped<IPredictedLineupOptimizationService, PredictedLineupOptimizationService>();
         return services;
     }

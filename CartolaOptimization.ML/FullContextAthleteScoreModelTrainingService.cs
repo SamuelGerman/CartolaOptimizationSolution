@@ -295,7 +295,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
     /// Categorical features (club, opponent, position, status) are permuted by shuffling their raw
     /// CartolaId column so the one-hot encoding is reshuffled consistently.
     /// </remarks>
-    private static List<(string FeatureName, double MeanRSquaredDrop, double RSquaredDropStdDev, bool IsNumeric)>
+    internal static List<(string FeatureName, double MeanRSquaredDrop, double RSquaredDropStdDev, bool IsNumeric)>
         ComputeFeatureImportances(
             MLContext mlContext,
             ITransformer model,
@@ -483,7 +483,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
         }
     }
 
-    private static IReadOnlyList<AthleteScorePositionDiagnostics> BuildPositionDiagnostics(
+    internal static IReadOnlyList<AthleteScorePositionDiagnostics> BuildPositionDiagnostics(
         IReadOnlyCollection<FullContextAthleteScoreTrainingRow> trainingRows,
         IReadOnlyList<FullContextAthleteScoreTrainingRow> holdoutRows,
         IReadOnlyList<float> holdoutScores)

@@ -10,7 +10,8 @@ namespace CartolaOptimization.ML;
 
 public sealed class FullContextAthleteScorePredictionService(
     IDbContextFactory<AppDbContext> dbContextFactory,
-    FullContextAthleteScoreModelArtifactStore artifactStore) : IFullContextAthleteScorePredictionService
+    FullContextAthleteScoreModelArtifactStore artifactStore,
+    PositionalAthleteScoreModelArtifactStore positionalArtifactStore) : IFullContextAthleteScorePredictionService
 {
     private const string DatasetKey = "full-context";
 
@@ -109,46 +110,96 @@ public sealed class FullContextAthleteScorePredictionService(
         }
 
         var mlContext = new MLContext(seed: 42);
-        using var modelStream = File.OpenRead(artifactStore.GetModelPath());
-        var model = mlContext.Model.Load(modelStream, out _);
 
-        var dataView = mlContext.Data.LoadFromEnumerable(candidates.Select(item => item.Input));
-        var transformed = model.Transform(dataView);
-        var scores = mlContext.Data.CreateEnumerable<AthleteScorePredictionOutput>(transformed, reuseRowObject: false).ToList();
+        // Load the global model — always used as a fallback when no positional model exists.
+        using var globalModelStream = File.OpenRead(artifactStore.GetModelPath());
+        var globalModel = mlContext.Model.Load(globalModelStream, out _);
+
+        // Score each position group independently using the best available model.
+        var candidatesByPosition = candidates
+            .GroupBy(c => c.Baseline.Position.CartolaId)
+            .ToList();
+
+        var scoredItems = new List<(FullContextPredictionCandidate Candidate, float Score, AthleteScoreModelArtifactMetadata EffectiveMetadata)>(
+            candidates.Count);
+
+        var positionalModelsApplied = 0;
+
+        foreach (var group in candidatesByPosition)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var pid = group.Key;
+            var groupCandidates = group.ToList();
+
+            AthleteScoreModelArtifactMetadata? positionalMetadata = null;
+            ITransformer? positionalModel = null;
+
+            if (positionalArtifactStore.ModelExists(pid))
+            {
+                positionalMetadata = await positionalArtifactStore.LoadMetadataAsync(pid, cancellationToken);
+                if (positionalMetadata is not null)
+                {
+                    using var positionalStream = File.OpenRead(positionalArtifactStore.GetModelPath(pid));
+                    positionalModel = mlContext.Model.Load(positionalStream, out _);
+                    positionalModelsApplied++;
+                }
+            }
+
+            var modelToUse = positionalModel ?? globalModel;
+            var metadataToUse = positionalMetadata ?? metadata;
+
+            var dataView = mlContext.Data.LoadFromEnumerable(groupCandidates.Select(c => c.Input));
+            var transformed = modelToUse.Transform(dataView);
+            var scores = mlContext.Data
+                .CreateEnumerable<AthleteScorePredictionOutput>(transformed, reuseRowObject: false)
+                .ToList();
+
+            for (var i = 0; i < groupCandidates.Count; i++)
+            {
+                scoredItems.Add((groupCandidates[i], scores[i].Score, metadataToUse));
+            }
+        }
+
+        var positionalNote = positionalModelsApplied > 0
+            ? $" Position-specific models were applied for {positionalModelsApplied} of {candidatesByPosition.Count} position(s)."
+            : string.Empty;
 
         var itemPredictionNotes = usingCurrentRoundBaselines
             ? "Prediction generated from the current pre-round athlete baseline with club and opponent context derived from local historical Cartola matches, athlete rounds and scouts."
             : $"Prediction generated from the latest persisted athlete baseline before round {round}, combined with club and opponent context derived from local historical Cartola matches, athlete rounds and scouts because no current pre-round athlete rows were available for that round.";
 
-        var athletes = candidates
-            .Zip(scores, (candidate, prediction) => new AthleteScorePredictionItem
+        var athletes = scoredItems
+            .Select(item => new AthleteScorePredictionItem
             {
-                AthleteCartolaId = candidate.Baseline.Athlete.CartolaId,
-                AthleteName = candidate.Baseline.Athlete.Name,
-                AthleteNickname = candidate.Baseline.Athlete.Nickname,
-                ClubCartolaId = candidate.Baseline.Club.CartolaId,
-                ClubName = candidate.Baseline.Club.Nickname,
-                PositionCartolaId = candidate.Baseline.Position.CartolaId,
-                PositionName = candidate.Baseline.Position.Name,
-                StatusCartolaId = candidate.Baseline.Status.CartolaId,
-                StatusName = candidate.Baseline.Status.Name,
-                BaselineRound = candidate.Baseline.RoundId,
-                BaselineDataPhase = candidate.Baseline.DataPhase,
-                PriceNum = candidate.Baseline.PriceNum,
-                PlayedMatchesSampleSize = (int)candidate.Input.PlayedMatchesSampleSize,
-                MovingAverage = Math.Round((decimal)candidate.Input.MovingAverage, 2, MidpointRounding.AwayFromZero),
-                AverageScore = Math.Round((decimal)candidate.Input.AverageScore, 2, MidpointRounding.AwayFromZero),
-                IsHomeMatch = candidate.IsHomeMatch,
-                ClubTablePosition = candidate.ClubTablePosition,
-                OpponentClubCartolaId = candidate.OpponentClubCartolaId,
-                OpponentClubName = candidate.OpponentClubName,
-                OpponentClubTablePosition = candidate.OpponentClubTablePosition,
-                ClubWinProbability = candidate.ClubWinProbability,
-                ClubExpectedPoints = candidate.ClubExpectedPoints,
-                OpponentWinProbability = candidate.OpponentWinProbability,
-                OpponentExpectedPoints = candidate.OpponentExpectedPoints,
-                PredictedScore = Math.Round(ApplyPositionCalibration(prediction.Score, candidate.Baseline.Position.CartolaId, metadata), 2, MidpointRounding.AwayFromZero),
-                PredictionConfidence = ComputePredictionConfidence(candidate.Input),
+                AthleteCartolaId = item.Candidate.Baseline.Athlete.CartolaId,
+                AthleteName = item.Candidate.Baseline.Athlete.Name,
+                AthleteNickname = item.Candidate.Baseline.Athlete.Nickname,
+                ClubCartolaId = item.Candidate.Baseline.Club.CartolaId,
+                ClubName = item.Candidate.Baseline.Club.Nickname,
+                PositionCartolaId = item.Candidate.Baseline.Position.CartolaId,
+                PositionName = item.Candidate.Baseline.Position.Name,
+                StatusCartolaId = item.Candidate.Baseline.Status.CartolaId,
+                StatusName = item.Candidate.Baseline.Status.Name,
+                BaselineRound = item.Candidate.Baseline.RoundId,
+                BaselineDataPhase = item.Candidate.Baseline.DataPhase,
+                PriceNum = item.Candidate.Baseline.PriceNum,
+                PlayedMatchesSampleSize = (int)item.Candidate.Input.PlayedMatchesSampleSize,
+                MovingAverage = Math.Round((decimal)item.Candidate.Input.MovingAverage, 2, MidpointRounding.AwayFromZero),
+                AverageScore = Math.Round((decimal)item.Candidate.Input.AverageScore, 2, MidpointRounding.AwayFromZero),
+                IsHomeMatch = item.Candidate.IsHomeMatch,
+                ClubTablePosition = item.Candidate.ClubTablePosition,
+                OpponentClubCartolaId = item.Candidate.OpponentClubCartolaId,
+                OpponentClubName = item.Candidate.OpponentClubName,
+                OpponentClubTablePosition = item.Candidate.OpponentClubTablePosition,
+                ClubWinProbability = item.Candidate.ClubWinProbability,
+                ClubExpectedPoints = item.Candidate.ClubExpectedPoints,
+                OpponentWinProbability = item.Candidate.OpponentWinProbability,
+                OpponentExpectedPoints = item.Candidate.OpponentExpectedPoints,
+                PredictedScore = Math.Round(
+                    ApplyPositionCalibration(item.Score, item.Candidate.Baseline.Position.CartolaId, item.EffectiveMetadata),
+                    2, MidpointRounding.AwayFromZero),
+                PredictionConfidence = ComputePredictionConfidence(item.Candidate.Input),
                 PredictionNotes = itemPredictionNotes,
             })
             .OrderByDescending(item => item.PredictedScore)
@@ -157,8 +208,8 @@ public sealed class FullContextAthleteScorePredictionService(
             .ToList();
 
         var predictionNotes = usingCurrentRoundBaselines
-            ? $"Predictions used current pre-round athlete baselines plus local full-context derived from historical Cartola matches, athlete rounds and scouts. {excludedAthletesWithoutContext} athlete(s) were excluded because a valid target-round match context was unavailable."
-            : $"Predictions used the latest persisted athlete baselines before round {round} plus local full-context derived from historical Cartola matches, athlete rounds and scouts. {excludedAthletesWithoutContext} athlete(s) were excluded because a valid target-round match context was unavailable.";
+            ? $"Predictions used current pre-round athlete baselines plus local full-context derived from historical Cartola matches, athlete rounds and scouts.{positionalNote} {excludedAthletesWithoutContext} athlete(s) were excluded because a valid target-round match context was unavailable."
+            : $"Predictions used the latest persisted athlete baselines before round {round} plus local full-context derived from historical Cartola matches, athlete rounds and scouts.{positionalNote} {excludedAthletesWithoutContext} athlete(s) were excluded because a valid target-round match context was unavailable.";
 
         return new AthleteScorePredictionResult
         {
@@ -183,7 +234,10 @@ public sealed class FullContextAthleteScorePredictionService(
     private static decimal Clamp(decimal value, decimal min, decimal max)
         => value < min ? min : value > max ? max : value;
 
-    private static decimal ApplyPositionCalibration(float rawScore, int positionCartolaId, AthleteScoreModelArtifactMetadata metadata)
+    private static decimal ApplyPositionCalibration(
+        float rawScore,
+        int positionCartolaId,
+        AthleteScoreModelArtifactMetadata metadata)
     {
         var diagnostics = metadata.PositionDiagnostics
             .FirstOrDefault(item => item.PositionCartolaId == positionCartolaId);

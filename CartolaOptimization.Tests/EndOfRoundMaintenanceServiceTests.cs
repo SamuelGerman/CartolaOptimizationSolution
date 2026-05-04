@@ -107,7 +107,8 @@ public sealed class EndOfRoundMaintenanceServiceTests
             cartolaSyncService,
             gatoMestreSyncService,
             preparationService,
-            trainingService);
+            trainingService,
+            new FakePositionalAthleteScoreModelTrainingService());
 
         var result = await service.RunAsync(validationRounds: 1);
 
@@ -221,7 +222,8 @@ public sealed class EndOfRoundMaintenanceServiceTests
             cartolaSyncService,
             gatoMestreSyncService,
             preparationService,
-            trainingService);
+            trainingService,
+            new FakePositionalAthleteScoreModelTrainingService());
 
         var result = await service.RunAsync(validationRounds: 1);
 

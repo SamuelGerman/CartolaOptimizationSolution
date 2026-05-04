@@ -214,6 +214,38 @@ internal sealed class FakeFullContextAthleteScoreModelTrainingService : IFullCon
         => OnGetCurrentModelInfoAsync(cancellationToken);
 }
 
+internal sealed class FakePositionalAthleteScoreModelTrainingService : IPositionalAthleteScoreModelTrainingService
+{
+    public List<(int? FromRound, int? ToRound, int ValidationRounds)> TrainAllCalls { get; } = [];
+
+    public Func<int?, int?, int, CancellationToken, Task<PositionalAthleteScoreTrainingResult>> OnTrainAllAsync { get; init; } =
+        (fromRound, toRound, validationRounds, _) => Task.FromResult(new PositionalAthleteScoreTrainingResult
+        {
+            Message = "trained",
+            FromRound = fromRound,
+            ToRound = toRound,
+            ValidationRounds = validationRounds,
+            TrainedPositions = 2,
+            SkippedPositions = 4,
+        });
+
+    public Func<CancellationToken, Task<IReadOnlyList<AthleteScoreModelInfo>>> OnGetAllModelInfosAsync { get; init; } =
+        _ => Task.FromResult<IReadOnlyList<AthleteScoreModelInfo>>([]);
+
+    public Task<PositionalAthleteScoreTrainingResult> TrainAllAsync(
+        int? fromRound = null,
+        int? toRound = null,
+        int validationRounds = 1,
+        CancellationToken cancellationToken = default)
+    {
+        TrainAllCalls.Add((fromRound, toRound, validationRounds));
+        return OnTrainAllAsync(fromRound, toRound, validationRounds, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<AthleteScoreModelInfo>> GetAllModelInfosAsync(CancellationToken cancellationToken = default)
+        => OnGetAllModelInfosAsync(cancellationToken);
+}
+
 internal sealed class FakeFullContextAthleteScorePredictionService : IFullContextAthleteScorePredictionService
 {
     public Func<int, int?, int?, int?, int, CancellationToken, Task<AthleteScorePredictionResult>> OnGetPredictedScoresAsync { get; init; } =
