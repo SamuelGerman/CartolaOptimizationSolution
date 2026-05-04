@@ -58,7 +58,7 @@ public sealed class TrainingDatasetExcelExporterTests
         var workbookXml = workbookReader.ReadToEnd();
 
         Assert.Contains("AthleteRoundId", worksheetXml, StringComparison.Ordinal);
-        Assert.Contains("João, \"Teste\"", worksheetXml, StringComparison.Ordinal);
+        Assert.Contains("João, &quot;Teste&quot;", worksheetXml, StringComparison.Ordinal);
         Assert.Contains("<c r=\"V2\" t=\"b\"><v>1</v></c>", worksheetXml, StringComparison.Ordinal);
         Assert.Contains("sheet name=\"full-context\"", workbookXml, StringComparison.Ordinal);
     }

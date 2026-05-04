@@ -1146,7 +1146,7 @@ public sealed class AthleteScoreModelServicesTests
                     DataPhase = RoundDataPhaseValues.CurrentOpen,
                     Scouts = [],
                 },
-                new AthleteRound(0, 4, athleteB.Id, clubB.Id, striker.Id, doubtful.Id, 7, 3, 4, 0m, 5.7m, 5.5m, 6.0m, 5.1m, -0.2m, 13.1m, false)
+                new AthleteRound(0, 4, athleteB.Id, clubB.Id, striker.Id, probable.Id, 7, 3, 4, 0m, 5.7m, 5.5m, 6.0m, 5.1m, -0.2m, 7.5m, false)
                 {
                     DataPhase = RoundDataPhaseValues.CurrentOpen,
                     Scouts = [],
