@@ -165,18 +165,20 @@ public sealed class PositionalAthleteScoreModelTrainingService(
         }
 
         var effectiveValidationRounds = Math.Min(validationRounds, distinctRounds.Length - 1);
-        var validationRoundSet = distinctRounds
-            .Skip(distinctRounds.Length - effectiveValidationRounds)
-            .ToHashSet();
 
-        var trainingRows = positionRows
-            .Where(r => !validationRoundSet.Contains((int)r.RoundId))
+        // The holdout window starts at this index into distinctRounds (ascending order).
+        var holdoutStartIdx = distinctRounds.Length - effectiveValidationRounds;
+        var holdoutStartRound = distinctRounds[holdoutStartIdx];
+
+        // Feature-selection split: train on everything before the holdout window.
+        var featureSelectionRows = positionRows
+            .Where(r => (int)r.RoundId < holdoutStartRound)
             .ToList();
         var holdoutRows = positionRows
-            .Where(r => validationRoundSet.Contains((int)r.RoundId))
+            .Where(r => (int)r.RoundId >= holdoutStartRound)
             .ToList();
 
-        if (trainingRows.Count == 0 || holdoutRows.Count == 0)
+        if (featureSelectionRows.Count == 0 || holdoutRows.Count == 0)
         {
             return new PositionalAthleteScoreModelResult
             {
@@ -185,18 +187,17 @@ public sealed class PositionalAthleteScoreModelTrainingService(
                 PositionName = positionName,
                 Trained = false,
                 SkipReason = "Insufficient rows after splitting into training and validation sets.",
-                TrainingRows = trainingRows.Count,
+                TrainingRows = featureSelectionRows.Count,
                 ValidationRows = holdoutRows.Count,
             };
         }
 
         logger.LogInformation(
-            "Training positional model for {Code} ({Id}): {TrainRows} training rows, {HoldoutRows} holdout rows, {Rounds} distinct round(s).",
-            positionCode, positionId, trainingRows.Count, holdoutRows.Count, distinctRounds.Length);
+            "Training positional model for {Code} ({Id}): {TotalRows} total rows, {Rounds} distinct round(s), {ValRounds} walk-forward fold(s).",
+            positionCode, positionId, positionRows.Count, distinctRounds.Length, effectiveValidationRounds);
 
         var mlContext = new MLContext(seed: 42);
-        var trainData = mlContext.Data.LoadFromEnumerable(trainingRows);
-        var holdoutData = mlContext.Data.LoadFromEnumerable(holdoutRows);
+        var featureSelectionData = mlContext.Data.LoadFromEnumerable(featureSelectionRows);
 
         var allNumericFeatureNames = FullContextAthleteScoreModelTrainingService
             .GetNumericFeatureNames(allowedFeatures: null);
@@ -204,7 +205,7 @@ public sealed class PositionalAthleteScoreModelTrainingService(
         // Phase 1: train on all features so PFI can rank them.
         var fullPipeline = FullContextAthleteScoreModelTrainingService
             .BuildPipeline(mlContext, allowedNumericFeatures: null, hyperparameters);
-        var fullModel = fullPipeline.Fit(trainData);
+        var fullModel = fullPipeline.Fit(featureSelectionData);
 
         List<(string FeatureName, double MeanRSquaredDrop, double RSquaredDropStdDev, bool IsNumeric)> importanceRanking;
         try
@@ -220,8 +221,7 @@ public sealed class PositionalAthleteScoreModelTrainingService(
             importanceRanking = [];
         }
 
-        // Phase 2 (optional): retrain with top-N numeric features.
-        ITransformer model = fullModel;
+        // Phase 2 (optional): select the top-N numeric features from the PFI ranking.
         IReadOnlySet<string>? allowedNumericFeatures = null;
 
         if (topNFeatures.HasValue && importanceRanking.Count > 0)
@@ -235,26 +235,75 @@ public sealed class PositionalAthleteScoreModelTrainingService(
             if (selectedNumericFeatures.Count > 0)
             {
                 allowedNumericFeatures = selectedNumericFeatures;
-                var filteredPipeline = FullContextAthleteScoreModelTrainingService
-                    .BuildPipeline(mlContext, allowedNumericFeatures, hyperparameters);
-                model = filteredPipeline.Fit(trainData);
-
                 logger.LogInformation(
-                    "Position {Code}: retrained with top {Selected}/{Total} numeric features.",
+                    "Position {Code}: selected top {Selected}/{Total} numeric features.",
                     positionCode, selectedNumericFeatures.Count, allNumericFeatureNames.Length);
             }
         }
 
-        var predictions = model.Transform(holdoutData);
-        var metrics = mlContext.Regression.Evaluate(
-            predictions,
-            labelColumnName: nameof(FullContextAthleteScoreTrainingRow.Label),
-            scoreColumnName: "Score");
+        // Phase 3: walk-forward (expanding-window) cross-validation.
+        var cvMaes = new List<double>(effectiveValidationRounds);
+        var cvRmses = new List<double>(effectiveValidationRounds);
+        var cvR2s = new List<double>(effectiveValidationRounds);
+        var cvTotalValidationRows = 0;
 
-        var holdoutScores = mlContext.Data
-            .CreateEnumerable<AthleteScorePredictionOutput>(predictions, reuseRowObject: false)
-            .Select(item => item.Score)
-            .ToList();
+        List<FullContextAthleteScoreTrainingRow>? lastFoldTrainingRows = null;
+        List<FullContextAthleteScoreTrainingRow>? lastFoldHoldoutRows = null;
+        List<float>? lastFoldScores = null;
+
+        for (var fold = 0; fold < effectiveValidationRounds; fold++)
+        {
+            var foldValidationRound = distinctRounds[holdoutStartIdx + fold];
+            var foldTrainingRows = positionRows.Where(r => (int)r.RoundId < foldValidationRound).ToList();
+            var foldHoldoutRows = positionRows.Where(r => (int)r.RoundId == foldValidationRound).ToList();
+
+            if (foldTrainingRows.Count == 0 || foldHoldoutRows.Count == 0)
+            {
+                logger.LogWarning(
+                    "Position {Code} fold {Fold}/{Total}: skipping (empty set).",
+                    positionCode, fold + 1, effectiveValidationRounds);
+                continue;
+            }
+
+            var foldPipeline = FullContextAthleteScoreModelTrainingService
+                .BuildPipeline(mlContext, allowedNumericFeatures, hyperparameters);
+            var foldTrainData = mlContext.Data.LoadFromEnumerable(foldTrainingRows);
+            var foldModel = foldPipeline.Fit(foldTrainData);
+
+            var foldHoldoutData = mlContext.Data.LoadFromEnumerable(foldHoldoutRows);
+            var foldPredictions = foldModel.Transform(foldHoldoutData);
+            var foldMetrics = mlContext.Regression.Evaluate(
+                foldPredictions,
+                labelColumnName: nameof(FullContextAthleteScoreTrainingRow.Label),
+                scoreColumnName: "Score");
+
+            cvMaes.Add(foldMetrics.MeanAbsoluteError);
+            cvRmses.Add(foldMetrics.RootMeanSquaredError);
+            cvR2s.Add(foldMetrics.RSquared);
+            cvTotalValidationRows += foldHoldoutRows.Count;
+
+            lastFoldTrainingRows = foldTrainingRows;
+            lastFoldHoldoutRows = foldHoldoutRows;
+            lastFoldScores = mlContext.Data
+                .CreateEnumerable<AthleteScorePredictionOutput>(foldPredictions, reuseRowObject: false)
+                .Select(item => item.Score)
+                .ToList();
+        }
+
+        var cvMae = cvMaes.Count > 0 ? cvMaes.Average() : 0d;
+        var cvRmse = cvRmses.Count > 0 ? cvRmses.Average() : 0d;
+        var cvR2 = cvR2s.Count > 0 ? cvR2s.Average() : 0d;
+
+        // Phase 4: train the persisted model on ALL position rows with the selected features.
+        var allPositionData = mlContext.Data.LoadFromEnumerable(positionRows);
+        var finalPipeline = FullContextAthleteScoreModelTrainingService
+            .BuildPipeline(mlContext, allowedNumericFeatures, hyperparameters);
+        var finalModel = finalPipeline.Fit(allPositionData);
+
+        // Calibration diagnostics come from the last (most recent) CV fold.
+        var positionDiagnostics = lastFoldTrainingRows is not null && lastFoldHoldoutRows is not null && lastFoldScores is not null
+            ? FullContextAthleteScoreModelTrainingService.BuildPositionDiagnostics(lastFoldTrainingRows, lastFoldHoldoutRows, lastFoldScores)
+            : [];
 
         // Build feature importance list with selected flags.
         var activeNumericFeatureSet = allowedNumericFeatures
@@ -271,14 +320,11 @@ public sealed class PositionalAthleteScoreModelTrainingService(
             })
             .ToList();
 
-        var positionDiagnostics = FullContextAthleteScoreModelTrainingService
-            .BuildPositionDiagnostics(trainingRows, holdoutRows, holdoutScores);
-
         var modelVersion = $"athlete-score-v1-positional-{positionCode.ToLowerInvariant()}";
         var datasetKey = $"positional-{positionCode.ToLowerInvariant()}";
 
         Directory.CreateDirectory(Path.GetDirectoryName(artifactStore.GetModelPath(positionId))!);
-        mlContext.Model.Save(model, trainData.Schema, artifactStore.GetModelPath(positionId));
+        mlContext.Model.Save(finalModel, allPositionData.Schema, artifactStore.GetModelPath(positionId));
 
         var metadata = new AthleteScoreModelArtifactMetadata
         {
@@ -289,13 +335,13 @@ public sealed class PositionalAthleteScoreModelTrainingService(
             FromRound = fromRound,
             ToRound = toRound,
             ValidationRounds = effectiveValidationRounds,
-            TrainingRows = trainingRows.Count,
-            ValidationRows = holdoutRows.Count,
-            TrainingDistinctRounds = trainingRows.Select(r => r.RoundId).Distinct().Count(),
-            ValidationDistinctRounds = holdoutRows.Select(r => r.RoundId).Distinct().Count(),
-            MeanAbsoluteError = metrics.MeanAbsoluteError,
-            RootMeanSquaredError = metrics.RootMeanSquaredError,
-            RSquared = metrics.RSquared,
+            TrainingRows = positionRows.Count,                          // final model trains on all position rows
+            ValidationRows = cvTotalValidationRows,                     // total rows across all CV folds
+            TrainingDistinctRounds = distinctRounds.Length,             // all distinct rounds
+            ValidationDistinctRounds = effectiveValidationRounds,       // one validation round per fold
+            MeanAbsoluteError = cvMae,
+            RootMeanSquaredError = cvRmse,
+            RSquared = cvR2,
             ModelArtifactPath = artifactStore.GetModelPath(positionId),
             MetadataArtifactPath = artifactStore.GetMetadataPath(positionId),
             PositionDiagnostics = positionDiagnostics,
@@ -308,8 +354,8 @@ public sealed class PositionalAthleteScoreModelTrainingService(
         await artifactStore.SaveMetadataAsync(positionId, metadata, cancellationToken);
 
         logger.LogInformation(
-            "Position {Code} ({Id}) model trained — R²={R2:F4}, MAE={Mae:F4}.",
-            positionCode, positionId, metrics.RSquared, metrics.MeanAbsoluteError);
+            "Position {Code} ({Id}) model trained — CV R²={R2:F4}, CV MAE={Mae:F4} ({Folds} fold(s)).",
+            positionCode, positionId, cvR2, cvMae, cvMaes.Count);
 
         return new PositionalAthleteScoreModelResult
         {
@@ -317,8 +363,8 @@ public sealed class PositionalAthleteScoreModelTrainingService(
             PositionCode = positionCode,
             PositionName = positionName,
             Trained = true,
-            TrainingRows = trainingRows.Count,
-            ValidationRows = holdoutRows.Count,
+            TrainingRows = positionRows.Count,
+            ValidationRows = cvTotalValidationRows,
             ModelInfo = artifactStore.ToModelInfo(metadata),
         };
     }

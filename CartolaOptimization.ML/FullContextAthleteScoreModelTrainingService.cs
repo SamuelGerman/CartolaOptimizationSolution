@@ -72,31 +72,31 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             validationRounds = distinctRounds.Length - 1;
         }
 
-        var validationRoundSet = distinctRounds
-            .Skip(distinctRounds.Length - validationRounds)
-            .ToHashSet();
+        // The holdout window starts at this index into distinctRounds (ascending order).
+        var holdoutStartIdx = distinctRounds.Length - validationRounds;
+        var holdoutStartRound = distinctRounds[holdoutStartIdx];
 
-        var trainingRows = rows
-            .Where(item => !validationRoundSet.Contains((int)item.RoundId))
+        // Feature-selection split: train on everything before the holdout window.
+        var featureSelectionRows = rows
+            .Where(item => (int)item.RoundId < holdoutStartRound)
             .ToList();
         var holdoutRows = rows
-            .Where(item => validationRoundSet.Contains((int)item.RoundId))
+            .Where(item => (int)item.RoundId >= holdoutStartRound)
             .ToList();
 
-        if (trainingRows.Count == 0 || holdoutRows.Count == 0)
+        if (featureSelectionRows.Count == 0 || holdoutRows.Count == 0)
         {
             throw new InvalidOperationException("The selected round window does not leave enough rows for temporal training and validation of the full-context model.");
         }
 
         var mlContext = new MLContext(seed: 42);
-        var trainData = mlContext.Data.LoadFromEnumerable(trainingRows);
-        var holdoutData = mlContext.Data.LoadFromEnumerable(holdoutRows);
+        var featureSelectionData = mlContext.Data.LoadFromEnumerable(featureSelectionRows);
 
         var allNumericFeatureNames = GetNumericFeatureNames(allowedFeatures: null);
 
         // Phase 1: train on all features so PFI evaluates relative importance on the full model.
         var fullPipeline = BuildPipeline(mlContext, allowedNumericFeatures: null, hyperparameters);
-        var fullModel = fullPipeline.Fit(trainData);
+        var fullModel = fullPipeline.Fit(featureSelectionData);
 
         // Compute permutation feature importance by manually shuffling each feature and measuring R² drop.
         // This avoids the ML.NET PFI API which requires a specific transformer type.
@@ -115,8 +115,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             importanceRanking = [];
         }
 
-        // Phase 2 (optional): retrain using only the top-N numeric features when requested.
-        ITransformer model = fullModel; // default: use the full model trained in phase 1
+        // Phase 2 (optional): select the top-N numeric features from the PFI ranking.
         IReadOnlySet<string>? allowedNumericFeatures = null;
 
         if (topNFeatures.HasValue)
@@ -139,25 +138,83 @@ public sealed class FullContextAthleteScoreModelTrainingService(
                 if (selectedNumericFeatures.Count > 0)
                 {
                     allowedNumericFeatures = selectedNumericFeatures;
-                    var filteredPipeline = BuildPipeline(mlContext, allowedNumericFeatures, hyperparameters);
-                    model = filteredPipeline.Fit(trainData);
                     logger.LogInformation(
-                        "Retrained with top {Selected}/{Total} numeric features (topNFeatures={TopN}).",
+                        "Selected top {Selected}/{Total} numeric features (topNFeatures={TopN}).",
                         selectedNumericFeatures.Count, allNumericFeatureNames.Length, topNFeatures.Value);
                 }
             }
         }
 
-        var predictions = model.Transform(holdoutData);
-        var metrics = mlContext.Regression.Evaluate(
-            predictions,
-            labelColumnName: nameof(FullContextAthleteScoreTrainingRow.Label),
-            scoreColumnName: "Score");
-        var holdoutScores = mlContext.Data
-            .CreateEnumerable<AthleteScorePredictionOutput>(predictions, reuseRowObject: false)
-            .Select(item => item.Score)
-            .ToList();
-        var positionDiagnostics = BuildPositionDiagnostics(trainingRows, holdoutRows, holdoutScores);
+        // Phase 3: walk-forward (expanding-window) cross-validation to estimate generalisation metrics.
+        // For each fold k the model trains on all rounds strictly before fold k's validation round
+        // and evaluates on that single round. Metrics are averaged across folds. The validation round
+        // for fold k is distinctRounds[holdoutStartIdx + k].
+        var cvMaes = new List<double>(validationRounds);
+        var cvRmses = new List<double>(validationRounds);
+        var cvR2s = new List<double>(validationRounds);
+        var cvTotalValidationRows = 0;
+
+        List<FullContextAthleteScoreTrainingRow>? lastFoldTrainingRows = null;
+        List<FullContextAthleteScoreTrainingRow>? lastFoldHoldoutRows = null;
+        List<float>? lastFoldScores = null;
+
+        for (var fold = 0; fold < validationRounds; fold++)
+        {
+            var foldValidationRound = distinctRounds[holdoutStartIdx + fold];
+            var foldTrainingRows = rows.Where(r => (int)r.RoundId < foldValidationRound).ToList();
+            var foldHoldoutRows = rows.Where(r => (int)r.RoundId == foldValidationRound).ToList();
+
+            if (foldTrainingRows.Count == 0 || foldHoldoutRows.Count == 0)
+            {
+                logger.LogWarning(
+                    "Walk-forward fold {Fold}/{Total} skipped: empty training ({Train}) or validation ({Val}) set.",
+                    fold + 1, validationRounds, foldTrainingRows.Count, foldHoldoutRows.Count);
+                continue;
+            }
+
+            var foldPipeline = BuildPipeline(mlContext, allowedNumericFeatures, hyperparameters);
+            var foldTrainData = mlContext.Data.LoadFromEnumerable(foldTrainingRows);
+            var foldModel = foldPipeline.Fit(foldTrainData);
+
+            var foldHoldoutData = mlContext.Data.LoadFromEnumerable(foldHoldoutRows);
+            var foldPredictions = foldModel.Transform(foldHoldoutData);
+            var foldMetrics = mlContext.Regression.Evaluate(
+                foldPredictions,
+                labelColumnName: nameof(FullContextAthleteScoreTrainingRow.Label),
+                scoreColumnName: "Score");
+
+            cvMaes.Add(foldMetrics.MeanAbsoluteError);
+            cvRmses.Add(foldMetrics.RootMeanSquaredError);
+            cvR2s.Add(foldMetrics.RSquared);
+            cvTotalValidationRows += foldHoldoutRows.Count;
+
+            lastFoldTrainingRows = foldTrainingRows;
+            lastFoldHoldoutRows = foldHoldoutRows;
+            lastFoldScores = mlContext.Data
+                .CreateEnumerable<AthleteScorePredictionOutput>(foldPredictions, reuseRowObject: false)
+                .Select(item => item.Score)
+                .ToList();
+
+            logger.LogInformation(
+                "Walk-forward fold {Fold}/{Total} — validation round {Round}: MAE={Mae:F4}, RMSE={Rmse:F4}, R²={R2:F4}.",
+                fold + 1, validationRounds, foldValidationRound,
+                foldMetrics.MeanAbsoluteError, foldMetrics.RootMeanSquaredError, foldMetrics.RSquared);
+        }
+
+        var cvMae = cvMaes.Count > 0 ? cvMaes.Average() : 0d;
+        var cvRmse = cvRmses.Count > 0 ? cvRmses.Average() : 0d;
+        var cvR2 = cvR2s.Count > 0 ? cvR2s.Average() : 0d;
+
+        // Phase 4: train the persisted model on ALL rows with the selected features.
+        // Walk-forward CV was used only to estimate metrics; the final model maximises training data.
+        var allData = mlContext.Data.LoadFromEnumerable(rows);
+        var finalPipeline = BuildPipeline(mlContext, allowedNumericFeatures, hyperparameters);
+        var finalModel = finalPipeline.Fit(allData);
+
+        // Calibration diagnostics come from the last (most recent) CV fold.
+        var positionDiagnostics = lastFoldTrainingRows is not null && lastFoldHoldoutRows is not null && lastFoldScores is not null
+            ? BuildPositionDiagnostics(lastFoldTrainingRows, lastFoldHoldoutRows, lastFoldScores)
+            : [];
 
         // Build the final feature importance list, tagging which features were kept in the model.
         var activeNumericFeatureSet = allowedNumericFeatures
@@ -176,7 +233,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             .ToList();
 
         Directory.CreateDirectory(Path.GetDirectoryName(artifactStore.GetModelPath())!);
-        mlContext.Model.Save(model, trainData.Schema, artifactStore.GetModelPath());
+        mlContext.Model.Save(finalModel, allData.Schema, artifactStore.GetModelPath());
 
         var metadata = new AthleteScoreModelArtifactMetadata
         {
@@ -187,13 +244,13 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             FromRound = fromRound,
             ToRound = toRound,
             ValidationRounds = validationRounds,
-            TrainingRows = trainingRows.Count,
-            ValidationRows = holdoutRows.Count,
-            TrainingDistinctRounds = trainingRows.Select(item => item.RoundId).Distinct().Count(),
-            ValidationDistinctRounds = holdoutRows.Select(item => item.RoundId).Distinct().Count(),
-            MeanAbsoluteError = metrics.MeanAbsoluteError,
-            RootMeanSquaredError = metrics.RootMeanSquaredError,
-            RSquared = metrics.RSquared,
+            TrainingRows = rows.Count,                                  // final model trains on all rows
+            ValidationRows = cvTotalValidationRows,                     // total rows across all CV folds
+            TrainingDistinctRounds = distinctRounds.Length,             // all distinct rounds
+            ValidationDistinctRounds = validationRounds,                // one validation round per fold
+            MeanAbsoluteError = cvMae,
+            RootMeanSquaredError = cvRmse,
+            RSquared = cvR2,
             ModelArtifactPath = artifactStore.GetModelPath(),
             MetadataArtifactPath = artifactStore.GetMetadataPath(),
             PositionDiagnostics = positionDiagnostics,
@@ -207,7 +264,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
 
         return new AthleteScoreModelTrainingResult
         {
-            Message = $"Model '{options.ModelVersion}' trained successfully with the {TrainerName} regressor and temporal validation across the last {validationRounds} round(s).",
+            Message = $"Model '{options.ModelVersion}' trained successfully with the {TrainerName} regressor and {validationRounds} walk-forward cross-validation fold(s).",
             ModelInfo = artifactStore.ToModelInfo(metadata),
         };
     }

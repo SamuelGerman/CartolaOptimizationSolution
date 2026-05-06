@@ -578,9 +578,9 @@ public sealed class AthleteScoreModelServicesTests
             Assert.True(File.Exists(metadata.MetadataArtifactPath));
             Assert.Equal("full-context", metadata.DatasetKey);
             Assert.Equal("LightGBM", metadata.TrainerName);
-            Assert.Equal(4, metadata.TrainingRows);
+            Assert.Equal(6, metadata.TrainingRows);           // walk-forward CV: final model trains on all rows
             Assert.Equal(2, metadata.ValidationRows);
-            Assert.Equal(2, metadata.TrainingDistinctRounds);
+            Assert.Equal(3, metadata.TrainingDistinctRounds); // walk-forward CV: final model covers all rounds
             Assert.Equal(1, metadata.ValidationDistinctRounds);
             Assert.NotEmpty(metadata.PositionDiagnostics);
             Assert.All(metadata.PositionDiagnostics, item => Assert.True(item.CalibrationSlope > 0d));
