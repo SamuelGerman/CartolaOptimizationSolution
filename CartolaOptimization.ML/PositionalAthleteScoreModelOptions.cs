@@ -20,7 +20,7 @@ public sealed class PositionalAthleteScoreModelOptions
     /// Default number of top-ranked numeric features (by PFI) to use in the final model.
     /// Set to <c>null</c> to train on all available numeric features.
     /// </summary>
-    public int? DefaultTopNFeatures { get; set; } = 10;
+    public int? DefaultTopNFeatures { get; set; }
 
     /// <summary>LightGBM hyperparameters applied when training each positional model.</summary>
     public LightGbmHyperparameters Hyperparameters { get; set; } = new();

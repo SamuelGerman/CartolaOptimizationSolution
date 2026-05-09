@@ -10,8 +10,7 @@ namespace CartolaOptimization.ML;
 
 public sealed class FullContextAthleteScorePredictionService(
     IDbContextFactory<AppDbContext> dbContextFactory,
-    FullContextAthleteScoreModelArtifactStore artifactStore,
-    PositionalAthleteScoreModelArtifactStore positionalArtifactStore) : IFullContextAthleteScorePredictionService
+    FullContextAthleteScoreModelArtifactStore artifactStore) : IFullContextAthleteScorePredictionService
 {
     private const string DatasetKey = "full-context";
 
@@ -111,59 +110,23 @@ public sealed class FullContextAthleteScorePredictionService(
 
         var mlContext = new MLContext(seed: 42);
 
-        // Load the global model — always used as a fallback when no positional model exists.
+        // Score all candidates with the global full-context model.
+        // Positional-model routing was evaluated empirically: position-specific models
+        // consistently underperformed the global model across every position due to their
+        // smaller per-position training sets (269–1 460 rows vs 4 313 for the global model),
+        // causing higher MAE even with feature selection disabled.
         using var globalModelStream = File.OpenRead(artifactStore.GetModelPath());
         var globalModel = mlContext.Model.Load(globalModelStream, out _);
 
-        // Score each position group independently using the best available model.
-        var candidatesByPosition = candidates
-            .GroupBy(c => c.Baseline.Position.CartolaId)
+        var dataView = mlContext.Data.LoadFromEnumerable(candidates.Select(c => c.Input));
+        var transformed = globalModel.Transform(dataView);
+        var rawScores = mlContext.Data
+            .CreateEnumerable<AthleteScorePredictionOutput>(transformed, reuseRowObject: false)
             .ToList();
 
-        var scoredItems = new List<(FullContextPredictionCandidate Candidate, float Score, AthleteScoreModelArtifactMetadata EffectiveMetadata)>(
-            candidates.Count);
-
-        var positionalModelsApplied = 0;
-
-        foreach (var group in candidatesByPosition)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var pid = group.Key;
-            var groupCandidates = group.ToList();
-
-            AthleteScoreModelArtifactMetadata? positionalMetadata = null;
-            ITransformer? positionalModel = null;
-
-            if (positionalArtifactStore.ModelExists(pid))
-            {
-                positionalMetadata = await positionalArtifactStore.LoadMetadataAsync(pid, cancellationToken);
-                if (positionalMetadata is not null)
-                {
-                    using var positionalStream = File.OpenRead(positionalArtifactStore.GetModelPath(pid));
-                    positionalModel = mlContext.Model.Load(positionalStream, out _);
-                    positionalModelsApplied++;
-                }
-            }
-
-            var modelToUse = positionalModel ?? globalModel;
-            var metadataToUse = positionalMetadata ?? metadata;
-
-            var dataView = mlContext.Data.LoadFromEnumerable(groupCandidates.Select(c => c.Input));
-            var transformed = modelToUse.Transform(dataView);
-            var scores = mlContext.Data
-                .CreateEnumerable<AthleteScorePredictionOutput>(transformed, reuseRowObject: false)
-                .ToList();
-
-            for (var i = 0; i < groupCandidates.Count; i++)
-            {
-                scoredItems.Add((groupCandidates[i], scores[i].Score, metadataToUse));
-            }
-        }
-
-        var positionalNote = positionalModelsApplied > 0
-            ? $" Position-specific models were applied for {positionalModelsApplied} of {candidatesByPosition.Count} position(s)."
-            : string.Empty;
+        var scoredItems = candidates
+            .Zip(rawScores, (candidate, score) => (Candidate: candidate, Score: score.Score, EffectiveMetadata: metadata))
+            .ToList();
 
         var itemPredictionNotes = usingCurrentRoundBaselines
             ? "Prediction generated from the current pre-round athlete baseline with club and opponent context derived from local historical Cartola matches, athlete rounds and scouts."
@@ -208,8 +171,8 @@ public sealed class FullContextAthleteScorePredictionService(
             .ToList();
 
         var predictionNotes = usingCurrentRoundBaselines
-            ? $"Predictions used current pre-round athlete baselines plus local full-context derived from historical Cartola matches, athlete rounds and scouts.{positionalNote} {excludedAthletesWithoutContext} athlete(s) were excluded because a valid target-round match context was unavailable."
-            : $"Predictions used the latest persisted athlete baselines before round {round} plus local full-context derived from historical Cartola matches, athlete rounds and scouts.{positionalNote} {excludedAthletesWithoutContext} athlete(s) were excluded because a valid target-round match context was unavailable.";
+            ? $"Predictions used current pre-round athlete baselines plus local full-context derived from historical Cartola matches, athlete rounds and scouts. {excludedAthletesWithoutContext} athlete(s) were excluded because a valid target-round match context was unavailable."
+            : $"Predictions used the latest persisted athlete baselines before round {round} plus local full-context derived from historical Cartola matches, athlete rounds and scouts. {excludedAthletesWithoutContext} athlete(s) were excluded because a valid target-round match context was unavailable.";
 
         return new AthleteScorePredictionResult
         {
