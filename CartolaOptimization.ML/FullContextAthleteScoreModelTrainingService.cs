@@ -279,6 +279,37 @@ public sealed class FullContextAthleteScoreModelTrainingService(
     /// Returns the names of numeric float feature columns, optionally restricted to an allowed set.
     /// The five ID/label columns are always excluded.
     /// </summary>
+    /// <summary>
+    /// Curated numeric feature set (Tier 1 + Tier 2 by permutation feature importance). The full
+    /// 231-feature pool was pruned to the ~47 features that carry measurable signal (PFI ranks 1-50,
+    /// R² drop ≤ ~-0.002); the long tail (126 features with PFI importance ≥ 0) was redundant or
+    /// actively harmful. Restricting the candidate pool to these speeds up training and removes noise.
+    /// (Club/Opponent/Position/Status one-hot encodings are always included separately by BuildPipeline.)
+    /// </summary>
+    private static readonly HashSet<string> CuratedNumericFeatures = new(StringComparer.Ordinal)
+    {
+        // Tier 1 — carry the signal
+        "PriceDeltaVsHistoricalAverage", "PositionRelativePriceSignal", "PriceNum", "IsHomeMatch",
+        "PriceTrendLast3", "HistoricalPointsPerCartoletaLast3",
+        "OpponentPositionScoutNegativeConcededAverageLast5", "OpponentAttackStrengthLast5",
+        "HomeAverageScore", "OpponentClubTablePosition",
+        // Tier 2 — residual signal
+        "HomeScoreEwmaLast3", "AverageScore", "AwayGamesNum", "OpponentScoutDefensiveConcededAverageLast5",
+        "MovingAverage", "ScoutBalanceSumLast5", "ClubGoalDifferencePerMatchLast3",
+        "OpponentScoutTacklesConcededAverageLast5", "OpponentScoutAssistsConcededAverageLast3",
+        "HistoricalPointsPerCartoletaLast5", "HomeScoreAverageLast5", "ScoutDefensiveEwmaLast5",
+        "GamesNum", "OpponentDefenseStrengthLast3", "ScoreHitRateOver5Last5", "PlayRateLast5",
+        "OpponentRecentFormPoints", "ScoreHitRateOver3Last5", "ContextualAverageScore",
+        "ScoutOffensiveAverageLast5", "OpponentAttackStrengthLast3", "ClubFantasyPointsForAverageLast5",
+        "ClubPositionScoutNegativeConcededAverageLast5", "VenueScoreEwmaLast3", "ScoutOffensiveSumLast5",
+        "OpponentPositionScoutAssistsConcededAverageLast3", "OpponentVenuePointsPerMatchLast5",
+        "ClubPositionScoutAssistsConcededAverageLast5", "OpponentScoutBalanceConcededAverageLast5",
+        "ClubPositionScoutDefensiveConcededAverageLast3", "ClubFailedToScoreRateLast5",
+        "RecentFormPointsDelta", "ClubGoalsForPerMatchLast5", "ClubAttackStrengthLast3",
+        "ScoreTrendLast3VsPrev3", "ClubPositionScoutAssistsConcededAverageLast3",
+        "PositionForVsOpponentConcededDeltaLast5",
+    };
+
     internal static string[] GetNumericFeatureNames(IReadOnlySet<string>? allowedFeatures)
     {
         var excluded = new HashSet<string>(StringComparer.Ordinal)
@@ -331,7 +362,9 @@ public sealed class FullContextAthleteScoreModelTrainingService(
 
         var all = typeof(FullContextAthleteScoreTrainingRow)
             .GetProperties()
-            .Where(prop => prop.PropertyType == typeof(float) && !excluded.Contains(prop.Name))
+            .Where(prop => prop.PropertyType == typeof(float)
+                && !excluded.Contains(prop.Name)
+                && CuratedNumericFeatures.Contains(prop.Name))
             .Select(prop => prop.Name)
             .ToArray();
 
