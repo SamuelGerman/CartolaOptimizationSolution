@@ -288,6 +288,45 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             nameof(FullContextAthleteScoreTrainingRow.OpponentClubCartolaId),
             nameof(FullContextAthleteScoreTrainingRow.PositionCartolaId),
             nameof(FullContextAthleteScoreTrainingRow.StatusCartolaId),
+
+            // ── GatoMestre context features — EXCLUDED due to confirmed target leak. ──────────────
+            // These come from the athleteRound.Context navigation populated by the GatoMestre sync.
+            // A controlled walk-forward ablation proved that the "*Current"/Index variants embed the
+            // round's OWN result (the moving average is updated WITH round N's score), inflating
+            // holdout R² from ~0.26 (leak-free) to ~0.87 while causing catastrophic train/serve skew
+            // at prediction time. The leak-free "*Previous" variants add no measurable value
+            // (ΔR²=-0.007), so the entire GatoMestre block is dropped: the model is now Cartola-only.
+            nameof(FullContextAthleteScoreTrainingRow.HasAthleteContext),
+            nameof(FullContextAthleteScoreTrainingRow.TeamAverageScore),
+            nameof(FullContextAthleteScoreTrainingRow.TeamHomeAverageCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.TeamHomeAveragePrevious),
+            nameof(FullContextAthleteScoreTrainingRow.TeamAwayAverageCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.TeamAwayAveragePrevious),
+            nameof(FullContextAthleteScoreTrainingRow.TeamVenueAverageCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.TeamVenueAveragePrevious),
+            nameof(FullContextAthleteScoreTrainingRow.PointsPerCartoletaCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.PointsPerCartoletaPrevious),
+            nameof(FullContextAthleteScoreTrainingRow.GrossOverallAverageCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.GrossOverallMovingAverageCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.GrossOverallAveragePrevious),
+            nameof(FullContextAthleteScoreTrainingRow.GrossOverallMovingAveragePrevious),
+            nameof(FullContextAthleteScoreTrainingRow.NetOverallAverageCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.NetOverallMovingAverageCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.NetOverallAveragePrevious),
+            nameof(FullContextAthleteScoreTrainingRow.NetOverallMovingAveragePrevious),
+            nameof(FullContextAthleteScoreTrainingRow.ValuationCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.MinimumToAppreciateCurrent),
+            nameof(FullContextAthleteScoreTrainingRow.ValuationPrevious),
+            nameof(FullContextAthleteScoreTrainingRow.MinimumToAppreciatePrevious),
+            nameof(FullContextAthleteScoreTrainingRow.IndexPointsPerCartoleta),
+            nameof(FullContextAthleteScoreTrainingRow.IndexOffensiveUsage),
+            nameof(FullContextAthleteScoreTrainingRow.IndexOffensiveRepresentation),
+            nameof(FullContextAthleteScoreTrainingRow.IndexPointsRepresentation),
+            nameof(FullContextAthleteScoreTrainingRow.IndexOffensiveEfficiency),
+            nameof(FullContextAthleteScoreTrainingRow.IndexDefensiveEfficiency),
+            nameof(FullContextAthleteScoreTrainingRow.IndexTackleDuelPercent),
+            nameof(FullContextAthleteScoreTrainingRow.IndexShotsPerGame),
+            nameof(FullContextAthleteScoreTrainingRow.IndexShotsPerGoal),
         };
 
         var all = typeof(FullContextAthleteScoreTrainingRow)
