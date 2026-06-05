@@ -26,4 +26,27 @@ public sealed class CartolaSyncController(ICartolaSyncService cartolaSyncService
         return Ok(result);
     }
 
+    /// <summary>
+    /// Finalizes a single closed historical round using Cartola data only (no Gato Mestre, no training):
+    /// fetches the final score payload, applies it to the persisted athlete-round baselines and marks the
+    /// round as historically closed so it becomes eligible for model training. Use this to retroactively
+    /// close rounds that elapsed without an end-of-round run. The round must be earlier than the current round.
+    /// </summary>
+    /// <param name="round">Closed historical round to finalize.</param>
+    /// <param name="cancellationToken">Cancellation token for the request.</param>
+    /// <returns>A summary describing the finalized round.</returns>
+    [HttpPost("closed-round/{round:int}")]
+    [ProducesResponseType(typeof(CartolaSyncResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SyncClosedRound(int round, CancellationToken cancellationToken)
+    {
+        if (round <= 0)
+        {
+            return BadRequest(new ProblemDetails { Title = "Invalid round", Detail = "Round must be greater than zero." });
+        }
+
+        var result = await cartolaSyncService.SyncClosedRoundAsync(round, cancellationToken);
+        return Ok(result);
+    }
 }
