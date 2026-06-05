@@ -129,8 +129,8 @@ public sealed class FullContextAthleteScorePredictionService(
             .ToList();
 
         var itemPredictionNotes = usingCurrentRoundBaselines
-            ? "Prediction generated from the current pre-round athlete baseline with club and opponent context derived from local historical Cartola matches, athlete rounds and scouts."
-            : $"Prediction generated from the latest persisted athlete baseline before round {round}, combined with club and opponent context derived from local historical Cartola matches, athlete rounds and scouts because no current pre-round athlete rows were available for that round.";
+            ? "Expected score (conditional model output weighted by the athlete's estimated play probability) generated from the current pre-round athlete baseline with context derived from local historical Cartola matches, athlete rounds and scouts."
+            : $"Expected score (conditional model output weighted by the athlete's estimated play probability) generated from the latest persisted athlete baseline before round {round}, combined with context derived from local historical Cartola matches, athlete rounds and scouts because no current pre-round athlete rows were available for that round.";
 
         var athletes = scoredItems
             .Select(item => new AthleteScorePredictionItem
@@ -159,8 +159,13 @@ public sealed class FullContextAthleteScorePredictionService(
                 ClubExpectedPoints = item.Candidate.ClubExpectedPoints,
                 OpponentWinProbability = item.Candidate.OpponentWinProbability,
                 OpponentExpectedPoints = item.Candidate.OpponentExpectedPoints,
+                // The model is trained only on athletes who played (WasInGame = true), so its raw
+                // output is the score CONDITIONAL on participation. Multiplying by the play
+                // probability converts it to the unconditional EXPECTED score (0 points if the
+                // athlete does not take the field), which is what the lineup optimizer should rank on.
                 PredictedScore = Math.Round(
-                    ApplyPositionCalibration(item.Score, item.Candidate.Baseline.Position.CartolaId, item.EffectiveMetadata),
+                    ApplyPositionCalibration(item.Score, item.Candidate.Baseline.Position.CartolaId, item.EffectiveMetadata)
+                        * ComputePlayProbability(item.Candidate.Input),
                     2, MidpointRounding.AwayFromZero),
                 PredictionConfidence = ComputePredictionConfidence(item.Candidate.Input),
                 PredictionNotes = itemPredictionNotes,
