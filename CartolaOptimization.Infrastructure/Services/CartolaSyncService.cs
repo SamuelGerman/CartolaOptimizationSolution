@@ -276,17 +276,26 @@ public sealed class CartolaSyncService(
             executionContext.SetContext("scorePayloadRound", scoresPayload.Round);
             executionContext.SetContext("scorePayloadTotalAthletes", scoresPayload.TotalAthletes);
 
+            // The closed-round score payload carries no match results; fetch the round's matches
+            // separately so the final scoreboard (HomeScore/AwayScore) is backfilled authoritatively.
+            executionContext.MarkStep("Load closed round matches payload");
+            var matchesPayload = await cartolaApiClient.GetMatchesAsync(round, cancellationToken);
+
             executionContext.MarkStep("Begin database transaction");
             transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
             executionContext.MarkStep("Upsert clubs");
-            var clubs = await UpsertClubsAsync(scoresPayload.Clubs, EmptyClubPayload, EmptyClubPayload, cancellationToken);
+            var clubs = await UpsertClubsAsync(scoresPayload.Clubs, matchesPayload.Clubs, EmptyClubPayload, cancellationToken);
 
             executionContext.MarkStep("Upsert positions");
             var positions = await UpsertPositionsAsync(scoresPayload.Positions, cancellationToken);
 
             executionContext.MarkStep("Persist catalog changes");
             await dbContext.SaveChangesAsync(cancellationToken);
+
+            executionContext.MarkStep("Upsert matches");
+            var matchesUpserted = await UpsertMatchesAsync(matchesPayload, clubs, cancellationToken);
+            executionContext.SetContext("matchesUpserted", matchesUpserted);
 
             executionContext.MarkStep("Finalize athlete rounds from closed score payload");
             var finalizeResult = await FinalizeClosedRoundAthleteResultsAsync(
