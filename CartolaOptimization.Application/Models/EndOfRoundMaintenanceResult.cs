@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the aggregated outcome of the automated end-of-round maintenance workflow.
+/// Representa o resultado agregado do fluxo automatizado de manutenção de fim de rodada.
 /// </summary>
 public sealed class EndOfRoundMaintenanceResult
 {

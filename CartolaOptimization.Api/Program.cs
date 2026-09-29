@@ -44,7 +44,7 @@ builder.Services.AddDbContextFactory<AppDbContext>(configureDbContext);
 builder.Services.AddControllers();
 builder.Services.AddInfrastructureServices();
 builder.Services.AddMachineLearningServices(builder.Configuration);
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+// Saiba mais sobre a configuração do Swagger/OpenAPI em https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -77,7 +77,7 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Configura o pipeline de requisições HTTP.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

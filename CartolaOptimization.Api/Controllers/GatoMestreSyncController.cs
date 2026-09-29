@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace CartolaOptimization.Api.Controllers;
 
 /// <summary>
-/// Exposes administrative endpoints used to synchronize enrichment datasets sourced from the Gato Mestre API.
+/// Expõe endpoints administrativos usados para sincronizar conjuntos de dados de enriquecimento originados da API do Gato Mestre.
 /// </summary>
 [ApiController]
 [Route("api/gatomestre/sync")]
@@ -13,12 +13,12 @@ namespace CartolaOptimization.Api.Controllers;
 public sealed class GatoMestreSyncController(IGatoMestreSyncService gatoMestreSyncService) : ControllerBase
 {
     /// <summary>
-    /// Synchronizes Gato Mestre data for a specific season and round.
+    /// Sincroniza os dados do Gato Mestre para uma temporada e rodada específicas.
     /// </summary>
-    /// <param name="season">Season used by the athlete round endpoint.</param>
-    /// <param name="round">Round that should be synchronized.</param>
-    /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>A summary describing the synchronized entities and rows.</returns>
+    /// <param name="season">Temporada usada pelo endpoint de atletas por rodada.</param>
+    /// <param name="round">Rodada que deve ser sincronizada.</param>
+    /// <param name="cancellationToken">Token de cancelamento da requisição.</param>
+    /// <returns>Um resumo descrevendo as entidades e linhas sincronizadas.</returns>
     [HttpPost("season/{season:int}/round/{round:int}")]
     [ProducesResponseType(typeof(GatoMestreSyncResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CartolaOptimization.Infrastructure.Services;
 
 /// <summary>
-/// Orchestrates the recurring end-of-round workflow required to refresh historical data and retrain the primary full-context model.
+/// Orquestra o fluxo recorrente de fim de rodada necessário para atualizar os dados históricos e retreinar o modelo full-context principal.
 /// </summary>
 public sealed class EndOfRoundMaintenanceService(
     IDbContextFactory<AppDbContext> dbContextFactory,

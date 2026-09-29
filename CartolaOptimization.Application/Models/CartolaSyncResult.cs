@@ -1,117 +1,117 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the outcome of a Cartola synchronization execution.
+/// Representa o resultado de uma execução de sincronização do Cartola.
 /// </summary>
 public sealed class CartolaSyncResult
 {
     /// <summary>
-    /// Gets the persisted synchronization execution identifier.
+    /// Obtém o identificador persistido da execução da sincronização.
     /// </summary>
     public int? SyncExecutionId { get; init; }
 
     /// <summary>
-    /// Gets the correlation id shared with diagnostics emitted during the execution.
+    /// Obtém o id de correlação compartilhado com os diagnósticos emitidos durante a execução.
     /// </summary>
     public string CorrelationId { get; init; } = string.Empty;
 
     /// <summary>
-    /// Gets the final synchronization execution status.
+    /// Obtém o status final da execução da sincronização.
     /// </summary>
     public string Status { get; init; } = string.Empty;
 
     /// <summary>
-    /// Gets the UTC timestamp in which the synchronization started.
+    /// Obtém o timestamp UTC em que a sincronização começou.
     /// </summary>
     public DateTime StartedAtUtc { get; init; }
 
     /// <summary>
-    /// Gets the UTC timestamp in which the synchronization finished.
+    /// Obtém o timestamp UTC em que a sincronização terminou.
     /// </summary>
     public DateTime FinishedAtUtc { get; init; }
 
     /// <summary>
-    /// Gets the total synchronization duration in milliseconds.
+    /// Obtém a duração total da sincronização em milissegundos.
     /// </summary>
     public long DurationMs { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether the execution satisfied its quality criteria.
+    /// Obtém um valor que indica se a execução satisfez seus critérios de qualidade.
     /// </summary>
     public bool QualityCriteriaSatisfied { get; init; }
 
     /// <summary>
-    /// Gets the human-readable quality criteria applied to the execution.
+    /// Obtém os critérios de qualidade legíveis aplicados à execução.
     /// </summary>
     public string QualityCriteriaDescription { get; init; } = string.Empty;
 
     /// <summary>
-    /// Gets the season reported by the Cartola market status endpoint.
+    /// Obtém a temporada informada pelo endpoint de status do mercado do Cartola.
     /// </summary>
     public int Season { get; init; }
 
     /// <summary>
-    /// Gets the current round reported by the Cartola market status endpoint.
+    /// Obtém a rodada atual informada pelo endpoint de status do mercado do Cartola.
     /// </summary>
     public int CurrentRound { get; init; }
 
     /// <summary>
-    /// Gets the round used to synchronize matches.
+    /// Obtém a rodada usada para sincronizar as partidas.
     /// </summary>
     public int MatchesRound { get; init; }
 
     /// <summary>
-    /// Gets the athlete rounds affected by the synchronization.
+    /// Obtém as atleta-rodadas afetadas pela sincronização.
     /// </summary>
     public IReadOnlyCollection<int> AthleteRounds { get; init; } = Array.Empty<int>();
 
     /// <summary>
-    /// Gets the total number of club records available after the upsert stage.
+    /// Obtém o número total de registros de clube disponíveis após a etapa de upsert.
     /// </summary>
     public int ClubsUpserted { get; init; }
 
     /// <summary>
-    /// Gets the total number of position records available after the upsert stage.
+    /// Obtém o número total de registros de posição disponíveis após a etapa de upsert.
     /// </summary>
     public int PositionsUpserted { get; init; }
 
     /// <summary>
-    /// Gets the total number of athlete status records available after the upsert stage.
+    /// Obtém o número total de registros de status de atleta disponíveis após a etapa de upsert.
     /// </summary>
     public int StatusesUpserted { get; init; }
 
     /// <summary>
-    /// Gets the total number of athlete records available after the upsert stage.
+    /// Obtém o número total de registros de atleta disponíveis após a etapa de upsert.
     /// </summary>
     public int AthletesUpserted { get; init; }
 
     /// <summary>
-    /// Gets the number of match rows processed in the synchronization.
+    /// Obtém o número de linhas de partida processadas na sincronização.
     /// </summary>
     public int MatchesUpserted { get; init; }
 
     /// <summary>
-    /// Gets the number of athlete round rows processed in the synchronization.
+    /// Obtém o número de linhas de atleta-rodada processadas na sincronização.
     /// </summary>
     public int AthleteRoundsUpserted { get; init; }
 
     /// <summary>
-    /// Gets the number of scout rows recreated for the synchronized athlete rounds.
+    /// Obtém o número de linhas de scout recriadas para as atleta-rodadas sincronizadas.
     /// </summary>
     public int ScoutsUpserted { get; init; }
 
     /// <summary>
-    /// Gets the number of existing local athlete rounds that were finalized with zero points because the closed Cartola payload did not contain them explicitly.
+    /// Obtém o número de atleta-rodadas locais existentes que foram finalizadas com zero pontos porque o payload fechado do Cartola não as continha explicitamente.
     /// </summary>
     public int AthleteRoundsMissingScorePayload { get; init; }
 
     /// <summary>
-    /// Gets the number of final score payload rows that could not be mapped to a local athlete round baseline.
+    /// Obtém o número de linhas do payload de pontuação final que não puderam ser mapeadas para uma linha-base local de atleta-rodada.
     /// </summary>
     public int ScorePayloadRowsWithoutLocalRound { get; init; }
 
     /// <summary>
-    /// Gets additional execution notes that help interpret partial or historical synchronizations.
+    /// Obtém notas adicionais da execução que ajudam a interpretar sincronizações parciais ou históricas.
     /// </summary>
     public string Notes { get; init; } = string.Empty;
 }

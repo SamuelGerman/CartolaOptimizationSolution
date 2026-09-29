@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CartolaOptimization.Infrastructure.Services;
 
 /// <summary>
-/// Provides administrative read access to the persisted training dataset readiness state.
+/// Fornece acesso administrativo de leitura ao estado de prontidão do conjunto de dados de treino persistido.
 /// </summary>
 public sealed class TrainingDatasetDiagnosticsService(AppDbContext dbContext) : ITrainingDatasetDiagnosticsService
 {

@@ -1,127 +1,127 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the outcome of a Gato Mestre synchronization execution.
+/// Representa o resultado de uma execução de sincronização do Gato Mestre.
 /// </summary>
 public sealed class GatoMestreSyncResult
 {
     /// <summary>
-    /// Gets the persisted synchronization execution identifier.
+    /// Obtém o identificador persistido da execução da sincronização.
     /// </summary>
     public int? SyncExecutionId { get; init; }
 
     /// <summary>
-    /// Gets the correlation id shared with diagnostics emitted during the execution.
+    /// Obtém o id de correlação compartilhado com os diagnósticos emitidos durante a execução.
     /// </summary>
     public string CorrelationId { get; init; } = string.Empty;
 
     /// <summary>
-    /// Gets the final synchronization execution status.
+    /// Obtém o status final da execução da sincronização.
     /// </summary>
     public string Status { get; init; } = string.Empty;
 
     /// <summary>
-    /// Gets the UTC timestamp in which the synchronization started.
+    /// Obtém o timestamp UTC em que a sincronização começou.
     /// </summary>
     public DateTime StartedAtUtc { get; init; }
 
     /// <summary>
-    /// Gets the UTC timestamp in which the synchronization finished.
+    /// Obtém o timestamp UTC em que a sincronização terminou.
     /// </summary>
     public DateTime FinishedAtUtc { get; init; }
 
     /// <summary>
-    /// Gets the total synchronization duration in milliseconds.
+    /// Obtém a duração total da sincronização em milissegundos.
     /// </summary>
     public long DurationMs { get; init; }
 
     /// <summary>
-    /// Gets the synchronized season.
+    /// Obtém a temporada sincronizada.
     /// </summary>
     public int Season { get; init; }
 
     /// <summary>
-    /// Gets the synchronized round.
+    /// Obtém a rodada sincronizada.
     /// </summary>
     public int Round { get; init; }
 
     /// <summary>
-    /// Gets the total number of clubs available after the team catalog upsert stage.
+    /// Obtém o número total de clubes disponíveis após a etapa de upsert do catálogo de times.
     /// </summary>
     public int ClubsUpserted { get; init; }
 
     /// <summary>
-    /// Gets the number of club round rows processed for the synchronized round.
+    /// Obtém o número de linhas de clube-rodada processadas para a rodada sincronizada.
     /// </summary>
     public int ClubRoundsUpserted { get; init; }
 
     /// <summary>
-    /// Gets the number of club round position rows processed for the synchronized round.
+    /// Obtém o número de linhas de clube-rodada-posição processadas para a rodada sincronizada.
     /// </summary>
     public int ClubRoundPositionsUpserted { get; init; }
 
     /// <summary>
-    /// Gets the number of athlete round rows enriched or created for the synchronized round.
+    /// Obtém o número de linhas de atleta-rodada enriquecidas ou criadas para a rodada sincronizada.
     /// </summary>
     public int AthleteRoundsUpserted { get; init; }
 
     /// <summary>
-    /// Gets the number of athlete rows skipped because the available payloads were not sufficient to build a reliable round record.
+    /// Obtém o número de linhas de atleta descartadas porque os payloads disponíveis não foram suficientes para montar um registro de rodada confiável.
     /// </summary>
     public int AthleteRoundsSkipped { get; init; }
 
     /// <summary>
-    /// Gets the number of athlete detail requests required to complete missing round data.
+    /// Obtém o número de requisições de detalhe de atleta necessárias para completar os dados de rodada faltantes.
     /// </summary>
     public int AthleteDetailsFetched { get; init; }
 
     /// <summary>
-    /// Gets the number of warning logs persisted while handling non-fatal athlete enrichment issues.
+    /// Obtém o número de logs de aviso persistidos ao tratar problemas não fatais de enriquecimento de atletas.
     /// </summary>
     public int AthleteFailuresLogged { get; init; }
 
     /// <summary>
-    /// Gets the athlete coverage percentage achieved during the synchronization.
+    /// Obtém o percentual de cobertura de atletas alcançado durante a sincronização.
     /// </summary>
     public decimal AthleteCoverageRate { get; init; }
 
     /// <summary>
-    /// Gets the skipped athlete percentage achieved during the synchronization.
+    /// Obtém o percentual de atletas descartados alcançado durante a sincronização.
     /// </summary>
     public decimal AthleteSkippedRate { get; init; }
 
     /// <summary>
-    /// Gets the minimum coverage rate required for the execution to be considered healthy.
+    /// Obtém a taxa mínima de cobertura exigida para que a execução seja considerada saudável.
     /// </summary>
     public decimal MinimumCoverageRate { get; init; }
 
     /// <summary>
-    /// Gets the maximum skipped athlete percentage allowed for the execution to be considered healthy.
+    /// Obtém o percentual máximo de atletas descartados permitido para que a execução seja considerada saudável.
     /// </summary>
     public decimal MaximumSkippedRate { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether the execution satisfied its quality criteria.
+    /// Obtém um valor que indica se a execução satisfez seus critérios de qualidade.
     /// </summary>
     public bool QualityCriteriaSatisfied { get; init; }
 
     /// <summary>
-    /// Gets the human-readable quality criteria applied to the execution.
+    /// Obtém os critérios de qualidade legíveis aplicados à execução.
     /// </summary>
     public string QualityCriteriaDescription { get; init; } = string.Empty;
 
     /// <summary>
-    /// Gets a value indicating whether the team confrontation data was available for the requested round.
+    /// Obtém um valor que indica se os dados de confronto do time estavam disponíveis para a rodada solicitada.
     /// </summary>
     public bool ClubRoundDataAvailable { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether the synchronization completed with partial enrichment.
+    /// Obtém um valor que indica se a sincronização terminou com enriquecimento parcial.
     /// </summary>
     public bool IsPartialSync { get; init; }
 
     /// <summary>
-    /// Gets an optional note describing relevant execution details, such as endpoint limitations for historical confrontation data.
+    /// Obtém uma nota opcional descrevendo detalhes relevantes da execução, como limitações do endpoint para dados históricos de confronto.
     /// </summary>
     public string Notes { get; init; } = string.Empty;
 }

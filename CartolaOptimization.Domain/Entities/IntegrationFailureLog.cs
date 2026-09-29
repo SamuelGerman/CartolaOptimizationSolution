@@ -1,127 +1,127 @@
 namespace CartolaOptimization.Domain.Entities
 {
     /// <summary>
-    /// Persists detailed diagnostics for failures that occur while collecting or synchronizing external datasets.
+    /// Persiste diagnósticos detalhados para as falhas que ocorrem ao coletar ou sincronizar conjuntos de dados externos.
     /// </summary>
     public sealed class IntegrationFailureLog
     {
         /// <summary>
-        /// Gets or sets the primary identifier of the failure log row.
+        /// Obtém ou define o identificador primário da linha de log de falha.
         /// </summary>
         public int Id { get; set; }
 
         /// <summary>
-        /// Gets or sets the UTC timestamp in which the failure was captured.
+        /// Obtém ou define o timestamp UTC em que a falha foi capturada.
         /// </summary>
         public DateTime OccurredAtUtc { get; set; }
 
         /// <summary>
-        /// Gets or sets the correlation id used to group all steps of a synchronization execution.
+        /// Obtém ou define o id de correlação usado para agrupar todos os passos de uma execução de sincronização.
         /// </summary>
         public string CorrelationId { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the external source involved in the failure, such as Cartola or GatoMestre.
+        /// Obtém ou define a fonte externa envolvida na falha, como Cartola ou GatoMestre.
         /// </summary>
         public string SourceSystem { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the process name that was running when the failure happened.
+        /// Obtém ou define o nome do processo que estava em execução quando a falha ocorreu.
         /// </summary>
         public string ProcessName { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the pipeline step that was executing when the failure happened.
+        /// Obtém ou define o passo do pipeline que estava em execução quando a falha ocorreu.
         /// </summary>
         public string StepName { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the method or component where the failure was detected.
+        /// Obtém ou define o método ou componente onde a falha foi detectada.
         /// </summary>
         public string ErrorLocation { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the HTTP method used for the external request.
+        /// Obtém ou define o método HTTP usado na requisição externa.
         /// </summary>
         public string RequestMethod { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the absolute request URL used when calling the external API.
+        /// Obtém ou define a URL absoluta da requisição usada ao chamar a API externa.
         /// </summary>
         public string RequestUrl { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the serialized request headers.
+        /// Obtém ou define os cabeçalhos de requisição serializados.
         /// </summary>
         public string RequestHeadersJson { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the serialized request payload sent to the external API.
+        /// Obtém ou define o payload de requisição serializado enviado à API externa.
         /// </summary>
         public string RequestPayload { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the HTTP status code returned by the external API when available.
+        /// Obtém ou define o código de status HTTP retornado pela API externa quando disponível.
         /// </summary>
         public int? ResponseStatusCode { get; set; }
 
         /// <summary>
-        /// Gets or sets the HTTP reason phrase returned by the external API when available.
+        /// Obtém ou define a reason phrase HTTP retornada pela API externa quando disponível.
         /// </summary>
         public string ResponseReasonPhrase { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the serialized response headers.
+        /// Obtém ou define os cabeçalhos de resposta serializados.
         /// </summary>
         public string ResponseHeadersJson { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the raw response payload received from the external API.
+        /// Obtém ou define o payload de resposta bruto recebido da API externa.
         /// </summary>
         public string ResponsePayload { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the serialized list of steps executed before the failure.
+        /// Obtém ou define a lista serializada de passos executados antes da falha.
         /// </summary>
         public string ExecutedStepsJson { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the serialized business context associated with the failure.
+        /// Obtém ou define o contexto de negócio serializado associado à falha.
         /// </summary>
         public string ContextJson { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the normalized business error code associated with the failure.
+        /// Obtém ou define o código de erro de negócio normalizado associado à falha.
         /// </summary>
         public string ErrorCode { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the severity assigned to the failure entry, such as Warning or Error.
+        /// Obtém ou define a severidade atribuída à entrada de falha, como Warning ou Error.
         /// </summary>
         public string Severity { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the type of the exception raised by the process.
+        /// Obtém ou define o tipo da exceção levantada pelo processo.
         /// </summary>
         public string ExceptionType { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the exception message.
+        /// Obtém ou define a mensagem da exceção.
         /// </summary>
         public string ExceptionMessage { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the message of the inner exception when available.
+        /// Obtém ou define a mensagem da exceção interna quando disponível.
         /// </summary>
         public string InnerExceptionMessage { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the captured exception stack trace.
+        /// Obtém ou define o stack trace capturado da exceção.
         /// </summary>
         public string StackTrace { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets a value indicating whether the main synchronization transaction was rolled back.
+        /// Obtém ou define um valor que indica se a transação principal de sincronização sofreu rollback.
         /// </summary>
         public bool TransactionRolledBack { get; set; }
     }

@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents the athlete identity block returned by Gato Mestre.
+/// Representa o bloco de identidade do atleta retornado pelo Gato Mestre.
 /// </summary>
 public sealed class GatoMestreAthleteProfileResponse
 {

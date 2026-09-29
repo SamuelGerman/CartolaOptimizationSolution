@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace CartolaOptimization.Infrastructure.Context;
 
 /// <summary>
-/// Creates <see cref="AppDbContext"/> instances for EF Core design-time commands without depending on the API host startup path.
+/// Cria instâncias de <see cref="AppDbContext"/> para os comandos de design-time do EF Core sem depender do caminho de inicialização do host da API.
 /// </summary>
 public sealed class AppDbContextDesignTimeFactory : IDesignTimeDbContextFactory<AppDbContext>
 {

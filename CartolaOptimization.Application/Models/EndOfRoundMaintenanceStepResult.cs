@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents a single step executed or skipped during the automated end-of-round maintenance workflow.
+/// Representa um único passo executado ou descartado durante o fluxo automatizado de manutenção de fim de rodada.
 /// </summary>
 public sealed class EndOfRoundMaintenanceStepResult
 {

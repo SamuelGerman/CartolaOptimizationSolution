@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Infrastructure.Diagnostics;
 
 /// <summary>
-/// Defines the supported severity values for persisted integration diagnostics.
+/// Define os valores de severidade suportados para os diagnósticos de integração persistidos.
 /// </summary>
 public static class IntegrationLogSeverity
 {

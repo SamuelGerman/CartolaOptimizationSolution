@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents a numeric value optionally accompanied by a variation.
+/// Representa um valor numérico opcionalmente acompanhado de uma variação.
 /// </summary>
 public sealed class GatoMestreNumericSnapshotResponse
 {

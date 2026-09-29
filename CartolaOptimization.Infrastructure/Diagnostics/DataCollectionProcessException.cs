@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Infrastructure.Diagnostics;
 
 /// <summary>
-/// Represents a synchronization failure that was already correlated and optionally persisted to the failure log table.
+/// Representa uma falha de sincronização que já foi correlacionada e opcionalmente persistida na tabela de log de falhas.
 /// </summary>
 public sealed class DataCollectionProcessException : Exception
 {

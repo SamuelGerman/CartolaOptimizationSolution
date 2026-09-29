@@ -6,7 +6,7 @@ using CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre;
 
 /// <summary>
-/// Default HTTP client used to consume the public Gato Mestre endpoints.
+/// Cliente HTTP padrão usado para consumir os endpoints públicos do Gato Mestre.
 /// </summary>
 public sealed class GatoMestreApiClient(HttpClient httpClient) : IGatoMestreApiClient
 {

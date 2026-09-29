@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the outcome of training and persisting the v0 athlete-score model.
+/// Representa o resultado de treinar e persistir o modelo de pontuação de atletas v0.
 /// </summary>
 public sealed class AthleteScoreModelTrainingResult
 {

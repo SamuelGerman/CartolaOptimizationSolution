@@ -3,25 +3,25 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.ML;
 
 /// <summary>
-/// Configuration for the per-position athlete-score model artifacts and training behaviour.
+/// Configuração dos artefatos e do comportamento de treino do modelo de pontuação de atletas por posição.
 /// </summary>
 public sealed class PositionalAthleteScoreModelOptions
 {
-    /// <summary>Directory where position-specific .zip and .metadata.json artifacts are stored.</summary>
+    /// <summary>Diretório onde os artefatos .zip e .metadata.json específicos de cada posição são armazenados.</summary>
     public string ArtifactsDirectory { get; set; } = "artifacts\\ml";
 
     /// <summary>
-    /// Minimum number of training rows required for a position to be trained.
-    /// Positions with fewer rows produce underfitted models and are skipped.
+    /// Número mínimo de linhas de treino exigidas para que uma posição seja treinada.
+    /// Posições com menos linhas produzem modelos subajustados e são descartadas.
     /// </summary>
     public int MinimumTrainingRows { get; set; } = 30;
 
     /// <summary>
-    /// Default number of top-ranked numeric features (by PFI) to use in the final model.
-    /// Set to <c>null</c> to train on all available numeric features.
+    /// Número padrão de features numéricas mais bem ranqueadas (por PFI) a usar no modelo final.
+    /// Defina como <c>null</c> para treinar em todas as features numéricas disponíveis.
     /// </summary>
     public int? DefaultTopNFeatures { get; set; }
 
-    /// <summary>LightGBM hyperparameters applied when training each positional model.</summary>
+    /// <summary>Hiperparâmetros do LightGBM aplicados ao treinar cada modelo posicional.</summary>
     public LightGbmHyperparameters Hyperparameters { get; set; } = new();
 }

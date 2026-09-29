@@ -93,10 +93,10 @@ public sealed class PredictedLineupOptimizationService(
             MaxPredictionCandidates,
             cancellationToken);
 
-        // Compute Bayesian shrinkage scores per position.
-        // Athletes with few games played have their prediction pulled toward the position mean,
-        // preventing outlier performances from a single game from dominating the optimizer.
-        // Score used only for internal ranking/selection; displayed PredictedScore remains the raw model output.
+        // Calcula as pontuações de encolhimento Bayesiano por posição.
+        // Atletas com poucos jogos disputados têm sua previsão puxada em direção à média da posição,
+        // evitando que desempenhos atípicos de um único jogo dominem o otimizador.
+        // Pontuação usada apenas para ranqueamento/seleção interna; o PredictedScore exibido continua sendo a saída bruta do modelo.
         var shrunkScores = ComputeShrunkScores(predictions.Athletes);
 
         var candidatesByPosition = predictions.Athletes
@@ -200,8 +200,8 @@ public sealed class PredictedLineupOptimizationService(
         var usesFallbackBaselines = selectedAthletes.Any(item =>
             item.PredictionNotes.Contains("latest persisted athlete baseline", StringComparison.OrdinalIgnoreCase));
 
-        // TotalPredictedScore uses raw model predictions (not shrunk), to show an honest forecast.
-        // The optimizer internally used shrunk scores to avoid over-weighting low-sample athletes.
+        // TotalPredictedScore usa as previsões brutas do modelo (sem encolhimento), para mostrar uma previsão honesta.
+        // O otimizador usou internamente pontuações encolhidas para evitar dar peso excessivo a atletas com poucas amostras.
         var totalActualPredictedScore = selectedAthletes.Sum(item => item.PredictedScore);
 
         return new PredictedLineupResult
@@ -348,12 +348,12 @@ public sealed class PredictedLineupOptimizationService(
         .ToList();
 
     /// <summary>
-    /// Applies Bayesian (James-Stein) shrinkage to each athlete's predicted score.
-    /// Athletes with few played rounds have their prediction pulled toward the position mean,
-    /// preventing a single outstanding game from biasing the optimizer.
+    /// Aplica encolhimento Bayesiano (James-Stein) à pontuação prevista de cada atleta.
+    /// Atletas com poucas rodadas jogadas têm sua previsão puxada em direção à média da posição,
+    /// evitando que um único jogo excepcional enviese o otimizador.
     /// Formula: shrunk = (n / (n + k)) * predicted + (k / (n + k)) * positionMean
-    /// where n = PlayedMatchesSampleSize, k = smoothing constant.
-    /// When PlayedMatchesSampleSize is not set (null), no shrinkage is applied.
+    /// onde n = PlayedMatchesSampleSize, k = constante de suavização.
+    /// Quando PlayedMatchesSampleSize não está definido (null), nenhum encolhimento é aplicado.
     /// </summary>
     private static IReadOnlyDictionary<int, decimal> ComputeShrunkScores(
         IReadOnlyCollection<AthleteScorePredictionItem> athletes,

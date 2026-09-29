@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents the confrontation payload used to build team round features.
+/// Representa o payload de confronto usado para montar as features de time por rodada.
 /// </summary>
 public sealed class GatoMestreClubConfrontationResponse
 {

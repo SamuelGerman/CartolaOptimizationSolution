@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents the athlete aggregation payload returned for a specific round.
+/// Representa o payload de agregação de atletas retornado para uma rodada específica.
 /// </summary>
 public sealed class GatoMestreAthletesRoundResponse
 {

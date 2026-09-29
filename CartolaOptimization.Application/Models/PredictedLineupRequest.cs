@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the budget and optional formation constraints used to build an optimal predicted lineup.
+/// Representa as restrições de orçamento e de formação (opcional) usadas para montar uma escalação prevista ótima.
 /// </summary>
 public sealed class PredictedLineupRequest
 {

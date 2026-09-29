@@ -3,52 +3,52 @@ using CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre;
 
 /// <summary>
-/// Defines the HTTP contract used to consume the public Gato Mestre endpoints required by the solution.
+/// Define o contrato HTTP usado para consumir os endpoints públicos do Gato Mestre exigidos pela solução.
 /// </summary>
 public interface IGatoMestreApiClient
 {
     /// <summary>
-    /// Loads the team catalog exposed by Gato Mestre.
+    /// Carrega o catálogo de times exposto pelo Gato Mestre.
     /// </summary>
     Task<Dictionary<int, GatoMestreTeamResponse>> GetTeamsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Loads athlete aggregate data for a specific season and round.
+    /// Carrega os dados agregados de atletas para uma temporada e rodada específicas.
     /// </summary>
     Task<GatoMestreAthletesRoundResponse> GetAthletesRoundAsync(int season, int round, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Loads the full athlete detail payload used as a fallback when the round summary is not sufficient to build a round row.
+    /// Carrega o payload completo de detalhe do atleta, usado como fallback quando o resumo da rodada não é suficiente para montar uma linha de rodada.
     /// </summary>
     Task<GatoMestreAthleteDetailResponse> GetAthleteDetailAsync(int athleteId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Loads the legacy athlete-round content payload with richer athlete-level indicators.
+    /// Carrega o payload legado de conteúdo de atleta-rodada com indicadores mais ricos em nível de atleta.
     /// </summary>
     Task<GatoMestreAthleteRoundContentResponse> GetAthleteRoundContentAsync(int athleteId, int round, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Loads team confrontation data for the next confrontation published by Gato Mestre.
+    /// Carrega os dados de confronto do time para o próximo confronto publicado pelo Gato Mestre.
     /// </summary>
     Task<GatoMestreClubConfrontationResponse> GetClubConfrontationAsync(int clubId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Loads the public round tips payload.
+    /// Carrega o payload público de dicas da rodada.
     /// </summary>
     Task<GatoMestreRoundCollectionResponse<GatoMestreTipItemResponse>> GetRoundTipsAsync(int season, int round, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Loads favorites/probability data for the matches of a round.
+    /// Carrega os dados de favoritismo/probabilidade das partidas de uma rodada.
     /// </summary>
     Task<GatoMestreRoundCollectionResponse<GatoMestreFavoriteMatchResponse>> GetFavoriteMatchesAsync(int season, int round, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Loads the editorial match forecasts for a round.
+    /// Carrega as previsões editoriais das partidas de uma rodada.
     /// </summary>
     Task<GatoMestreRoundCollectionResponse<GatoMestreForecastMatchResponse>> GetMatchForecastsAsync(int season, int round, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Loads club average rankings for a specific round.
+    /// Carrega os rankings de médias de clubes para uma rodada específica.
     /// </summary>
     Task<GatoMestreRoundCollectionResponse<GatoMestreClubAverageRankingResponse>> GetClubAverageRankingsAsync(int season, int round, CancellationToken cancellationToken = default);
 }

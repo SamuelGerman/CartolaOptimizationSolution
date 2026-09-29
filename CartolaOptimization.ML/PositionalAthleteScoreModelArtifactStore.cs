@@ -6,8 +6,8 @@ using Microsoft.Extensions.Options;
 namespace CartolaOptimization.ML;
 
 /// <summary>
-/// Manages on-disk artifacts (.zip model and .metadata.json) for the six Cartola position-specific
-/// athlete-score models. Each position maps to a deterministic file-name pair derived from the
+/// Gerencia os artefatos em disco (modelo .zip e .metadata.json) para os seis modelos específicos de posição do Cartola
+/// modelos de pontuação de atletas. Cada posição mapeia para um par determinístico de nomes de arquivo derivado do
 /// position code (gol, lat, zag, mei, ata, tec).
 /// </summary>
 public sealed class PositionalAthleteScoreModelArtifactStore(
@@ -27,7 +27,7 @@ public sealed class PositionalAthleteScoreModelArtifactStore(
             [6] = "tec",
         };
 
-    /// <summary>All position IDs for which this store can produce artifact paths.</summary>
+    /// <summary>Todos os IDs de posição para os quais este store consegue produzir caminhos de artefato.</summary>
     public IReadOnlyCollection<int> SupportedPositionIds => PositionCodes.Keys.ToArray();
 
     public string GetModelPath(int positionCartolaId)

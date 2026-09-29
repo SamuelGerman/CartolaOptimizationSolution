@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Domain.Entities
 {
     /// <summary>
-    /// Stores additional athlete-round enrichment signals collected from Gato Mestre.
+    /// Armazena sinais adicionais de enriquecimento de atleta-rodada coletados do Gato Mestre.
     /// </summary>
     public class AthleteRoundContext
     {

@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents athlete averages across general, home and away contexts.
+/// Representa as médias do atleta nos contextos geral, casa e fora.
 /// </summary>
 public sealed class GatoMestreDetailedAveragesResponse
 {

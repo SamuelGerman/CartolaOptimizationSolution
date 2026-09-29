@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents the per-athlete round-content payload published by the legacy v1 content endpoint.
+/// Representa o payload de conteúdo de rodada por atleta publicado pelo endpoint legado de conteúdo v1.
 /// </summary>
 public sealed class GatoMestreAthleteRoundContentResponse
 {

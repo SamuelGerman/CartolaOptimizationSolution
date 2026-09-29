@@ -36,21 +36,21 @@ internal sealed class AthleteScoreModelArtifactMetadata
 
     public IReadOnlyList<CartolaOptimization.Application.Models.AthleteScorePositionDiagnostics> PositionDiagnostics { get; init; } = [];
 
-    /// <summary>Total number of numeric features available before any top-N filter is applied.</summary>
+    /// <summary>Número total de features numéricas disponíveis antes de aplicar qualquer filtro top-N.</summary>
     public int TotalNumericFeatureCount { get; init; }
 
-    /// <summary>Number of numeric features actually used in the final trained model.</summary>
+    /// <summary>Número de features numéricas efetivamente usadas no modelo final treinado.</summary>
     public int ActiveNumericFeatureCount { get; init; }
 
     /// <summary>
-    /// Per-feature permutation importance ranked from most to least important.
-    /// Populated after every training run. Empty for artifacts trained before this feature was introduced.
+    /// Importância por permutação de cada feature, ordenada da mais para a menos importante.
+    /// Preenchido após cada execução de treino. Vazio para artefatos treinados antes desta feature ser introduzida.
     /// </summary>
     public IReadOnlyList<CartolaOptimization.Application.Models.AthleteScoreFeatureImportance> FeatureImportances { get; init; } = [];
 
     /// <summary>
-    /// LightGBM hyperparameters used when training this artifact.
-    /// Populated on every training run; reflects the effective values after config and override resolution.
+    /// Hiperparâmetros do LightGBM usados ao treinar este artefato.
+    /// Preenchido em cada execução de treino; reflete os valores efetivos após a resolução de configuração e sobrescritas.
     /// </summary>
     public CartolaOptimization.Application.Models.LightGbmHyperparameters Hyperparameters { get; init; } = new();
 }

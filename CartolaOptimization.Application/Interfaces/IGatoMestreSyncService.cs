@@ -3,16 +3,16 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.Application.Interfaces;
 
 /// <summary>
-/// Defines the contract for synchronizing the datasets sourced from the public Gato Mestre API.
+/// Define o contrato para sincronizar os conjuntos de dados originados da API pública do Gato Mestre.
 /// </summary>
 public interface IGatoMestreSyncService
 {
     /// <summary>
-    /// Synchronizes Gato Mestre datasets for a specific season and round, enriching team-level and athlete-level round data.
+    /// Sincroniza os conjuntos de dados do Gato Mestre para uma temporada e rodada específicas, enriquecendo os dados de rodada em nível de time e de atleta.
     /// </summary>
-    /// <param name="season">Season used by the Gato Mestre athletes round endpoint.</param>
-    /// <param name="round">Round that should be synchronized.</param>
-    /// <param name="cancellationToken">Cancellation token for the operation.</param>
-    /// <returns>A summary of the synchronization execution.</returns>
+    /// <param name="season">Temporada usada pelo endpoint de atletas por rodada do Gato Mestre.</param>
+    /// <param name="round">Rodada que deve ser sincronizada.</param>
+    /// <param name="cancellationToken">Token de cancelamento da operação.</param>
+    /// <returns>Um resumo da execução da sincronização.</returns>
     Task<GatoMestreSyncResult> SyncRoundAsync(int season, int round, CancellationToken cancellationToken = default);
 }

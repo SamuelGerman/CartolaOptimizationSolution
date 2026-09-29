@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents a summary athlete row returned by the round aggregation endpoint.
+/// Representa uma linha-resumo de atleta retornada pelo endpoint de agregação por rodada.
 /// </summary>
 public sealed class GatoMestreAthleteRoundSummaryResponse
 {

@@ -3,22 +3,22 @@
     using System.Collections.Generic;
 
     /// <summary>
-    /// Defines the <see cref="ClubRound" />
+    /// Define <see cref="ClubRound" />
     /// </summary>
     public class ClubRound
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="ClubRound"/> class.
+        /// Inicializa uma nova instância da classe <see cref="ClubRound"/>.
         /// </summary>
-        /// <param name="id">The id<see cref="long"/></param>
-        /// <param name="round">The round<see cref="int"/></param>
-        /// <param name="clubId">The clubId<see cref="int"/></param>
-        /// <param name="winProbability">The winProbability<see cref="decimal"/></param>
-        /// <param name="drawProbability">The drawProbability<see cref="decimal"/></param>
-        /// <param name="loseProbability">The loseProbability<see cref="decimal"/></param>
-        /// <param name="overallAverage">The overallAverage<see cref="decimal"/></param>
-        /// <param name="movingAverage">The movingAverage<see cref="decimal"/></param>
-        /// <param name="expectedPoints">The expectedPoints<see cref="decimal"/></param>
+        /// <param name="id">O id<see cref="long"/></param>
+        /// <param name="round">O round<see cref="int"/></param>
+        /// <param name="clubId">O clubId<see cref="int"/></param>
+        /// <param name="winProbability">O winProbability<see cref="decimal"/></param>
+        /// <param name="drawProbability">O drawProbability<see cref="decimal"/></param>
+        /// <param name="loseProbability">O loseProbability<see cref="decimal"/></param>
+        /// <param name="overallAverage">O overallAverage<see cref="decimal"/></param>
+        /// <param name="movingAverage">O movingAverage<see cref="decimal"/></param>
+        /// <param name="expectedPoints">O expectedPoints<see cref="decimal"/></param>
         public ClubRound(long id, int round, int clubId, decimal winProbability, decimal drawProbability, decimal loseProbability, decimal overallAverage, decimal movingAverage, decimal expectedPoints)
         {
             Id = id;
@@ -33,85 +33,85 @@
         }
 
         /// <summary>
-        /// Gets or sets the Id
+        /// Obtém ou define Id
         /// </summary>
         public long Id { get; set; }
 
         /// <summary>
-        /// Gets or sets the Round
+        /// Obtém ou define Round
         /// </summary>
         public int Round { get; set; }
 
         /// <summary>
-        /// Gets or sets the ClubId
+        /// Obtém ou define ClubId
         /// </summary>
         public int ClubId { get; set; }
 
         // Probabilidade de Vitória e Empate (%) - Essencial para prever SG (Saldo de Gols)
 
         /// <summary>
-        /// Gets or sets the WinProbability
+        /// Obtém ou define WinProbability
         /// </summary>
         public decimal WinProbability { get; set; }
 
         /// <summary>
-        /// Gets or sets the DrawProbability
+        /// Obtém ou define DrawProbability
         /// </summary>
         public decimal DrawProbability { get; set; }
 
         /// <summary>
-        /// Gets or sets the LoseProbability
+        /// Obtém ou define LoseProbability
         /// </summary>
         public decimal LoseProbability { get; set; }
 
         // Médias de pontos da equipe (Gato Mestre)
 
         /// <summary>
-        /// Gets or sets the OverallAverage
+        /// Obtém ou define OverallAverage
         /// </summary>
         public decimal OverallAverage { get; set; }
 
         /// <summary>
-        /// Gets or sets the MovingAverage
+        /// Obtém ou define MovingAverage
         /// </summary>
         public decimal MovingAverage { get; set; }
 
         /// <summary>
-        /// Gets or sets the ExpectedPoints
+        /// Obtém ou define ExpectedPoints
         /// </summary>
         public decimal ExpectedPoints { get; set; }
 
         /// <summary>
-        /// Gets or sets the readiness classification of the row for model training.
+        /// Obtém ou define a classificação de prontidão da linha para o treino do modelo.
         /// </summary>
         public string TrainingReadinessStatus { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the reason associated with the training readiness classification.
+        /// Obtém ou define o motivo associado à classificação de prontidão para treino.
         /// </summary>
         public string TrainingReadinessReason { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets a value indicating whether the row is currently eligible to be used by the training dataset.
+        /// Obtém ou define um valor que indica se a linha está atualmente elegível para uso pelo conjunto de dados de treino.
         /// </summary>
         public bool IsTrainingEligible { get; set; }
 
         // Navegação
 
         /// <summary>
-        /// Gets or sets the Club
+        /// Obtém ou define Club
         /// </summary>
         public Club Club { get; set; } = null!;
 
         // Estatísticas granulares por posição (A cereja do bolo para o ML)
 
         /// <summary>
-        /// Gets or sets the PositionStats
+        /// Obtém ou define PositionStats
         /// </summary>
         public ICollection<ClubRoundPosition> PositionStats { get; set; } = [];
 
         /// <summary>
-        /// Gets or sets additional club-round enrichment collected from Gato Mestre.
+        /// Obtém ou define o enriquecimento adicional de clube-rodada coletado do Gato Mestre.
         /// </summary>
         public ClubRoundContext? Context { get; set; }
     }

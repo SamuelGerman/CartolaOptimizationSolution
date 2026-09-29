@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents a single round processed by the historical Gato Mestre backfill.
+/// Representa uma única rodada processada pelo backfill histórico do Gato Mestre.
 /// </summary>
 public sealed class GatoMestreBackfillRoundResult
 {

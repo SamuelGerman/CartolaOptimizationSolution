@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents per-position training, validation and calibration diagnostics for a trained athlete-score model.
+/// Representa os diagnósticos de treino, validação e calibração por posição de um modelo de pontuação de atletas treinado.
 /// </summary>
 public sealed class AthleteScorePositionDiagnostics
 {

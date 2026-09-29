@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the outcome of a single historical Cartola round backfill.
+/// Representa o resultado de um único backfill de rodada histórica do Cartola.
 /// </summary>
 public sealed class CartolaBackfillRoundResult
 {

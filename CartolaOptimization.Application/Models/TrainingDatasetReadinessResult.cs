@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the outcome of recomputing training-readiness metadata for persisted round rows.
+/// Representa o resultado do recálculo dos metadados de prontidão para treino das linhas de rodada persistidas.
 /// </summary>
 public sealed class TrainingDatasetReadinessResult
 {

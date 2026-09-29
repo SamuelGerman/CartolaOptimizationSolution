@@ -1,17 +1,17 @@
 ﻿namespace CartolaOptimization.Domain.Entities
 {
     /// <summary>
-    /// Defines the <see cref="AthleteRoundScouts" />
+    /// Define <see cref="AthleteRoundScouts" />
     /// </summary>
     public class AthleteRoundScouts
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="AthleteRoundScouts"/> class.
+        /// Inicializa uma nova instância da classe <see cref="AthleteRoundScouts"/>.
         /// </summary>
-        /// <param name="id">The id<see cref="long"/></param>
-        /// <param name="athleteRoundId">The athleteRoundId<see cref="long"/></param>
-        /// <param name="scoutKey">The scoutKey<see cref="string"/></param>
-        /// <param name="valor">The valor<see cref="decimal"/></param>
+        /// <param name="id">O id<see cref="long"/></param>
+        /// <param name="athleteRoundId">O athleteRoundId<see cref="long"/></param>
+        /// <param name="scoutKey">O scoutKey<see cref="string"/></param>
+        /// <param name="valor">O valor<see cref="decimal"/></param>
         public AthleteRoundScouts(long id, long athleteRoundId, string scoutKey, decimal valor)
         {
             Id = id;
@@ -21,27 +21,27 @@
         }
 
         /// <summary>
-        /// Gets or sets the Id
+        /// Obtém ou define Id
         /// </summary>
         public long Id { get; set; }
 
         /// <summary>
-        /// Gets or sets the AthleteRoundId
+        /// Obtém ou define AthleteRoundId
         /// </summary>
         public long AthleteRoundId { get; set; }
 
         /// <summary>
-        /// Gets or sets the ScoutKey
+        /// Obtém ou define ScoutKey
         /// </summary>
         public string ScoutKey { get; set; } = null!;
 
         /// <summary>
-        /// Gets or sets the Valor
+        /// Obtém ou define Valor
         /// </summary>
         public decimal Valor { get; set; }
 
         /// <summary>
-        /// Gets or sets the AthleteRound
+        /// Obtém ou define AthleteRound
         /// </summary>
         public AthleteRound AthleteRound { get; set; } = null!;
     }

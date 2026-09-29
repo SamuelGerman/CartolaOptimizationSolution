@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents an administrative backfill execution that closes historical rounds using Cartola final scores.
+/// Representa uma execução administrativa de backfill que fecha rodadas históricas usando as pontuações finais do Cartola.
 /// </summary>
 public sealed class CartolaBackfillResult
 {

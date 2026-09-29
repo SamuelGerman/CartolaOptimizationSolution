@@ -3,7 +3,7 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.Application.Interfaces;
 
 /// <summary>
-/// Defines administrative read operations for the persisted training dataset readiness metadata.
+/// Define operações administrativas de leitura para os metadados de prontidão do conjunto de dados de treino persistido.
 /// </summary>
 public interface ITrainingDatasetDiagnosticsService
 {

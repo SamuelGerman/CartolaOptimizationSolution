@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents the team shield URLs returned by Gato Mestre.
+/// Representa as URLs do escudo do time retornadas pelo Gato Mestre.
 /// </summary>
 public sealed class GatoMestreTeamShieldResponse
 {

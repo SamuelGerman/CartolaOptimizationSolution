@@ -4,16 +4,16 @@
     using System.Collections.Generic;
 
     /// <summary>
-    /// Defines the <see cref="AthleteStatus" />
+    /// Define <see cref="AthleteStatus" />
     /// </summary>
     public class AthleteStatus
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="AthleteStatus"/> class.
+        /// Inicializa uma nova instância da classe <see cref="AthleteStatus"/>.
         /// </summary>
-        /// <param name="id">The id<see cref="int"/></param>
-        /// <param name="cartolaId">The cartolaId<see cref="int"/></param>
-        /// <param name="name">The name<see cref="string"/></param>
+        /// <param name="id">O id<see cref="int"/></param>
+        /// <param name="cartolaId">O cartolaId<see cref="int"/></param>
+        /// <param name="name">O name<see cref="string"/></param>
         public AthleteStatus(int id, int cartolaId, string name)
         {
             Id = id;
@@ -22,22 +22,22 @@
         }
 
         /// <summary>
-        /// Gets or sets the Id
+        /// Obtém ou define Id
         /// </summary>
         public int Id { get; set; }
 
         /// <summary>
-        /// Gets or sets the CartolaId
+        /// Obtém ou define CartolaId
         /// </summary>
         public int CartolaId { get; set; }
 
         /// <summary>
-        /// Gets or sets the Name
+        /// Obtém ou define Name
         /// </summary>
         public string Name { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the AthleteRounds
+        /// Obtém ou define AthleteRounds
         /// </summary>
         public ICollection<AthleteRound> AthleteRounds { get; set; } = [];
     }

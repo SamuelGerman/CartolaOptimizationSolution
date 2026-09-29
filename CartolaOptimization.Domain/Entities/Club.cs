@@ -4,19 +4,19 @@
     using System.Collections.Generic;
 
     /// <summary>
-    /// Defines the <see cref="Club" />
+    /// Define <see cref="Club" />
     /// </summary>
     public class Club
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="Club"/> class.
+        /// Inicializa uma nova instância da classe <see cref="Club"/>.
         /// </summary>
-        /// <param name="id">The id<see cref="int"/></param>
-        /// <param name="cartolaId">The cartolaId<see cref="int"/></param>
-        /// <param name="abreviation">The abreviation<see cref="string"/></param>
-        /// <param name="slug">The slug<see cref="string"/></param>
-        /// <param name="nickname">The nickname<see cref="string"/></param>
-        /// <param name="logoUrl">The logoUrl<see cref="string"/></param>
+        /// <param name="id">O id<see cref="int"/></param>
+        /// <param name="cartolaId">O cartolaId<see cref="int"/></param>
+        /// <param name="abreviation">O abreviation<see cref="string"/></param>
+        /// <param name="slug">O slug<see cref="string"/></param>
+        /// <param name="nickname">O nickname<see cref="string"/></param>
+        /// <param name="logoUrl">O logoUrl<see cref="string"/></param>
         public Club(int id, int cartolaId, string abreviation, string slug, string nickname, string logoUrl)
         {
             Id = id;
@@ -28,37 +28,37 @@
         }
 
         /// <summary>
-        /// Gets or sets the Id
+        /// Obtém ou define Id
         /// </summary>
         public int Id { get; set; }
 
         /// <summary>
-        /// Gets or sets the CartolaId
+        /// Obtém ou define CartolaId
         /// </summary>
         public int CartolaId { get; set; }
 
         /// <summary>
-        /// Gets or sets the Abreviation
+        /// Obtém ou define Abreviation
         /// </summary>
         public string Abreviation { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the Slug
+        /// Obtém ou define Slug
         /// </summary>
         public string Slug { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the Nickname
+        /// Obtém ou define Nickname
         /// </summary>
         public string Nickname { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the LogoUrl
+        /// Obtém ou define LogoUrl
         /// </summary>
         public string LogoUrl { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the AthleteRounds
+        /// Obtém ou define AthleteRounds
         /// </summary>
         public ICollection<AthleteRound> AthleteRounds { get; set; } = new List<AthleteRound>();
     }

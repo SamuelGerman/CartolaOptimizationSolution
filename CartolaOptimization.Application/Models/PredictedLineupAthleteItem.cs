@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents an athlete selected for the optimized predicted lineup.
+/// Representa um atleta selecionado para a escalação prevista otimizada.
 /// </summary>
 public sealed class PredictedLineupAthleteItem
 {

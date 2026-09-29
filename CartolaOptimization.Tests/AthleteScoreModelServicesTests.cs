@@ -834,7 +834,7 @@ public sealed class AthleteScoreModelServicesTests
 
             var result = await service.TrainAllAsync(fromRound: 1, toRound: 3, validationRounds: 1);
 
-            // Seed data has defenders (pos 3) and strikers (pos 5); other positions have 0 rows.
+            // Os dados de seed têm zagueiros (pos 3) e atacantes (pos 5); as outras posições têm 0 linhas.
             Assert.Contains("trained", result.Message, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(2, result.TrainedPositions);
             Assert.Equal(4, result.SkippedPositions);
@@ -869,9 +869,9 @@ public sealed class AthleteScoreModelServicesTests
         {
             await SeedFullContextTrainingDataAsync(await dbContextFactory.CreateDbContextAsync(), includeCurrentRoundAthleteBaselines: true);
 
-            // Train global model — the sole predictor; positional routing was removed after
-            // empirical evaluation showed the global model outperforms position-specific models
-            // across every position due to its larger training dataset.
+            // Treina o modelo global — o único preditor; o roteamento posicional foi removido depois que
+            // a avaliação empírica mostrou que o modelo global supera os modelos específicos de posição
+            // em todas as posições devido ao seu conjunto de dados de treino maior.
             var globalStore = CreateFullContextArtifactStore(artifactDirectory);
             var globalTraining = new FullContextAthleteScoreModelTrainingService(
                 dbContextFactory,

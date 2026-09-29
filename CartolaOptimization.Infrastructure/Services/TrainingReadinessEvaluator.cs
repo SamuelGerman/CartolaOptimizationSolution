@@ -4,7 +4,7 @@ using CartolaOptimization.Domain.Entities;
 namespace CartolaOptimization.Infrastructure.Services;
 
 /// <summary>
-/// Centralizes the rules that classify round rows as complete, partial or unfit for model training.
+/// Centraliza as regras que classificam as linhas de rodada como completas, parciais ou inaptas para o treino do modelo.
 /// </summary>
 internal static class TrainingReadinessEvaluator
 {

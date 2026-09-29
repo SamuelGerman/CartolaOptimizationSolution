@@ -1,19 +1,19 @@
 ﻿namespace CartolaOptimization.Domain.Entities
 {
     /// <summary>
-    /// Defines the <see cref="ClubRoundPosition" />
+    /// Define <see cref="ClubRoundPosition" />
     /// </summary>
     public class ClubRoundPosition
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="ClubRoundPosition"/> class.
+        /// Inicializa uma nova instância da classe <see cref="ClubRoundPosition"/>.
         /// </summary>
-        /// <param name="id">The id<see cref="long"/></param>
-        /// <param name="clubRoundId">The clubRoundId<see cref="long"/></param>
-        /// <param name="positionId">The positionId<see cref="int"/></param>
-        /// <param name="pointsConcededAverage">The pointsConcededAverage<see cref="decimal"/></param>
-        /// <param name="pointsConqueredAverage">The pointsConqueredAverage<see cref="decimal"/></param>
-        /// <param name="distributionValue">The distributionValue<see cref="decimal"/></param>
+        /// <param name="id">O id<see cref="long"/></param>
+        /// <param name="clubRoundId">O clubRoundId<see cref="long"/></param>
+        /// <param name="positionId">O positionId<see cref="int"/></param>
+        /// <param name="pointsConcededAverage">O pointsConcededAverage<see cref="decimal"/></param>
+        /// <param name="pointsConqueredAverage">O pointsConqueredAverage<see cref="decimal"/></param>
+        /// <param name="distributionValue">O distributionValue<see cref="decimal"/></param>
         public ClubRoundPosition(long id, long clubRoundId, int positionId, decimal pointsConcededAverage, decimal pointsConqueredAverage, decimal distributionValue = 0m)
         {
             Id = id;
@@ -25,48 +25,48 @@
         }
 
         /// <summary>
-        /// Gets or sets the Id
+        /// Obtém ou define Id
         /// </summary>
         public long Id { get; set; }
 
         /// <summary>
-        /// Gets or sets the ClubRoundId
+        /// Obtém ou define ClubRoundId
         /// </summary>
         public long ClubRoundId { get; set; }
 
         /// <summary>
-        /// Gets or sets the PositionId
+        /// Obtém ou define PositionId
         /// </summary>
         public int PositionId { get; set; }
 
         // Representa o quão fácil/difícil é para um adversário pontuar contra este time nesta posição
 
         /// <summary>
-        /// Gets or sets the PointsConcededAverage
+        /// Obtém ou define PointsConcededAverage
         /// </summary>
         public decimal PointsConcededAverage { get; set; }
 
         // Representa o quanto os jogadores DESTE time pontuam nesta posição
 
         /// <summary>
-        /// Gets or sets the PointsConqueredAverage
+        /// Obtém ou define PointsConqueredAverage
         /// </summary>
         public decimal PointsConqueredAverage { get; set; }
 
         /// <summary>
-        /// Gets or sets the share of team points historically concentrated on this position.
+        /// Obtém ou define a parcela de pontos do time historicamente concentrada nesta posição.
         /// </summary>
         public decimal DistributionValue { get; set; }
 
         // Navegação
 
         /// <summary>
-        /// Gets or sets the ClubRound
+        /// Obtém ou define ClubRound
         /// </summary>
         public ClubRound ClubRound { get; set; } = null!;
 
         /// <summary>
-        /// Gets or sets the Position
+        /// Obtém ou define Position
         /// </summary>
         public Position Position { get; set; } = null!;
     }

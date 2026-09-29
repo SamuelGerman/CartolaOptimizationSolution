@@ -3,15 +3,15 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.Application.Interfaces;
 
 /// <summary>
-/// Trains and loads a separate LightGBM athlete-score model for each Cartola position
-/// (GOL, LAT, ZAG, MEI, ATA, TEC). Each model uses the same full-context feature set
-/// but is trained exclusively on athletes of its own position.
+/// Treina e carrega um modelo LightGBM de pontuação de atletas separado para cada posição do Cartola
+/// (GOL, LAT, ZAG, MEI, ATA, TEC). Cada modelo usa o mesmo conjunto de features full-context
+/// mas é treinado exclusivamente com atletas da sua própria posição.
 /// </summary>
 public interface IPositionalAthleteScoreModelTrainingService
 {
     /// <summary>
-    /// Trains one model per supported Cartola position. Positions with fewer rows than the
-    /// configured minimum threshold are skipped instead of producing an underfitted artifact.
+    /// Treina um modelo por posição suportada do Cartola. Posições com menos linhas que o
+    /// limiar mínimo configurado são descartadas em vez de produzir um artefato subajustado.
     /// </summary>
     Task<PositionalAthleteScoreTrainingResult> TrainAllAsync(
         int? fromRound = null,
@@ -20,8 +20,8 @@ public interface IPositionalAthleteScoreModelTrainingService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Returns the metadata for every persisted positional model artifact, ordered by
-    /// <c>PositionCartolaId</c>. Positions whose artifact does not exist are omitted.
+    /// Retorna os metadados de cada artefato de modelo posicional persistido, ordenados por
+    /// <c>PositionCartolaId</c>. Posições cujo artefato não existe são omitidas.
     /// </summary>
     Task<IReadOnlyList<AthleteScoreModelInfo>> GetAllModelInfosAsync(CancellationToken cancellationToken = default);
 }

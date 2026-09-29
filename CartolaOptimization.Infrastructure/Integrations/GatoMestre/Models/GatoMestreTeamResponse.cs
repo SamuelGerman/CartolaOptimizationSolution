@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents a team row returned by Gato Mestre.
+/// Representa uma linha de time retornada pelo Gato Mestre.
 /// </summary>
 public sealed class GatoMestreTeamResponse
 {

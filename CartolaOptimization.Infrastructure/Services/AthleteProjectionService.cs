@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CartolaOptimization.Infrastructure.Services;
 
 /// <summary>
-/// Generates explainable baseline score projections for athletes in a target round using persisted historical and contextual features.
+/// Gera projeções de pontuação de referência explicáveis para os atletas de uma rodada-alvo usando features históricas e contextuais persistidas.
 /// </summary>
 public sealed class AthleteProjectionService(AppDbContext dbContext) : IAthleteProjectionService
 {

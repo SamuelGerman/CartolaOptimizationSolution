@@ -6,7 +6,7 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 namespace CartolaOptimization.Api.Swagger;
 
 /// <summary>
-/// Supplies a helpful default Swagger example for lineup optimization requests without changing runtime defaults.
+/// Fornece um exemplo padrão útil no Swagger para as requisições de otimização de escalação sem alterar os padrões de runtime.
 /// </summary>
 public sealed class PredictedLineupRequestSchemaFilter : ISchemaFilter
 {

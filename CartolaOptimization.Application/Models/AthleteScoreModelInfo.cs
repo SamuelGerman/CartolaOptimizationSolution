@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents persisted metadata about a trained athlete-score model artifact.
+/// Representa os metadados persistidos sobre um artefato de modelo de pontuação de atletas treinado.
 /// </summary>
 public sealed class AthleteScoreModelInfo
 {
@@ -39,20 +39,20 @@ public sealed class AthleteScoreModelInfo
 
     public IReadOnlyList<AthleteScorePositionDiagnostics> PositionDiagnostics { get; init; } = [];
 
-    /// <summary>Total number of numeric features available before any top-N filter is applied.</summary>
+    /// <summary>Número total de features numéricas disponíveis antes de aplicar qualquer filtro top-N.</summary>
     public int TotalNumericFeatureCount { get; init; }
 
-    /// <summary>Number of numeric features actually used in the final trained model.</summary>
+    /// <summary>Número de features numéricas efetivamente usadas no modelo final treinado.</summary>
     public int ActiveNumericFeatureCount { get; init; }
 
     /// <summary>
-    /// Per-feature permutation importance ranked from most to least important.
-    /// Populated after every training run. Empty for artifacts trained before this feature was introduced.
+    /// Importância por permutação de cada feature, ordenada da mais para a menos importante.
+    /// Preenchido após cada execução de treino. Vazio para artefatos treinados antes desta feature ser introduzida.
     /// </summary>
     public IReadOnlyList<AthleteScoreFeatureImportance> FeatureImportances { get; init; } = [];
 
     /// <summary>
-    /// LightGBM hyperparameters that were active when this model artifact was trained.
+    /// Hiperparâmetros do LightGBM que estavam ativos quando este artefato de modelo foi treinado.
     /// </summary>
     public LightGbmHyperparameters Hyperparameters { get; init; } = new();
 }

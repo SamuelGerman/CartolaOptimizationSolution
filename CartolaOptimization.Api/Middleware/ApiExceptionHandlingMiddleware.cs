@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace CartolaOptimization.Api.Middleware;
 
 /// <summary>
-/// Converts synchronization failures into structured problem details responses.
+/// Converte falhas de sincronização em respostas estruturadas de problem details.
 /// </summary>
 public sealed class ApiExceptionHandlingMiddleware(
     RequestDelegate next,

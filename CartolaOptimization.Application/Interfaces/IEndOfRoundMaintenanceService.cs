@@ -3,7 +3,7 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.Application.Interfaces;
 
 /// <summary>
-/// Defines the contract for the end-of-round maintenance workflow that refreshes historical data and retrains the primary full-context model.
+/// Define o contrato do fluxo de manutenção de fim de rodada que atualiza os dados históricos e retreina o modelo full-context principal.
 /// </summary>
 public interface IEndOfRoundMaintenanceService
 {

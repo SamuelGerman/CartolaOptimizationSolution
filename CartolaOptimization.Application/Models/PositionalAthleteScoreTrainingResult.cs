@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Aggregated result of a positional athlete-score model training run across all six Cartola positions.
+/// Resultado agregado de uma execução de treino do modelo posicional de pontuação de atletas nas seis posições do Cartola.
 /// </summary>
 public sealed class PositionalAthleteScoreTrainingResult
 {
@@ -13,12 +13,12 @@ public sealed class PositionalAthleteScoreTrainingResult
 
     public int ValidationRounds { get; init; }
 
-    /// <summary>Number of positions for which a model was successfully trained and persisted.</summary>
+    /// <summary>Número de posições para as quais um modelo foi treinado e persistido com sucesso.</summary>
     public int TrainedPositions { get; init; }
 
-    /// <summary>Number of positions skipped due to insufficient data.</summary>
+    /// <summary>Número de posições descartadas por dados insuficientes.</summary>
     public int SkippedPositions { get; init; }
 
-    /// <summary>Per-position training outcomes ordered by <c>PositionCartolaId</c>.</summary>
+    /// <summary>Resultados de treino por posição, ordenados por <c>PositionCartolaId</c>.</summary>
     public IReadOnlyList<PositionalAthleteScoreModelResult> Positions { get; init; } = [];
 }

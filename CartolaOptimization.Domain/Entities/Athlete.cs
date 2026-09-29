@@ -4,17 +4,17 @@
     using System.Collections.Generic;
 
     /// <summary>
-    /// Defines the <see cref="Athlete" />
+    /// Define <see cref="Athlete" />
     /// </summary>
     public class Athlete
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="Athlete"/> class.
+        /// Inicializa uma nova instância da classe <see cref="Athlete"/>.
         /// </summary>
-        /// <param name="id">The id<see cref="int"/></param>
-        /// <param name="cartolaId">The cartolaId<see cref="int"/></param>
-        /// <param name="name">The name<see cref="string"/></param>
-        /// <param name="nickname">The nickname<see cref="string"/></param>
+        /// <param name="id">O id<see cref="int"/></param>
+        /// <param name="cartolaId">O cartolaId<see cref="int"/></param>
+        /// <param name="name">O name<see cref="string"/></param>
+        /// <param name="nickname">O nickname<see cref="string"/></param>
         public Athlete(int id, int cartolaId, string name, string nickname)
         {
             Id = id;
@@ -24,27 +24,27 @@
         }
 
         /// <summary>
-        /// Gets or sets the Id
+        /// Obtém ou define Id
         /// </summary>
         public int Id { get; set; }
 
         /// <summary>
-        /// Gets or sets the CartolaId
+        /// Obtém ou define CartolaId
         /// </summary>
         public int CartolaId { get; set; }
 
         /// <summary>
-        /// Gets or sets the Name
+        /// Obtém ou define Name
         /// </summary>
         public string Name { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the Nickname
+        /// Obtém ou define Nickname
         /// </summary>
         public string Nickname { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the Rounds
+        /// Obtém ou define Rounds
         /// </summary>
         public ICollection<AthleteRound> Rounds { get; set; } = new List<AthleteRound>();
     }

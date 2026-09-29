@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents an export-ready full-context training dataset slice.
+/// Representa um recorte do conjunto de dados de treino full-context, pronto para exportação.
 /// </summary>
 public sealed class TrainingFullContextDatasetResult
 {

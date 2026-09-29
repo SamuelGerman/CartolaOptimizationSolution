@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents a historical athlete-round row enriched with athlete-level Gato Mestre context and Cartola match context.
+/// Representa uma linha histórica de atleta-rodada enriquecida com contexto do Gato Mestre em nível de atleta e contexto de partida do Cartola.
 /// </summary>
 public sealed class TrainingAthleteContextDatasetRow
 {

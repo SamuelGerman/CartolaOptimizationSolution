@@ -3,13 +3,13 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.Application.Interfaces;
 
 /// <summary>
-/// Defines administrative operations that train and persist the v1 full-context athlete-score machine learning model.
+/// Define operações administrativas que treinam e persistem o modelo de aprendizado de máquina de pontuação de atletas full-context v1.
 /// </summary>
 public interface IFullContextAthleteScoreModelTrainingService
 {
     /// <summary>
-    /// Trains and persists the full-context model. When <paramref name="hyperparameters"/> is
-    /// <c>null</c> the implementation falls back to the values configured in
+    /// Treina e persiste o modelo full-context. Quando <paramref name="hyperparameters"/> é
+    /// <c>null</c>, a implementação recorre aos valores configurados em
     /// <c>MachineLearning:FullContext:Hyperparameters</c>.
     /// </summary>
     Task<AthleteScoreModelTrainingResult> TrainAsync(

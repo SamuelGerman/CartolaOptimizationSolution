@@ -21,9 +21,9 @@ public sealed class FullContextAthleteScoreModelTrainingService(
     private readonly FullContextAthleteScoreModelOptions options = options.Value;
 
     /// <summary>
-    /// One-hot encoded column names. Their slots in the concatenated Features vector are identified
-    /// by prefix (e.g. "ClubEncoded.0", "ClubEncoded.1", …) and are always included in the model
-    /// regardless of the <paramref name="topNFeatures"/> cutoff.
+    /// Nomes das colunas codificadas em one-hot. Suas posições no vetor Features concatenado são identificadas
+    /// por prefixo (por exemplo, "ClubEncoded.0", "ClubEncoded.1", …) e são sempre incluídas no modelo
+    /// independentemente do corte <paramref name="topNFeatures"/>.
     /// </summary>
     private static readonly HashSet<string> EncodedPrefixes = new(StringComparer.Ordinal)
     {
@@ -44,7 +44,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
         NormalizeOptionalRange(ref fromRound, ref toRound);
         validationRounds = Math.Max(1, validationRounds);
 
-        // Fall back to the configured defaults when the caller does not supply explicit values.
+        // Recorre aos padrões configurados quando o chamador não fornece valores explícitos.
         topNFeatures ??= options.DefaultTopNFeatures;
         hyperparameters ??= options.Hyperparameters;
 
@@ -72,11 +72,11 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             validationRounds = distinctRounds.Length - 1;
         }
 
-        // The holdout window starts at this index into distinctRounds (ascending order).
+        // A janela de holdout começa neste índice de distinctRounds (ordem ascendente).
         var holdoutStartIdx = distinctRounds.Length - validationRounds;
         var holdoutStartRound = distinctRounds[holdoutStartIdx];
 
-        // Feature-selection split: train on everything before the holdout window.
+        // Divisão para seleção de features: treina em tudo antes da janela de holdout.
         var featureSelectionRows = rows
             .Where(item => (int)item.RoundId < holdoutStartRound)
             .ToList();
@@ -94,12 +94,12 @@ public sealed class FullContextAthleteScoreModelTrainingService(
 
         var allNumericFeatureNames = GetNumericFeatureNames(allowedFeatures: null);
 
-        // Phase 1: train on all features so PFI evaluates relative importance on the full model.
+        // Fase 1: treina em todas as features para que o PFI avalie a importância relativa no modelo completo.
         var fullPipeline = BuildPipeline(mlContext, allowedNumericFeatures: null, hyperparameters);
         var fullModel = fullPipeline.Fit(featureSelectionData);
 
-        // Compute permutation feature importance by manually shuffling each feature and measuring R² drop.
-        // This avoids the ML.NET PFI API which requires a specific transformer type.
+        // Calcula a importância das features por permutação, embaralhando manualmente cada feature e medindo a queda no R².
+        // Isto evita a API de PFI do ML.NET, que exige um tipo específico de transformer.
         List<(string FeatureName, double MeanRSquaredDrop, double RSquaredDropStdDev, bool IsNumeric)> importanceRanking;
         try
         {
@@ -115,7 +115,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             importanceRanking = [];
         }
 
-        // Phase 2 (optional): select the top-N numeric features from the PFI ranking.
+        // Fase 2 (opcional): seleciona as top-N features numéricas do ranking de PFI.
         IReadOnlySet<string>? allowedNumericFeatures = null;
 
         if (topNFeatures.HasValue)
@@ -145,10 +145,10 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             }
         }
 
-        // Phase 3: walk-forward (expanding-window) cross-validation to estimate generalisation metrics.
-        // For each fold k the model trains on all rounds strictly before fold k's validation round
-        // and evaluates on that single round. Metrics are averaged across folds. The validation round
-        // for fold k is distinctRounds[holdoutStartIdx + k].
+        // Fase 3: validação cruzada walk-forward (janela expansiva) para estimar as métricas de generalização.
+        // Para cada fold k o modelo treina em todas as rodadas estritamente anteriores à rodada de validação do fold k
+        // e avalia nessa única rodada. As métricas são calculadas como média entre os folds. A rodada de validação
+        // para o fold k é distinctRounds[holdoutStartIdx + k].
         var cvMaes = new List<double>(validationRounds);
         var cvRmses = new List<double>(validationRounds);
         var cvR2s = new List<double>(validationRounds);
@@ -205,18 +205,18 @@ public sealed class FullContextAthleteScoreModelTrainingService(
         var cvRmse = cvRmses.Count > 0 ? cvRmses.Average() : 0d;
         var cvR2 = cvR2s.Count > 0 ? cvR2s.Average() : 0d;
 
-        // Phase 4: train the persisted model on ALL rows with the selected features.
-        // Walk-forward CV was used only to estimate metrics; the final model maximises training data.
+        // Fase 4: treina o modelo persistido em TODAS as linhas com as features selecionadas.
+        // A CV walk-forward foi usada apenas para estimar métricas; o modelo final maximiza os dados de treino.
         var allData = mlContext.Data.LoadFromEnumerable(rows);
         var finalPipeline = BuildPipeline(mlContext, allowedNumericFeatures, hyperparameters);
         var finalModel = finalPipeline.Fit(allData);
 
-        // Calibration diagnostics come from the last (most recent) CV fold.
+        // Os diagnósticos de calibração vêm do último (mais recente) fold da validação cruzada.
         var positionDiagnostics = lastFoldTrainingRows is not null && lastFoldHoldoutRows is not null && lastFoldScores is not null
             ? BuildPositionDiagnostics(lastFoldTrainingRows, lastFoldHoldoutRows, lastFoldScores)
             : [];
 
-        // Build the final feature importance list, tagging which features were kept in the model.
+        // Monta a lista final de importância das features, marcando quais foram mantidas no modelo.
         var activeNumericFeatureSet = allowedNumericFeatures
             ?? new HashSet<string>(allNumericFeatureNames, StringComparer.Ordinal);
 
@@ -227,7 +227,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
                 MeanRSquaredDrop = item.MeanRSquaredDrop,
                 RSquaredDropStdDev = item.RSquaredDropStdDev,
                 Rank = idx + 1,
-                // Categorical encoded groups are always selected; numeric features only when in the top-N set.
+                // Os grupos categóricos codificados são sempre selecionados; as features numéricas apenas quando estão no conjunto top-N.
                 IsSelected = !item.IsNumeric || activeNumericFeatureSet.Contains(item.FeatureName),
             })
             .ToList();
@@ -276,19 +276,19 @@ public sealed class FullContextAthleteScoreModelTrainingService(
     }
 
     /// <summary>
-    /// Returns the names of numeric float feature columns, optionally restricted to an allowed set.
-    /// The five ID/label columns are always excluded.
+    /// Retorna os nomes das colunas de features numéricas float, opcionalmente restritas a um conjunto permitido.
+    /// As cinco colunas de ID/rótulo são sempre excluídas.
     /// </summary>
     /// <summary>
-    /// Curated numeric feature set (Tier 1 + Tier 2 by permutation feature importance). The full
-    /// 231-feature pool was pruned to the ~47 features that carry measurable signal (PFI ranks 1-50,
-    /// R² drop ≤ ~-0.002); the long tail (126 features with PFI importance ≥ 0) was redundant or
-    /// actively harmful. Restricting the candidate pool to these speeds up training and removes noise.
-    /// (Club/Opponent/Position/Status one-hot encodings are always included separately by BuildPipeline.)
+    /// Conjunto curado de features numéricas (Tier 1 + Tier 2 por importância de permutação). O conjunto completo
+    /// O conjunto de 231 features foi podado para as ~47 features que carregam sinal mensurável (ranks PFI 1-50,
+    /// queda de R² ≤ ~-0,002); a cauda longa (126 features com importância PFI ≥ 0) era redundante ou
+    /// ativamente prejudiciais. Restringir o conjunto de candidatos a estas acelera o treino e remove ruído.
+    /// (As codificações one-hot de Club/Opponent/Position/Status são sempre incluídas separadamente por BuildPipeline.)
     /// </summary>
     private static readonly HashSet<string> CuratedNumericFeatures = new(StringComparer.Ordinal)
     {
-        // Tier 1 — carry the signal
+        // Tier 1 — carregam o sinal
         "PriceDeltaVsHistoricalAverage", "PositionRelativePriceSignal", "PriceNum", "IsHomeMatch",
         "PriceTrendLast3", "HistoricalPointsPerCartoletaLast3",
         "OpponentPositionScoutNegativeConcededAverageLast5", "OpponentAttackStrengthLast5",
@@ -320,13 +320,13 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             nameof(FullContextAthleteScoreTrainingRow.PositionCartolaId),
             nameof(FullContextAthleteScoreTrainingRow.StatusCartolaId),
 
-            // ── GatoMestre context features — EXCLUDED due to confirmed target leak. ──────────────
-            // These come from the athleteRound.Context navigation populated by the GatoMestre sync.
-            // A controlled walk-forward ablation proved that the "*Current"/Index variants embed the
-            // round's OWN result (the moving average is updated WITH round N's score), inflating
-            // holdout R² from ~0.26 (leak-free) to ~0.87 while causing catastrophic train/serve skew
-            // at prediction time. The leak-free "*Previous" variants add no measurable value
-            // (ΔR²=-0.007), so the entire GatoMestre block is dropped: the model is now Cartola-only.
+            // ── Features de contexto do GatoMestre — EXCLUÍDAS por vazamento de alvo confirmado. ──────────────
+            // Estas vêm da navegação athleteRound.Context preenchida pela sincronização do GatoMestre.
+            // Uma ablação walk-forward controlada provou que as variantes "*Current"/Index embutem o
+            // resultado da PRÓPRIA rodada (a média móvel é atualizada COM a pontuação da rodada N), inflando
+            // o R² de holdout de ~0,26 (livre de vazamento) para ~0,87 ao mesmo tempo em que causa um desvio catastrófico entre treino e produção
+            // no momento da previsão. As variantes "*Previous" livres de vazamento não agregam valor mensurável
+            // (ΔR²=-0.007), então todo o bloco do GatoMestre é descartado: o modelo agora é só-Cartola.
             nameof(FullContextAthleteScoreTrainingRow.HasAthleteContext),
             nameof(FullContextAthleteScoreTrainingRow.TeamAverageScore),
             nameof(FullContextAthleteScoreTrainingRow.TeamHomeAverageCurrent),
@@ -413,16 +413,16 @@ public sealed class FullContextAthleteScoreModelTrainingService(
     }
 
     /// <summary>
-    /// Computes permutation feature importance by shuffling each feature's values in a holdout sample
-    /// and measuring the resulting drop in R². Works with any <see cref="ITransformer"/> without
-    /// requiring ML.NET's internal PFI API, which imposes type constraints on the model.
+    /// Calcula a importância das features por permutação, embaralhando os valores de cada feature em uma amostra de holdout
+    /// e medindo a queda resultante no R². Funciona com qualquer <see cref="ITransformer"/> sem
+    /// exigir a API interna de PFI do ML.NET, que impõe restrições de tipo ao modelo.
     /// </summary>
     /// <remarks>
-    /// Algorithm: for each feature, randomly permute its values across sample rows, re-score with the
-    /// full model and measure R² change (permuted − baseline). A more negative delta means the feature
-    /// was important: scrambling it hurt the model more.
-    /// Categorical features (club, opponent, position, status) are permuted by shuffling their raw
-    /// CartolaId column so the one-hot encoding is reshuffled consistently.
+    /// Algoritmo: para cada feature, permuta aleatoriamente seus valores entre as linhas da amostra, repontua com o
+    /// modelo completo e mede a variação do R² (permutado − referência). Um delta mais negativo significa que a feature
+    /// era importante: embaralhá-la prejudicou mais o modelo.
+    /// As features categóricas (clube, adversário, posição, status) são permutadas embaralhando seus
+    /// coluna CartolaId, de modo que a codificação one-hot seja reembaralhada de forma consistente.
     /// </remarks>
     internal static List<(string FeatureName, double MeanRSquaredDrop, double RSquaredDropStdDev, bool IsNumeric)>
         ComputeFeatureImportances(
@@ -436,32 +436,32 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             return [];
         }
 
-        // Cap the sample size so PFI completes in seconds rather than minutes.
+        // Limita o tamanho da amostra para que o PFI termine em segundos, e não em minutos.
         var rng = new Random(42);
         var sample = holdoutRows.Count > 200
             ? holdoutRows.OrderBy(_ => rng.Next()).Take(200).ToList()
             : holdoutRows.ToList();
 
-        // Pre-cache PropertyInfo objects — one reflection lookup per feature name, not per row.
+        // Faz cache prévio dos objetos PropertyInfo — uma busca por reflexão por nome de feature, não por linha.
         var propByName = typeof(FullContextAthleteScoreTrainingRow)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .ToDictionary(p => p.Name, StringComparer.Ordinal);
 
-        // MemberwiseClone is protected on System.Object; call it via reflection to clone immutable rows.
+        // MemberwiseClone é protegido em System.Object; chama-o via reflexão para clonar linhas imutáveis.
         var cloneMethod = typeof(object)
             .GetMethod("MemberwiseClone", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
-        // Baseline R² on the unmodified sample.
+        // R² de referência na amostra não modificada.
         var baselineR2 = EvaluateR2(mlContext, model, sample);
 
         var results = new List<(string FeatureName, double MeanRSquaredDrop, double RSquaredDropStdDev, bool IsNumeric)>(numericFeatureNames.Length + 4);
 
-        // ── Numeric features ──────────────────────────────────────────────────────────────────────
+        // ── Features numéricas ──────────────────────────────────────────────────────────────────────
         foreach (var featureName in numericFeatureNames)
         {
             var prop = propByName[featureName];
 
-            // Single permutation run (sufficient for relative ranking with the current data volume).
+            // Uma única execução de permutação (suficiente para o ranqueamento relativo com o volume de dados atual).
             var values = sample.Select(r => (float)prop.GetValue(r)!).ToArray();
             FisherYatesShuffle(values, rng);
 
@@ -479,8 +479,8 @@ public sealed class FullContextAthleteScoreModelTrainingService(
         }
 
         // ── Categorical encoded groups ─────────────────────────────────────────────────────────────
-        // Permute the raw CartolaId column; the pipeline's OneHotEncoding reshuffles the encoding
-        // consistently, so the measured drop reflects the true importance of the categorical group.
+        // Permuta a coluna bruta CartolaId; o OneHotEncoding do pipeline reembaralha a codificação
+        // de forma consistente, então a queda medida reflete a real importância do grupo categórico.
         var categoricalItems = new[]
         {
             ("ClubEncoded", nameof(FullContextAthleteScoreTrainingRow.ClubCartolaId)),
@@ -512,7 +512,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             .ToList();
     }
 
-    /// <summary>Scores <paramref name="rows"/> with <paramref name="model"/> and returns the R² metric.</summary>
+    /// <summary>Pontua <paramref name="rows"/> com <paramref name="model"/> e retorna a métrica R².</summary>
     private static double EvaluateR2(
         MLContext mlContext,
         ITransformer model,
@@ -526,7 +526,7 @@ public sealed class FullContextAthleteScoreModelTrainingService(
             scoreColumnName: "Score").RSquared;
     }
 
-    /// <summary>In-place Fisher-Yates shuffle.</summary>
+    /// <summary>Embaralhamento Fisher-Yates in-place.</summary>
     private static void FisherYatesShuffle<T>(T[] array, Random rng)
     {
         for (var i = array.Length - 1; i > 0; i--)

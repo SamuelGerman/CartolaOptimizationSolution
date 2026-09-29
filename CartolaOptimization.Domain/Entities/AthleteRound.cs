@@ -5,30 +5,30 @@
     //essa classe vira do endpoint /mercado/atletas e https://api.gatomestre.globo.com/api/v2/atletas/2026/campeonato-brasileiro/home/atletas/rodadas/{numrodada}?a=true
 
     /// <summary>
-    /// Defines the <see cref="AthleteRound" />
+    /// Define <see cref="AthleteRound" />
     /// </summary>
     public class AthleteRound
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="AthleteRound"/> class.
+        /// Inicializa uma nova instância da classe <see cref="AthleteRound"/>.
         /// </summary>
-        /// <param name="id">The id<see cref="long"/></param>
-        /// <param name="roundId">The roundId<see cref="int"/></param>
-        /// <param name="athleteId">The athleteId<see cref="int"/></param>
-        /// <param name="clubId">The clubId<see cref="int"/></param>
-        /// <param name="positionId">The positionId<see cref="int"/></param>
-        /// <param name="statusId">The statusId<see cref="int"/></param>
-        /// <param name="gamesNum">The gamesNum<see cref="int"/></param>
-        /// <param name="homeGamesNum">The homeGamesNum<see cref="int"/></param>
-        /// <param name="awayGamesNum">The awayGamesNum<see cref="int"/></param>
-        /// <param name="scoreNum">The scoreNum<see cref="decimal"/></param>
-        /// <param name="movingAverage">The movingAverage<see cref="decimal"/></param>
-        /// <param name="averageScoreNum">The averageScoreNum<see cref="decimal"/></param>
-        /// <param name="homeAverageScore">The homeAverageScore<see cref="decimal"/></param>
-        /// <param name="awayAverageScore">The awayAverageScore<see cref="decimal"/></param>
-        /// <param name="variationNum">The variationNum<see cref="decimal"/></param>
-        /// <param name="priceNum">The priceNum<see cref="decimal"/></param>
-        /// <param name="wasInGame">The wasInGame<see cref="bool"/></param>
+        /// <param name="id">O id<see cref="long"/></param>
+        /// <param name="roundId">O roundId<see cref="int"/></param>
+        /// <param name="athleteId">O athleteId<see cref="int"/></param>
+        /// <param name="clubId">O clubId<see cref="int"/></param>
+        /// <param name="positionId">O positionId<see cref="int"/></param>
+        /// <param name="statusId">O statusId<see cref="int"/></param>
+        /// <param name="gamesNum">O gamesNum<see cref="int"/></param>
+        /// <param name="homeGamesNum">O homeGamesNum<see cref="int"/></param>
+        /// <param name="awayGamesNum">O awayGamesNum<see cref="int"/></param>
+        /// <param name="scoreNum">O scoreNum<see cref="decimal"/></param>
+        /// <param name="movingAverage">O movingAverage<see cref="decimal"/></param>
+        /// <param name="averageScoreNum">O averageScoreNum<see cref="decimal"/></param>
+        /// <param name="homeAverageScore">O homeAverageScore<see cref="decimal"/></param>
+        /// <param name="awayAverageScore">O awayAverageScore<see cref="decimal"/></param>
+        /// <param name="variationNum">O variationNum<see cref="decimal"/></param>
+        /// <param name="priceNum">O priceNum<see cref="decimal"/></param>
+        /// <param name="wasInGame">O wasInGame<see cref="bool"/></param>
         public AthleteRound(long id, int roundId, int athleteId, int clubId, int positionId, int statusId, int gamesNum, int homeGamesNum, int awayGamesNum, decimal scoreNum, decimal movingAverage, decimal averageScoreNum, decimal homeAverageScore, decimal awayAverageScore, decimal variationNum, decimal priceNum, bool wasInGame)
         {
             Id = id;
@@ -51,141 +51,141 @@
         }
 
         /// <summary>
-        /// Gets or sets the Id
+        /// Obtém ou define Id
         /// </summary>
         public long Id { get; set; }
 
         /// <summary>
-        /// Gets or sets the RoundId
+        /// Obtém ou define RoundId
         /// </summary>
         public int RoundId { get; set; }
 
         /// <summary>
-        /// Gets or sets the AthleteId
+        /// Obtém ou define AthleteId
         /// </summary>
         public int AthleteId { get; set; }
 
         /// <summary>
-        /// Gets or sets the ClubId
+        /// Obtém ou define ClubId
         /// </summary>
         public int ClubId { get; set; }
 
         /// <summary>
-        /// Gets or sets the PositionId
+        /// Obtém ou define PositionId
         /// </summary>
         public int PositionId { get; set; }
 
         /// <summary>
-        /// Gets or sets the StatusId
+        /// Obtém ou define StatusId
         /// </summary>
         public int StatusId { get; set; }
 
         // Jogos disputados (Recorte Casa/Fora)
 
         /// <summary>
-        /// Gets or sets the GamesNum
+        /// Obtém ou define GamesNum
         /// </summary>
         public int GamesNum { get; set; }
 
         /// <summary>
-        /// Gets or sets the HomeGamesNum
+        /// Obtém ou define HomeGamesNum
         /// </summary>
         public int HomeGamesNum { get; set; }
 
         /// <summary>
-        /// Gets or sets the AwayGamesNum
+        /// Obtém ou define AwayGamesNum
         /// </summary>
         public int AwayGamesNum { get; set; }
 
         // Médias e Pontuações
 
         /// <summary>
-        /// Gets or sets the ScoreNum
+        /// Obtém ou define ScoreNum
         /// </summary>
         public decimal ScoreNum { get; set; }
 
         /// <summary>
-        /// Gets or sets the MovingAverage
+        /// Obtém ou define MovingAverage
         /// </summary>
         public decimal MovingAverage { get; set; }
 
         /// <summary>
-        /// Gets or sets the AverageScoreNum
+        /// Obtém ou define AverageScoreNum
         /// </summary>
         public decimal AverageScoreNum { get; set; }
 
         /// <summary>
-        /// Gets or sets the HomeAverageScore
+        /// Obtém ou define HomeAverageScore
         /// </summary>
         public decimal HomeAverageScore { get; set; }
 
         /// <summary>
-        /// Gets or sets the AwayAverageScore
+        /// Obtém ou define AwayAverageScore
         /// </summary>
         public decimal AwayAverageScore { get; set; }
 
         /// <summary>
-        /// Gets or sets the VariationNum
+        /// Obtém ou define VariationNum
         /// </summary>
         public decimal VariationNum { get; set; }
 
         /// <summary>
-        /// Gets or sets the PriceNum
+        /// Obtém ou define PriceNum
         /// </summary>
         public decimal PriceNum { get; set; }
 
         /// <summary>
-        /// Gets or sets a value indicating whether WasInGame
+        /// Obtém ou define um valor que indica se WasInGame
         /// </summary>
         public bool WasInGame { get; set; }
 
         /// <summary>
-        /// Gets or sets the phase that describes whether this row belongs to a closed historical round or an open/current round.
+        /// Obtém ou define a fase que descreve se esta linha pertence a uma rodada histórica fechada ou a uma rodada aberta/atual.
         /// </summary>
         public string DataPhase { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the readiness classification of the row for model training.
+        /// Obtém ou define a classificação de prontidão da linha para o treino do modelo.
         /// </summary>
         public string TrainingReadinessStatus { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the reason associated with the training readiness classification.
+        /// Obtém ou define o motivo associado à classificação de prontidão para treino.
         /// </summary>
         public string TrainingReadinessReason { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets a value indicating whether the row is currently eligible to be used by the training dataset.
+        /// Obtém ou define um valor que indica se a linha está atualmente elegível para uso pelo conjunto de dados de treino.
         /// </summary>
         public bool IsTrainingEligible { get; set; }
 
         /// <summary>
-        /// Gets or sets the Athlete
+        /// Obtém ou define Athlete
         /// </summary>
         public Athlete Athlete { get; set; } = null!;
 
         /// <summary>
-        /// Gets or sets the Status
+        /// Obtém ou define Status
         /// </summary>
         public AthleteStatus Status { get; set; } = null!;
 
         /// <summary>
-        /// Gets or sets the Club
+        /// Obtém ou define Club
         /// </summary>
         public Club Club { get; set; } = null!;
 
         /// <summary>
-        /// Gets or sets the Position
+        /// Obtém ou define Position
         /// </summary>
         public Position Position { get; set; } = null!;
 
         /// <summary>
-        /// Gets or sets the Scouts
+        /// Obtém ou define Scouts
         /// </summary>
         public ICollection<AthleteRoundScouts> Scouts { get; set; } = null!;
 
         /// <summary>
-        /// Gets or sets additional athlete-round enrichment collected from Gato Mestre.
+        /// Obtém ou define o enriquecimento adicional de atleta-rodada coletado do Gato Mestre.
         /// </summary>
         public AthleteRoundContext? Context { get; set; }
     }

@@ -3,7 +3,7 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.Application.Interfaces;
 
 /// <summary>
-/// Defines administrative read operations for synchronization execution history and failure diagnostics.
+/// Define operações administrativas de leitura para o histórico de execuções de sincronização e os diagnósticos de falha.
 /// </summary>
 public interface ISyncDiagnosticsService
 {

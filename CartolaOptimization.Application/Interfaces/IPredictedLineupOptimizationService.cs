@@ -3,7 +3,7 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.Application.Interfaces;
 
 /// <summary>
-/// Defines read operations that build an optimal predicted lineup for a target round under budget and formation constraints.
+/// Define operações de leitura que montam uma escalação prevista ótima para uma rodada-alvo sob restrições de orçamento e formação.
 /// </summary>
 public interface IPredictedLineupOptimizationService
 {

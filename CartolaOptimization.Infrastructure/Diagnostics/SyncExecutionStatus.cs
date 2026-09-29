@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Infrastructure.Diagnostics;
 
 /// <summary>
-/// Defines the lifecycle status values used by synchronization execution rows.
+/// Define os valores de status do ciclo de vida usados pelas linhas de execução de sincronização.
 /// </summary>
 public static class SyncExecutionStatus
 {

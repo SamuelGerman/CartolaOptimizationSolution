@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents a ranked list of athlete machine-learning score predictions for a target round.
+/// Representa uma lista ordenada de previsões de pontuação de atletas por aprendizado de máquina para uma rodada-alvo.
 /// </summary>
 public sealed class AthleteScorePredictionResult
 {

@@ -3,7 +3,7 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.Application.Interfaces;
 
 /// <summary>
-/// Defines administrative operations used to prepare the persisted rounds for model training.
+/// Define operações administrativas usadas para preparar as rodadas persistidas para o treino do modelo.
 /// </summary>
 public interface ITrainingDatasetPreparationService
 {

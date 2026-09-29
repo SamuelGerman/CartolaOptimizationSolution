@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Infrastructure.Diagnostics;
 
 /// <summary>
-/// Represents an inconsistency detected while translating external payloads into the local relational model.
+/// Representa uma inconsistência detectada ao traduzir payloads externos para o modelo relacional local.
 /// </summary>
 public sealed class DataCollectionIntegrityException : Exception
 {

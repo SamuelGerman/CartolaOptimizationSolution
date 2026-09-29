@@ -923,11 +923,11 @@ internal static class FullContextHistoricalFeatureCalculator
         return materialized[0] - Average(materialized.Skip(1));
     }
 
-    // Higher means a stronger recent attack based on goals plus fantasy output.
+    // Valores maiores significam um ataque recente mais forte, baseado em gols mais o desempenho no fantasy.
     private static decimal ComputeAttackStrength(decimal goalsForPerMatch, decimal fantasyPointsForAverage, decimal positionFantasyPointsForAverage)
         => goalsForPerMatch + (fantasyPointsForAverage / 10m) + (positionFantasyPointsForAverage / 10m);
 
-    // Higher means a stronger recent defense based on clean sheets, goals conceded and fantasy points allowed.
+    // Valores maiores significam uma defesa recente mais forte, baseada em jogos sem sofrer gols, gols sofridos e pontos de fantasy cedidos.
     private static decimal ComputeDefenseStrength(decimal cleanSheetRate, decimal goalsAgainstPerMatch, decimal fantasyPointsAgainstAverage, decimal positionFantasyPointsAgainstAverage)
         => (2m * cleanSheetRate) - goalsAgainstPerMatch - (fantasyPointsAgainstAverage / 10m) - (positionFantasyPointsAgainstAverage / 10m);
 

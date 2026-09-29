@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace CartolaOptimization.Api.Controllers;
 
 /// <summary>
-/// Exposes administrative endpoints used to synchronize data sourced from the Cartola API.
+/// Expõe endpoints administrativos usados para sincronizar dados originados da API do Cartola.
 /// </summary>
 [ApiController]
 [Route("api/cartola/sync")]
@@ -13,10 +13,10 @@ namespace CartolaOptimization.Api.Controllers;
 public sealed class CartolaSyncController(ICartolaSyncService cartolaSyncService) : ControllerBase
 {
     /// <summary>
-    /// Synchronizes the current Cartola catalog, athlete market data and the matches for the current round.
+    /// Sincroniza o catálogo atual do Cartola, os dados de mercado dos atletas e as partidas da rodada atual.
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>A summary describing the synchronized entities and rows.</returns>
+    /// <param name="cancellationToken">Token de cancelamento da requisição.</param>
+    /// <returns>Um resumo descrevendo as entidades e linhas sincronizadas.</returns>
     [HttpPost("current")]
     [ProducesResponseType(typeof(CartolaSyncResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
@@ -27,14 +27,14 @@ public sealed class CartolaSyncController(ICartolaSyncService cartolaSyncService
     }
 
     /// <summary>
-    /// Finalizes a single closed historical round using Cartola data only (no Gato Mestre, no training):
-    /// fetches the final score payload, applies it to the persisted athlete-round baselines and marks the
-    /// round as historically closed so it becomes eligible for model training. Use this to retroactively
-    /// close rounds that elapsed without an end-of-round run. The round must be earlier than the current round.
+    /// Finaliza uma única rodada histórica fechada usando apenas dados do Cartola (sem Gato Mestre, sem treino):
+    /// busca o payload de pontuação final, o aplica às linhas-base de atleta-rodada persistidas e marca a
+    /// rodada como historicamente fechada para que se torne elegível ao treino do modelo. Use isto para, retroativamente,
+    /// fechar rodadas que passaram sem uma execução de fim de rodada. A rodada deve ser anterior à rodada atual.
     /// </summary>
-    /// <param name="round">Closed historical round to finalize.</param>
-    /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>A summary describing the finalized round.</returns>
+    /// <param name="round">Rodada histórica fechada a finalizar.</param>
+    /// <param name="cancellationToken">Token de cancelamento da requisição.</param>
+    /// <returns>Um resumo descrevendo a rodada finalizada.</returns>
     [HttpPost("closed-round/{round:int}")]
     [ProducesResponseType(typeof(CartolaSyncResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]

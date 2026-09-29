@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents a bucket of average values returned by Gato Mestre.
+/// Representa um agrupamento de valores médios retornado pelo Gato Mestre.
 /// </summary>
 public sealed class GatoMestreAveragesBucketResponse
 {

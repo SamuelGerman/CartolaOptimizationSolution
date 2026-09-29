@@ -3,7 +3,7 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.Application.Interfaces;
 
 /// <summary>
-/// Defines administrative operations that train and persist the v1 athlete-context machine learning model.
+/// Define operações administrativas que treinam e persistem o modelo de aprendizado de máquina de contexto de atleta v1.
 /// </summary>
 public interface IAthleteContextAthleteScoreModelTrainingService
 {

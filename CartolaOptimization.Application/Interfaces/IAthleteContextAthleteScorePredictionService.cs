@@ -3,7 +3,7 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.Application.Interfaces;
 
 /// <summary>
-/// Defines read operations that return athlete-context machine-learning score predictions for a target round.
+/// Define operações de leitura que retornam previsões de pontuação por aprendizado de máquina de contexto de atleta para uma rodada-alvo.
 /// </summary>
 public interface IAthleteContextAthleteScorePredictionService
 {

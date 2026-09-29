@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents a compact row used to inspect athlete-round readiness in the training dataset.
+/// Representa uma linha compacta usada para inspecionar a prontidão de atleta-rodada no conjunto de dados de treino.
 /// </summary>
 public sealed class TrainingAthleteRoundListItem
 {

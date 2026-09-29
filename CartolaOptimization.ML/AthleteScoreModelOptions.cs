@@ -1,7 +1,7 @@
 namespace CartolaOptimization.ML;
 
 /// <summary>
-/// Defines file-system options used to persist the v0 athlete-score model artifacts.
+/// Define opções de sistema de arquivos usadas para persistir os artefatos do modelo de pontuação de atletas v0.
 /// </summary>
 public sealed class AthleteScoreModelOptions
 {

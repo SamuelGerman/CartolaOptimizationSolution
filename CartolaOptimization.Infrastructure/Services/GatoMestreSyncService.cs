@@ -14,7 +14,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace CartolaOptimization.Infrastructure.Services;
 
 /// <summary>
-/// Synchronizes team and athlete enrichment data published by Gato Mestre.
+/// Sincroniza os dados de enriquecimento de time e atleta publicados pelo Gato Mestre.
 /// </summary>
 public sealed class GatoMestreSyncService(
     AppDbContext dbContext,
@@ -415,9 +415,9 @@ public sealed class GatoMestreSyncService(
     {
         var positions = await dbContext.Positions.ToDictionaryAsync(position => position.CartolaId, cancellationToken);
 
-        // Pre-load home club IDs for the requested round so we can determine the correct
-        // position-stats slice (home vs away) when the confrontation endpoint returns a
-        // round mismatch (e.g. historical rounds where proxima-rodada is no longer available).
+        // Pré-carrega os IDs dos clubes mandantes da rodada solicitada para podermos determinar o
+        // recorte de estatísticas por posição (casa vs fora) quando o endpoint de confronto retorna um
+        // divergência de rodada (por exemplo, rodadas históricas em que proxima-rodada não está mais disponível).
         var homeClubIds = (await dbContext.Matches
             .AsNoTracking()
             .Where(m => m.Round == requestedRound)
@@ -492,9 +492,9 @@ public sealed class GatoMestreSyncService(
                     mismatchWarningLogged = true;
                 }
 
-                // Still persist the club round using cumulative stats from the block.
-                // Match-specific fields (win/draw/loss probability, expected points) are zeroed
-                // because they are unavailable for historical rounds via the proxima-rodada endpoint.
+                // Ainda assim persiste a clube-rodada usando estatísticas cumulativas do bloco.
+                // Os campos específicos de partida (probabilidade de vitória/empate/derrota, pontos esperados) são zerados
+                // porque não estão disponíveis para rodadas históricas via endpoint proxima-rodada.
                 var mismatchedBlock = ResolveClubBlock(confrontation, club.CartolaId);
                 if (mismatchedBlock is null)
                 {
@@ -502,7 +502,7 @@ public sealed class GatoMestreSyncService(
                     continue;
                 }
 
-                // Determine the correct position-stats slice from Cartola match data.
+                // Determina o recorte correto de estatísticas por posição a partir dos dados de partida do Cartola.
                 var isHomeTeam = homeClubIds.Contains(club.Id);
                 var historicalPositionStats = isHomeTeam
                     ? mismatchedBlock.PositionStats.Home

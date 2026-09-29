@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CartolaOptimization.Infrastructure.Services;
 
 /// <summary>
-/// Provides administrative read access to synchronization history and persisted failure diagnostics.
+/// Fornece acesso administrativo de leitura ao histórico de sincronização e aos diagnósticos de falha persistidos.
 /// </summary>
 public sealed class SyncDiagnosticsService(AppDbContext dbContext) : ISyncDiagnosticsService
 {

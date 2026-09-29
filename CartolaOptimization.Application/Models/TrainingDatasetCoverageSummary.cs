@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents an aggregated view of the persisted training dataset readiness window.
+/// Representa uma visão agregada da janela de prontidão do conjunto de dados de treino persistido.
 /// </summary>
 public sealed class TrainingDatasetCoverageSummary
 {

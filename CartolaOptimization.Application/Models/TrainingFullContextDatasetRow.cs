@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents a historical athlete-round row enriched with local athlete, club, opponent and match context for supervised training.
+/// Representa uma linha histórica de atleta-rodada enriquecida com contexto local de atleta, clube, adversário e partida para treino supervisionado.
 /// </summary>
 public sealed class TrainingFullContextDatasetRow
 {

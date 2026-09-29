@@ -1,41 +1,41 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the permutation-based importance of a single feature group in the full-context athlete-score model.
-/// A more negative <see cref="MeanRSquaredDrop"/> indicates the feature had a larger impact on the model's
-/// predictive accuracy: permuting it caused the biggest drop in R².
+/// Representa a importância baseada em permutação de um único grupo de features no modelo de pontuação de atletas full-context.
+/// Um <see cref="MeanRSquaredDrop"/> mais negativo indica que a feature teve maior impacto na
+/// acurácia preditiva: permutá-la causou a maior queda no R².
 /// </summary>
 public sealed class AthleteScoreFeatureImportance
 {
     /// <summary>
-    /// Feature column name for scalar numeric features, or the aggregated group name for one-hot encoded
-    /// categorical features (e.g. "ClubEncoded", "PositionEncoded").
+    /// Nome da coluna da feature para features numéricas escalares, ou o nome do grupo agregado para features codificadas em one-hot
+    /// features categóricas (por exemplo, "ClubEncoded", "PositionEncoded").
     /// </summary>
     public string FeatureName { get; init; } = string.Empty;
 
     /// <summary>
-    /// Average change in R² across permutation runs when this feature is shuffled on the holdout set.
-    /// A more negative value indicates a more important feature (permuting it degraded the model more).
-    /// Near-zero values indicate features that contribute little to prediction accuracy.
+    /// Variação média do R² entre as execuções de permutação quando esta feature é embaralhada no conjunto de holdout.
+    /// Um valor mais negativo indica uma feature mais importante (permutá-la degradou mais o modelo).
+    /// Valores próximos de zero indicam features que contribuem pouco para a acurácia da previsão.
     /// </summary>
     public double MeanRSquaredDrop { get; init; }
 
     /// <summary>
-    /// Standard deviation of the R² change across permutation runs, providing a reliability estimate
-    /// for the importance measurement.
+    /// Desvio padrão da variação do R² entre as execuções de permutação, fornecendo uma estimativa de confiabilidade
+    /// para a medição de importância.
     /// </summary>
     public double RSquaredDropStdDev { get; init; }
 
     /// <summary>
-    /// Importance rank where 1 is the most important feature group.
+    /// Rank de importância em que 1 é o grupo de features mais importante.
     /// </summary>
     public int Rank { get; init; }
 
     /// <summary>
-    /// Whether this feature was included in the final trained model.
-    /// Always true when no <c>topNFeatures</c> filter was applied during training.
-    /// False for numeric features that were dropped because they ranked below the top-N cutoff.
-    /// Categorical encoded features (Club, Opponent, Position, Status) are always selected.
+    /// Se esta feature foi incluída no modelo final treinado.
+    /// Sempre verdadeiro quando nenhum filtro <c>topNFeatures</c> foi aplicado durante o treino.
+    /// Falso para features numéricas descartadas por ficarem abaixo do corte top-N.
+    /// As features categóricas codificadas (Club, Opponent, Position, Status) são sempre selecionadas.
     /// </summary>
     public bool IsSelected { get; init; }
 }

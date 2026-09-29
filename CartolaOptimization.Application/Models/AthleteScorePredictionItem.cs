@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents a machine-learning score prediction for a single athlete in a target round.
+/// Representa uma previsão de pontuação por aprendizado de máquina para um único atleta em uma rodada-alvo.
 /// </summary>
 public sealed class AthleteScorePredictionItem
 {
@@ -52,9 +52,9 @@ public sealed class AthleteScorePredictionItem
     public decimal? OpponentExpectedPoints { get; init; }
 
     /// <summary>
-    /// Number of rounds in which this athlete actually played (WasInGame = true) prior to the target round.
-    /// Used to weight prediction reliability: a high score based on a single game is less trustworthy
-    /// than the same score built from many observations. Null when not available (older model versions).
+    /// Número de rodadas em que este atleta de fato jogou (WasInGame = true) antes da rodada-alvo.
+    /// Usado para ponderar a confiabilidade da previsão: uma pontuação alta baseada em um único jogo é menos confiável
+    /// que a mesma pontuação construída a partir de muitas observações. Null quando não disponível (versões mais antigas do modelo).
     /// </summary>
     public int? PlayedMatchesSampleSize { get; init; }
 

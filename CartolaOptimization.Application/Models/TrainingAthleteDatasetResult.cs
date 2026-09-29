@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents an export-ready athlete-only training dataset slice.
+/// Representa um recorte do conjunto de dados de treino apenas com atletas, pronto para exportação.
 /// </summary>
 public sealed class TrainingAthleteDatasetResult
 {

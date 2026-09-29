@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents the next confrontation probability block returned for a team.
+/// Representa o bloco de probabilidade do próximo confronto retornado para um time.
 /// </summary>
 public sealed class GatoMestreNextConfrontationResponse
 {

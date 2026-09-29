@@ -110,11 +110,11 @@ public sealed class FullContextAthleteScorePredictionService(
 
         var mlContext = new MLContext(seed: 42);
 
-        // Score all candidates with the global full-context model.
-        // Positional-model routing was evaluated empirically: position-specific models
-        // consistently underperformed the global model across every position due to their
-        // smaller per-position training sets (269–1 460 rows vs 4 313 for the global model),
-        // causing higher MAE even with feature selection disabled.
+        // Pontua todos os candidatos com o modelo global full-context.
+        // O roteamento por modelo posicional foi avaliado empiricamente: os modelos específicos de posição
+        // tiveram desempenho consistentemente inferior ao do modelo global em todas as posições devido aos seus
+        // conjuntos de treino por posição menores (269–1 460 linhas vs 4 313 do modelo global),
+        // causando um MAE maior mesmo com a seleção de features desativada.
         using var globalModelStream = File.OpenRead(artifactStore.GetModelPath());
         var globalModel = mlContext.Model.Load(globalModelStream, out _);
 
@@ -159,10 +159,10 @@ public sealed class FullContextAthleteScorePredictionService(
                 ClubExpectedPoints = item.Candidate.ClubExpectedPoints,
                 OpponentWinProbability = item.Candidate.OpponentWinProbability,
                 OpponentExpectedPoints = item.Candidate.OpponentExpectedPoints,
-                // The model is trained only on athletes who played (WasInGame = true), so its raw
-                // output is the score CONDITIONAL on participation. Multiplying by the play
-                // probability converts it to the unconditional EXPECTED score (0 points if the
-                // athlete does not take the field), which is what the lineup optimizer should rank on.
+                // O modelo é treinado apenas com atletas que jogaram (WasInGame = true), então sua saída bruta
+                // é a pontuação CONDICIONAL à participação. Multiplicar pela probabilidade
+                // de jogar converte-a na pontuação ESPERADA incondicional (0 pontos se
+                // o atleta não entra em campo), que é o critério pelo qual o otimizador de escalação deve ranquear.
                 PredictedScore = Math.Round(
                     ApplyPositionCalibration(item.Score, item.Candidate.Baseline.Position.CartolaId, item.EffectiveMetadata)
                         * ComputePlayProbability(item.Candidate.Input),
@@ -218,18 +218,18 @@ public sealed class FullContextAthleteScorePredictionService(
     }
 
     /// <summary>
-    /// Estimates the probability that the athlete will participate in the target round.
-    /// The model is trained on athletes who played (WasInGame = true) and therefore
-    /// predicts score conditional on participation. Multiplying by play probability
-    /// converts the conditional prediction to an unconditional expected value.
+    /// Estima a probabilidade de o atleta participar da rodada-alvo.
+    /// O modelo é treinado com atletas que jogaram (WasInGame = true) e, portanto,
+    /// prevê a pontuação condicional à participação. Multiplicar pela probabilidade de jogar
+    /// converte a previsão condicional em um valor esperado incondicional.
     /// </summary>
     private static decimal ComputePlayProbability(FullContextAthleteScorePredictionInput input)
     {
         var rateLast5 = Clamp((decimal)input.PlayRateLast5, 0m, 1m);
         var empiricalRate = Clamp((decimal)input.EmpiricalPlayRateForCurrentStatus, 0m, 1m);
 
-        // Weight recent form more heavily (60%) than status empirical rate (40%).
-        // Floor at 0.10 — even uncertain athletes have some chance of participating.
+        // Pondera a forma recente com mais peso (60%) do que a taxa empírica de status (40%).
+        // Piso em 0,10 — mesmo atletas incertos têm alguma chance de participar.
         var blended = (rateLast5 * 0.6m) + (empiricalRate * 0.4m);
         return Clamp(blended, 0.10m, 1.0m);
     }
@@ -266,9 +266,9 @@ public sealed class FullContextAthleteScorePredictionService(
     }
 
     /// <summary>
-    /// When the current round has no GatoMestre context (e.g. data not yet published for an upcoming round),
-    /// inject the most recent historical context for each athlete so the model receives realistic
-    /// team-stat features instead of all-zero inputs that fall outside the training distribution.
+    /// Quando a rodada atual não tem contexto do GatoMestre (por exemplo, dados ainda não publicados para uma rodada futura),
+    /// injeta o contexto histórico mais recente de cada atleta para que o modelo receba
+    /// features de estatística de time em vez de entradas todas-zero que ficam fora da distribuição de treino.
     /// </summary>
     private static async Task InjectHistoricalContextFallbackAsync(
         AppDbContext dbContext,

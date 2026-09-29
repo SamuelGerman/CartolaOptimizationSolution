@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the full payload of a persisted synchronization execution.
+/// Representa o payload completo de uma execução de sincronização persistida.
 /// </summary>
 public sealed class SyncExecutionDetails
 {

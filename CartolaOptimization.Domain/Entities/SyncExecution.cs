@@ -1,112 +1,112 @@
 namespace CartolaOptimization.Domain.Entities;
 
 /// <summary>
-/// Persists the lifecycle and quality metrics of each synchronization execution.
+/// Persiste o ciclo de vida e as métricas de qualidade de cada execução de sincronização.
 /// </summary>
 public sealed class SyncExecution
 {
     /// <summary>
-    /// Gets or sets the primary identifier of the execution row.
+    /// Obtém ou define o identificador primário da linha de execução.
     /// </summary>
     public int Id { get; set; }
 
     /// <summary>
-    /// Gets or sets the correlation id shared with failure logs emitted by the same execution.
+    /// Obtém ou define o id de correlação compartilhado com os logs de falha emitidos pela mesma execução.
     /// </summary>
     public string CorrelationId { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the synchronized source system, such as Cartola or GatoMestre.
+    /// Obtém ou define o sistema de origem sincronizado, como Cartola ou GatoMestre.
     /// </summary>
     public string SourceSystem { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the process name responsible for the synchronization.
+    /// Obtém ou define o nome do processo responsável pela sincronização.
     /// </summary>
     public string ProcessName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the UTC timestamp in which the execution started.
+    /// Obtém ou define o timestamp UTC em que a execução começou.
     /// </summary>
     public DateTime StartedAtUtc { get; set; }
 
     /// <summary>
-    /// Gets or sets the UTC timestamp in which the execution finished.
+    /// Obtém ou define o timestamp UTC em que a execução terminou.
     /// </summary>
     public DateTime? FinishedAtUtc { get; set; }
 
     /// <summary>
-    /// Gets or sets the total execution duration in milliseconds when available.
+    /// Obtém ou define a duração total da execução em milissegundos quando disponível.
     /// </summary>
     public long? DurationMs { get; set; }
 
     /// <summary>
-    /// Gets or sets the final execution status.
+    /// Obtém ou define o status final da execução.
     /// </summary>
     public string Status { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the most recent pipeline step reached by the execution.
+    /// Obtém ou define o passo mais recente do pipeline alcançado pela execução.
     /// </summary>
     public string LastStepName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the requested season when the execution targets a seasonal dataset.
+    /// Obtém ou define a temporada solicitada quando a execução tem como alvo um conjunto de dados sazonal.
     /// </summary>
     public int? Season { get; set; }
 
     /// <summary>
-    /// Gets or sets the requested round when the execution targets a round-specific dataset.
+    /// Obtém ou define a rodada solicitada quando a execução tem como alvo um conjunto de dados específico de rodada.
     /// </summary>
     public int? Round { get; set; }
 
     /// <summary>
-    /// Gets or sets the normalized business error code associated with the execution when applicable.
+    /// Obtém ou define o código de erro de negócio normalizado associado à execução quando aplicável.
     /// </summary>
     public string ErrorCode { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the final execution note shown to operators.
+    /// Obtém ou define a nota final da execução mostrada aos operadores.
     /// </summary>
     public string Notes { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the serialized metrics produced by the execution.
+    /// Obtém ou define as métricas serializadas produzidas pela execução.
     /// </summary>
     public string MetricsJson { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the serialized business context captured for the execution.
+    /// Obtém ou define o contexto de negócio serializado capturado para a execução.
     /// </summary>
     public string ContextJson { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the serialized quality thresholds used to evaluate the execution.
+    /// Obtém ou define os limiares de qualidade serializados usados para avaliar a execução.
     /// </summary>
     public string QualityCriteriaJson { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the achieved coverage rate when the metric applies.
+    /// Obtém ou define a taxa de cobertura alcançada quando a métrica se aplica.
     /// </summary>
     public decimal? CoverageRate { get; set; }
 
     /// <summary>
-    /// Gets or sets the percentage of skipped items when the metric applies.
+    /// Obtém ou define o percentual de itens descartados quando a métrica se aplica.
     /// </summary>
     public decimal? SkippedRate { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether the execution met the configured quality criteria.
+    /// Obtém ou define um valor que indica se a execução atingiu os critérios de qualidade configurados.
     /// </summary>
     public bool? QualityCriteriaSatisfied { get; set; }
 
     /// <summary>
-    /// Gets or sets the total number of persisted warning logs linked to the execution.
+    /// Obtém ou define o número total de logs de aviso persistidos vinculados à execução.
     /// </summary>
     public int WarningLogsCount { get; set; }
 
     /// <summary>
-    /// Gets or sets the total number of persisted error logs linked to the execution.
+    /// Obtém ou define o número total de logs de erro persistidos vinculados à execução.
     /// </summary>
     public int ErrorLogsCount { get; set; }
 }

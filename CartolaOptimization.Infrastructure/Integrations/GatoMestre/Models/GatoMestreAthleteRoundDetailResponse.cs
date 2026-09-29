@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents a round entry inside the athlete detail payload.
+/// Representa uma entrada de rodada dentro do payload de detalhe do atleta.
 /// </summary>
 public sealed class GatoMestreAthleteRoundDetailResponse
 {

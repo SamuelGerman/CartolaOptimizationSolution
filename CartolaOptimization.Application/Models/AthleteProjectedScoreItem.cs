@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the expected-score projection generated for a single athlete in a target round.
+/// Representa a projeção de pontuação esperada gerada para um único atleta em uma rodada-alvo.
 /// </summary>
 public sealed class AthleteProjectedScoreItem
 {

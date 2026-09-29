@@ -3,7 +3,7 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.Application.Interfaces;
 
 /// <summary>
-/// Defines read operations that estimate the expected score of each athlete for a target round.
+/// Define operações de leitura que estimam a pontuação esperada de cada atleta para uma rodada-alvo.
 /// </summary>
 public interface IAthleteProjectionService
 {

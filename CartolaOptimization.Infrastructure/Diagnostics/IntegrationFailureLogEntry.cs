@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Infrastructure.Diagnostics;
 
 /// <summary>
-/// Represents the diagnostic payload persisted when a synchronization failure occurs.
+/// Representa o payload de diagnóstico persistido quando ocorre uma falha de sincronização.
 /// </summary>
 public sealed class IntegrationFailureLogEntry
 {

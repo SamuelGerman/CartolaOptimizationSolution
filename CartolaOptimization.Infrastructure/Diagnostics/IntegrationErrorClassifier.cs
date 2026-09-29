@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace CartolaOptimization.Infrastructure.Diagnostics;
 
 /// <summary>
-/// Translates low-level exceptions into normalized business error codes for diagnostics and reporting.
+/// Traduz exceções de baixo nível em códigos de erro de negócio normalizados para diagnóstico e relatórios.
 /// </summary>
 public static class IntegrationErrorClassifier
 {

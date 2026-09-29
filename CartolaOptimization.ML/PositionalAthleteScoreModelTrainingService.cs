@@ -9,10 +9,10 @@ using Microsoft.ML;
 namespace CartolaOptimization.ML;
 
 /// <summary>
-/// Trains one LightGBM model per Cartola position (GOL, LAT, ZAG, MEI, ATA, TEC) using the same
-/// full-context feature set as the global model, but restricted to athletes of each position.
-/// Position-specific models learn the particular scoring patterns of each role, reducing the
-/// noise introduced by cross-position variance in the shared global model.
+/// Treina um modelo LightGBM por posição do Cartola (GOL, LAT, ZAG, MEI, ATA, TEC) usando o mesmo
+/// conjunto de features full-context do modelo global, mas restrito aos atletas de cada posição.
+/// Os modelos específicos de posição aprendem os padrões de pontuação particulares de cada função, reduzindo o
+/// ruído introduzido pela variância entre posições no modelo global compartilhado.
 /// </summary>
 public sealed class PositionalAthleteScoreModelTrainingService(
     IDbContextFactory<AppDbContext> dbContextFactory,
@@ -47,7 +47,7 @@ public sealed class PositionalAthleteScoreModelTrainingService(
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        // Load the full dataset once; filter per position in memory to avoid N database queries.
+        // Carrega o conjunto de dados completo uma vez; filtra por posição em memória para evitar N consultas ao banco.
         var allRows = await FullContextAthleteScoreModelTrainingService.QueryTrainingRowsAsync(
             dbContext, fromRound, toRound, cancellationToken);
 
@@ -166,11 +166,11 @@ public sealed class PositionalAthleteScoreModelTrainingService(
 
         var effectiveValidationRounds = Math.Min(validationRounds, distinctRounds.Length - 1);
 
-        // The holdout window starts at this index into distinctRounds (ascending order).
+        // A janela de holdout começa neste índice de distinctRounds (ordem ascendente).
         var holdoutStartIdx = distinctRounds.Length - effectiveValidationRounds;
         var holdoutStartRound = distinctRounds[holdoutStartIdx];
 
-        // Feature-selection split: train on everything before the holdout window.
+        // Divisão para seleção de features: treina em tudo antes da janela de holdout.
         var featureSelectionRows = positionRows
             .Where(r => (int)r.RoundId < holdoutStartRound)
             .ToList();
@@ -202,7 +202,7 @@ public sealed class PositionalAthleteScoreModelTrainingService(
         var allNumericFeatureNames = FullContextAthleteScoreModelTrainingService
             .GetNumericFeatureNames(allowedFeatures: null);
 
-        // Phase 1: train on all features so PFI can rank them.
+        // Fase 1: treina em todas as features para que o PFI possa ranqueá-las.
         var fullPipeline = FullContextAthleteScoreModelTrainingService
             .BuildPipeline(mlContext, allowedNumericFeatures: null, hyperparameters);
         var fullModel = fullPipeline.Fit(featureSelectionData);
@@ -221,7 +221,7 @@ public sealed class PositionalAthleteScoreModelTrainingService(
             importanceRanking = [];
         }
 
-        // Phase 2 (optional): select the top-N numeric features from the PFI ranking.
+        // Fase 2 (opcional): seleciona as top-N features numéricas do ranking de PFI.
         IReadOnlySet<string>? allowedNumericFeatures = null;
 
         if (topNFeatures.HasValue && importanceRanking.Count > 0)
@@ -294,18 +294,18 @@ public sealed class PositionalAthleteScoreModelTrainingService(
         var cvRmse = cvRmses.Count > 0 ? cvRmses.Average() : 0d;
         var cvR2 = cvR2s.Count > 0 ? cvR2s.Average() : 0d;
 
-        // Phase 4: train the persisted model on ALL position rows with the selected features.
+        // Fase 4: treina o modelo persistido em TODAS as linhas da posição com as features selecionadas.
         var allPositionData = mlContext.Data.LoadFromEnumerable(positionRows);
         var finalPipeline = FullContextAthleteScoreModelTrainingService
             .BuildPipeline(mlContext, allowedNumericFeatures, hyperparameters);
         var finalModel = finalPipeline.Fit(allPositionData);
 
-        // Calibration diagnostics come from the last (most recent) CV fold.
+        // Os diagnósticos de calibração vêm do último (mais recente) fold da validação cruzada.
         var positionDiagnostics = lastFoldTrainingRows is not null && lastFoldHoldoutRows is not null && lastFoldScores is not null
             ? FullContextAthleteScoreModelTrainingService.BuildPositionDiagnostics(lastFoldTrainingRows, lastFoldHoldoutRows, lastFoldScores)
             : [];
 
-        // Build feature importance list with selected flags.
+        // Monta a lista de importância das features com os flags de seleção.
         var activeNumericFeatureSet = allowedNumericFeatures
             ?? new HashSet<string>(allNumericFeatureNames, StringComparer.Ordinal);
 

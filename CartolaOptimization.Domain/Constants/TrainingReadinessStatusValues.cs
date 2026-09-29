@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Domain.Constants;
 
 /// <summary>
-/// Defines the readiness values used to indicate whether a row can be used by the training dataset.
+/// Define os valores de prontidão usados para indicar se uma linha pode ser usada pelo conjunto de dados de treino.
 /// </summary>
 public static class TrainingReadinessStatusValues
 {

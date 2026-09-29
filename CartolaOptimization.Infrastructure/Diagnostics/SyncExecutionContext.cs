@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace CartolaOptimization.Infrastructure.Diagnostics;
 
 /// <summary>
-/// Tracks execution breadcrumbs and business context for a synchronization run.
+/// Rastreia os breadcrumbs de execução e o contexto de negócio de uma execução de sincronização.
 /// </summary>
 public sealed class SyncExecutionContext
 {

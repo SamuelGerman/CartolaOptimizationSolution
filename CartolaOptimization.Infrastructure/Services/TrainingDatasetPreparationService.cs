@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CartolaOptimization.Infrastructure.Services;
 
 /// <summary>
-/// Prepares the persisted round data for downstream model-training workflows.
+/// Prepara os dados de rodada persistidos para os fluxos subsequentes de treino do modelo.
 /// </summary>
 public sealed class TrainingDatasetPreparationService(
     AppDbContext dbContext,
@@ -22,10 +22,10 @@ public sealed class TrainingDatasetPreparationService(
     {
         NormalizeRange(ref fromRound, ref toRound);
 
-        // Resolve the current open round from the most recent Cartola baseline sync so that
-        // rounds below it that still carry Unknown or empty DataPhase can be promoted to
-        // HistoricalClosed.  This handles AthleteRound rows that were created by the Gato
-        // Mestre sync for athletes absent from the Cartola pontuados payload.
+        // Resolve a rodada aberta atual a partir da sincronização de linha-base mais recente do Cartola para que
+        // as rodadas abaixo dela que ainda carregam DataPhase Unknown ou vazio podem ser promovidas para
+        // HistoricalClosed. Isto trata as linhas de AthleteRound que foram criadas pelo Gato
+        // sincronização do Mestre para atletas ausentes do payload de pontuados do Cartola.
         var latestKnownCurrentRound = await dbContext.AthleteRounds
             .AsNoTracking()
             .Where(r => r.DataPhase == RoundDataPhaseValues.CurrentOpen)
@@ -59,8 +59,8 @@ public sealed class TrainingDatasetPreparationService(
 
             if (phaseUnknownOrEmpty)
             {
-                // Promote to HistoricalClosed when a reliable current-round baseline exists
-                // and confirms this round has already been finalized.
+                // Promove para HistoricalClosed quando existe uma linha-base confiável da rodada atual
+                // e confirma que esta rodada já foi finalizada.
                 athleteRound.DataPhase = latestKnownCurrentRound > 0 && athleteRound.RoundId < latestKnownCurrentRound
                     ? RoundDataPhaseValues.HistoricalClosed
                     : RoundDataPhaseValues.Unknown;

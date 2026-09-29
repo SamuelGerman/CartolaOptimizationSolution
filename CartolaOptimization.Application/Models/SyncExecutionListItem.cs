@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents a compact view of a persisted synchronization execution.
+/// Representa uma visão compacta de uma execução de sincronização persistida.
 /// </summary>
 public sealed class SyncExecutionListItem
 {

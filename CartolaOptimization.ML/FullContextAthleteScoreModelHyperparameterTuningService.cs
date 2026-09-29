@@ -9,26 +9,26 @@ using Microsoft.ML;
 namespace CartolaOptimization.ML;
 
 /// <summary>
-/// Performs random-search hyperparameter optimisation for the full-context LightGBM model using
+/// Realiza otimização de hiperparâmetros por busca aleatória para o modelo LightGBM full-context usando
 /// temporal walk-forward cross-validation.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>Search strategy — random search</strong>: randomly samples hyperparameter combinations
-/// from discrete candidate grids. Random search finds near-optimal configurations faster than
-/// grid search in high-dimensional spaces because it covers more of the parameter landscape per
+/// a partir de grades discretas de candidatos. A busca aleatória encontra configurações quase ótimas mais rápido que
+/// a busca em grade em espaços de alta dimensão porque cobre mais do panorama de parâmetros por
 /// trial (Bergstra &amp; Bengio, 2012).
 /// </para>
 /// <para>
-/// <strong>Validation strategy — walk-forward CV</strong>: for <em>k</em> folds the last <em>k</em>
-/// distinct rounds are used as successive holdouts, each time expanding the training window.
-/// This preserves the temporal ordering of the data and avoids look-ahead bias.
+/// <strong>Estratégia de validação — CV walk-forward</strong>: para <em>k</em> folds, as últimas <em>k</em>
+/// rodadas distintas são usadas como holdouts sucessivos, a cada vez expandindo a janela de treino.
+/// Isto preserva a ordenação temporal dos dados e evita viés de look-ahead.
 /// </para>
 /// <para>
-/// <strong>Feature selection during CV</strong>: all available numeric features (no PFI filter)
-/// are used inside each CV fold so that every trial is evaluated on a consistent feature space.
-/// Applying per-fold PFI would double the training time and introduce fold-specific selection
-/// bias. The final model retrained with <c>applyBest=true</c> uses the configured
+/// <strong>Seleção de features durante a CV</strong>: todas as features numéricas disponíveis (sem filtro de PFI)
+/// são usadas dentro de cada fold da CV para que cada trial seja avaliado em um espaço de features consistente.
+/// Aplicar PFI por fold dobraria o tempo de treino e introduziria seleção específica de cada fold
+/// viés. O modelo final retreinado com <c>applyBest=true</c> usa a
 /// <c>DefaultTopNFeatures</c> (including PFI), matching production semantics.
 /// </para>
 /// </remarks>
@@ -42,8 +42,8 @@ public sealed class FullContextAthleteScoreModelHyperparameterTuningService(
     private readonly FullContextAthleteScoreModelOptions options = options.Value;
 
     // ── Discrete candidate grids ───────────────────────────────────────────────────────────────
-    // Values chosen to cover a wide range while keeping total search time reasonable.
-    // Iteration counts are bounded by available data size; regularisation values span two decades.
+    // Valores escolhidos para cobrir uma ampla faixa mantendo o tempo total de busca razoável.
+    // As contagens de iterações são limitadas pelo tamanho dos dados disponíveis; os valores de regularização abrangem duas ordens de grandeza.
     private static readonly int[] IterationsGrid = [200, 300, 400, 600, 800];
     private static readonly double[] LearningRateGrid = [0.01, 0.02, 0.03, 0.05, 0.08, 0.10, 0.15];
     private static readonly int[] LeavesGrid = [15, 31, 63, 127];
@@ -73,7 +73,7 @@ public sealed class FullContextAthleteScoreModelHyperparameterTuningService(
             .OrderBy(r => r)
             .ToArray();
 
-        // Need at least 2 rounds for training + 1 per fold.
+        // É preciso pelo menos 2 rodadas para treino + 1 por fold.
         var minRoundsRequired = validationFolds + 2;
         if (distinctRounds.Length < minRoundsRequired)
         {
@@ -83,11 +83,11 @@ public sealed class FullContextAthleteScoreModelHyperparameterTuningService(
                 $"in the selected window.");
         }
 
-        // Clamp folds so we always have ≥2 training rounds in the first fold.
+        // Limita os folds para que sempre haja ≥2 rodadas de treino no primeiro fold.
         validationFolds = Math.Min(validationFolds, distinctRounds.Length - 2);
 
-        // Build walk-forward fold definitions: each fold adds one more round to the holdout set
-        // taken from the tail, and the rest form the training window.
+        // Monta as definições dos folds walk-forward: cada fold adiciona mais uma rodada ao conjunto de holdout
+        // tiradas da cauda, e o restante forma a janela de treino.
         var foldHoldoutRounds = Enumerable.Range(0, validationFolds)
             .Select(foldIndex => distinctRounds[distinctRounds.Length - validationFolds + foldIndex])
             .ToArray();
@@ -97,7 +97,7 @@ public sealed class FullContextAthleteScoreModelHyperparameterTuningService(
             "Holdout rounds: [{HoldoutRounds}].",
             numberOfTrials, validationFolds, string.Join(", ", foldHoldoutRounds));
 
-        // Pre-group rows by round for fast fold splitting.
+        // Pré-agrupa as linhas por rodada para uma divisão rápida em folds.
         var rowsByRound = rows
             .GroupBy(r => (int)r.RoundId)
             .ToDictionary(g => g.Key, g => g.ToList());
@@ -115,7 +115,7 @@ public sealed class FullContextAthleteScoreModelHyperparameterTuningService(
 
             for (var foldIndex = 0; foldIndex < validationFolds; foldIndex++)
             {
-                // Folds accumulate: fold k uses all rounds up to the (k+1)-th holdout round.
+                // Os folds acumulam: o fold k usa todas as rodadas até a (k+1)-ésima rodada de holdout.
                 var holdoutRound = foldHoldoutRounds[foldIndex];
                 var trainingRounds = distinctRounds
                     .Where(r => r < holdoutRound)
@@ -176,7 +176,7 @@ public sealed class FullContextAthleteScoreModelHyperparameterTuningService(
         var bestTrial = trialResults.MinBy(t => t.CrossValidationMae)!;
         var bestHyperparameters = bestTrial.Hyperparameters;
 
-        // Mark the winning trial and sort by CV-MAE ascending.
+        // Marca o trial vencedor e ordena por CV-MAE crescente.
         var finalTrials = trialResults
             .Select(t => new HyperparameterTrialResult
             {
@@ -202,7 +202,7 @@ public sealed class FullContextAthleteScoreModelHyperparameterTuningService(
             bestHyperparameters.L1Regularization,
             bestHyperparameters.L2Regularization);
 
-        // Optionally retrain the persisted model with the best hyperparameters.
+        // Opcionalmente retreina o modelo persistido com os melhores hiperparâmetros.
         AthleteScoreModelInfo? retrainedModelInfo = null;
         if (applyBest)
         {
@@ -249,9 +249,9 @@ public sealed class FullContextAthleteScoreModelHyperparameterTuningService(
     };
 
     /// <summary>
-    /// Trains a LightGBM model on <paramref name="trainRows"/> and evaluates it on
-    /// <paramref name="holdoutRows"/>, returning (MAE, R²). No PFI or feature selection is applied
-    /// inside CV folds so that every trial uses an identical feature space.
+    /// Treina um modelo LightGBM em <paramref name="trainRows"/> e o avalia em
+    /// <paramref name="holdoutRows"/>, retornando (MAE, R²). Nenhum PFI ou seleção de features é aplicado
+    /// dentro dos folds da CV para que cada trial use um espaço de features idêntico.
     /// </summary>
     private static (double Mae, double R2) EvaluateFold(
         IEnumerable<FullContextAthleteScoreTrainingRow> trainRows,
@@ -263,7 +263,7 @@ public sealed class FullContextAthleteScoreModelHyperparameterTuningService(
         var trainData = mlContext.Data.LoadFromEnumerable(trainRows);
         var holdoutData = mlContext.Data.LoadFromEnumerable(holdoutRows);
 
-        // Use all numeric features inside CV — consistent across trials, avoids per-fold PFI cost.
+        // Usa todas as features numéricas dentro da CV — consistente entre os trials, evita o custo de PFI por fold.
         var pipeline = FullContextAthleteScoreModelTrainingService.BuildPipeline(
             mlContext, allowedNumericFeatures: null, hyperparameters);
 

@@ -276,8 +276,8 @@ public sealed class CartolaSyncService(
             executionContext.SetContext("scorePayloadRound", scoresPayload.Round);
             executionContext.SetContext("scorePayloadTotalAthletes", scoresPayload.TotalAthletes);
 
-            // The closed-round score payload carries no match results; fetch the round's matches
-            // separately so the final scoreboard (HomeScore/AwayScore) is backfilled authoritatively.
+            // O payload de pontuação da rodada fechada não traz os resultados das partidas; busca as partidas da rodada
+            // separadamente para que o placar final (HomeScore/AwayScore) seja preenchido de forma autoritativa.
             executionContext.MarkStep("Load closed round matches payload");
             var matchesPayload = await cartolaApiClient.GetMatchesAsync(round, cancellationToken);
 

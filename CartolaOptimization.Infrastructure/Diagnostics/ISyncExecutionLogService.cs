@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Infrastructure.Diagnostics;
 
 /// <summary>
-/// Persists the lifecycle of synchronization executions outside the main business transaction.
+/// Persiste o ciclo de vida das execuções de sincronização fora da transação principal de negócio.
 /// </summary>
 public interface ISyncExecutionLogService
 {

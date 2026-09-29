@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the optimal machine-learning lineup found for a round under budget and formation constraints.
+/// Representa a escalação ótima por aprendizado de máquina encontrada para uma rodada sob restrições de orçamento e formação.
 /// </summary>
 public sealed class PredictedLineupResult
 {

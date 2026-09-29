@@ -3,34 +3,34 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.Application.Interfaces;
 
 /// <summary>
-/// Defines the hyperparameter search operation for the v1 full-context athlete-score model.
-/// Performs random search with walk-forward cross-validation to identify the best LightGBM
-/// hyperparameter combination, then optionally retrains the persisted model with those values.
+/// Define a operação de busca de hiperparâmetros para o modelo de pontuação de atletas full-context v1.
+/// Realiza busca aleatória com validação cruzada walk-forward para identificar os melhores hiperparâmetros
+/// combinação de hiperparâmetros, e então opcionalmente retreina o modelo persistido com esses valores.
 /// </summary>
 public interface IFullContextAthleteScoreModelHyperparameterTuningService
 {
     /// <summary>
-    /// Runs a random-search hyperparameter optimisation using temporal walk-forward
-    /// cross-validation over the available training rounds.
+    /// Executa uma otimização de hiperparâmetros por busca aleatória usando validação cruzada temporal walk-forward
+    /// validação cruzada sobre as rodadas de treino disponíveis.
     /// </summary>
-    /// <param name="fromRound">Optional earliest round to include in the search dataset.</param>
-    /// <param name="toRound">Optional latest round to include in the search dataset.</param>
+    /// <param name="fromRound">Rodada inicial opcional a incluir no conjunto de dados da busca.</param>
+    /// <param name="toRound">Rodada final opcional a incluir no conjunto de dados da busca.</param>
     /// <param name="numberOfTrials">
-    /// Number of random hyperparameter combinations to evaluate. More trials improve the
-    /// chance of finding the global optimum but increase runtime proportionally.
+    /// Número de combinações aleatórias de hiperparâmetros a avaliar. Mais trials melhoram a
+    /// chance de encontrar o ótimo global mas aumentam o tempo de execução proporcionalmente.
     /// </param>
     /// <param name="validationFolds">
-    /// Number of walk-forward folds. Each fold uses all rounds up to fold <em>k</em> for
-    /// training and round <em>k+1</em> as the holdout, progressing from the end of the dataset.
-    /// Must be at least 1 and less than the total number of distinct training rounds minus 1.
+    /// Número de folds walk-forward. Cada fold usa todas as rodadas até o fold <em>k</em> para
+    /// treino e a rodada <em>k+1</em> como holdout, avançando a partir do fim do conjunto de dados.
+    /// Deve ser no mínimo 1 e menor que o número total de rodadas de treino distintas menos 1.
     /// </param>
     /// <param name="applyBest">
-    /// When <c>true</c>, retrains and persists the full-context model with the best
-    /// hyperparameter combination found, using the same <c>topNFeatures</c> setting configured
-    /// in <c>MachineLearning:FullContext:DefaultTopNFeatures</c>.
+    /// Quando <c>true</c>, retreina e persiste o modelo full-context com a melhor
+    /// combinação de hiperparâmetros encontrada, usando o mesmo ajuste <c>topNFeatures</c> configurado
+    /// em <c>MachineLearning:FullContext:DefaultTopNFeatures</c>.
     /// </param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Search results including all trial scores, the best combination, and the final model info.</returns>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>Resultados da busca, incluindo as pontuações de todos os trials, a melhor combinação e os metadados do modelo final.</returns>
     Task<HyperparameterSearchResult> SearchAsync(
         int? fromRound = null,
         int? toRound = null,

@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents a historical athlete-round row that can be used by a baseline athlete-only training dataset.
+/// Representa uma linha histórica de atleta-rodada que pode ser usada por um conjunto de dados de treino de referência apenas com atletas.
 /// </summary>
 public sealed class TrainingAthleteDatasetRow
 {

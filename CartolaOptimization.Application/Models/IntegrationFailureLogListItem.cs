@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents a compact view of a persisted integration failure log.
+/// Representa uma visão compacta de um log de falha de integração persistido.
 /// </summary>
 public sealed class IntegrationFailureLogListItem
 {

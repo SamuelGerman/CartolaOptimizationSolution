@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents the athlete detail payload returned by Gato Mestre.
+/// Representa o payload de detalhe do atleta retornado pelo Gato Mestre.
 /// </summary>
 public sealed class GatoMestreAthleteDetailResponse
 {

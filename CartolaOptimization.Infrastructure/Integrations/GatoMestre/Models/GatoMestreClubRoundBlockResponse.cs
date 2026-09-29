@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents one side of the confrontation payload.
+/// Representa um lado do payload de confronto.
 /// </summary>
 public sealed class GatoMestreClubRoundBlockResponse
 {

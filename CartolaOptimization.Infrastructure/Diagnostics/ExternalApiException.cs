@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Infrastructure.Diagnostics;
 
 /// <summary>
-/// Represents a failure that happened while calling or deserializing an external API response.
+/// Representa uma falha ocorrida ao chamar ou desserializar a resposta de uma API externa.
 /// </summary>
 public sealed class ExternalApiException : Exception
 {

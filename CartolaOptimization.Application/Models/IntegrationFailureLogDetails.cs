@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the full payload of a persisted integration failure log.
+/// Representa o payload completo de um log de falha de integração persistido.
 /// </summary>
 public sealed class IntegrationFailureLogDetails
 {

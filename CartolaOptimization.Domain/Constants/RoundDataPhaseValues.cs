@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Domain.Constants;
 
 /// <summary>
-/// Defines the lifecycle phase values used to describe round-level athlete data.
+/// Define os valores de fase do ciclo de vida usados para descrever os dados de atleta por rodada.
 /// </summary>
 public static class RoundDataPhaseValues
 {

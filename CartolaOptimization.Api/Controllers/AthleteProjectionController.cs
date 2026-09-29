@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace CartolaOptimization.Api.Controllers;
 
 /// <summary>
-/// Exposes the principal full-context prediction endpoints used by the application.
+/// Expõe os principais endpoints de previsão full-context usados pela aplicação.
 /// </summary>
 [ApiController]
 [Route("api/projections")]
@@ -15,15 +15,15 @@ public sealed class AthleteProjectionController(
     IPredictedLineupOptimizationService predictedLineupOptimizationService) : ControllerBase
 {
     /// <summary>
-    /// Returns machine-learning score predictions for the athletes that can be evaluated with the principal full-context model for the informed round.
+    /// Retorna previsões de pontuação por aprendizado de máquina para os atletas que podem ser avaliados com o modelo full-context principal para a rodada informada.
     /// </summary>
-    /// <param name="round">Target round for the prediction.</param>
-    /// <param name="statusCartolaId">Optional Cartola status filter that uses the athlete current status for the informed round.</param>
-    /// <param name="clubCartolaId">Optional Cartola club filter that uses the athlete current club for the informed round.</param>
-    /// <param name="positionCartolaId">Optional Cartola position filter that uses the athlete current position for the informed round.</param>
-    /// <param name="take">Maximum number of predicted athletes returned. Limited to 5000 rows.</param>
-    /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>A ranked list of machine-learning predicted scores for the informed round using the principal full-context model.</returns>
+    /// <param name="round">Rodada-alvo para a previsão.</param>
+    /// <param name="statusCartolaId">Filtro opcional de status do Cartola que usa o status atual do atleta para a rodada informada.</param>
+    /// <param name="clubCartolaId">Filtro opcional de clube do Cartola que usa o clube atual do atleta para a rodada informada.</param>
+    /// <param name="positionCartolaId">Filtro opcional de posição do Cartola que usa a posição atual do atleta para a rodada informada.</param>
+    /// <param name="take">Número máximo de atletas previstos retornados. Limitado a 5000 linhas.</param>
+    /// <param name="cancellationToken">Token de cancelamento da requisição.</param>
+    /// <returns>Uma lista ordenada de pontuações previstas por aprendizado de máquina para a rodada informada usando o modelo full-context principal.</returns>
     [HttpGet("round/{round:int}/athletes/ml")]
     [ProducesResponseType(typeof(AthleteScorePredictionResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMachineLearningPredictions(
@@ -46,12 +46,12 @@ public sealed class AthleteProjectionController(
     }
 
     /// <summary>
-    /// Returns the highest-total-score lineup composed only of provável athletes for the informed round, respecting the requested budget and formation.
+    /// Retorna a escalação de maior pontuação total composta apenas por atletas prováveis para a rodada informada, respeitando o orçamento e a formação solicitados.
     /// </summary>
-    /// <param name="round">Target round for the lineup optimization.</param>
-    /// <param name="request">Budget and formation constraints used by the optimizer.</param>
-    /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>The optimal predicted lineup under the informed constraints.</returns>
+    /// <param name="round">Rodada-alvo para a otimização da escalação.</param>
+    /// <param name="request">Restrições de orçamento e formação usadas pelo otimizador.</param>
+    /// <param name="cancellationToken">Token de cancelamento da requisição.</param>
+    /// <returns>A escalação prevista ótima sob as restrições informadas.</returns>
     [HttpPost("round/{round:int}/optimal-lineup/ml")]
     [ProducesResponseType(typeof(PredictedLineupResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]

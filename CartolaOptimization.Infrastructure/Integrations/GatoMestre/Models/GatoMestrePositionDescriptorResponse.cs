@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents the athlete position descriptor returned by Gato Mestre.
+/// Representa o descritor de posição do atleta retornado pelo Gato Mestre.
 /// </summary>
 public sealed class GatoMestrePositionDescriptorResponse
 {

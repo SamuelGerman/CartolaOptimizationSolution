@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Describes an export-ready historical athlete-context dataset slice.
+/// Descreve um recorte histórico do conjunto de dados de contexto de atleta pronto para exportação.
 /// </summary>
 public sealed class TrainingAthleteContextDatasetResult
 {

@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace CartolaOptimization.Api.Controllers;
 
 /// <summary>
-/// Exposes the principal administrative endpoints used to keep the training base current and operate the full-context model.
+/// Expõe os principais endpoints administrativos usados para manter a base de treino atualizada e operar o modelo full-context.
 /// </summary>
 [ApiController]
 [Route("api/admin/training")]
@@ -19,13 +19,13 @@ public sealed class TrainingDatasetController(
     IPositionalAthleteScoreModelTrainingService positionalAthleteScoreModelTrainingService) : ControllerBase
 {
     /// <summary>
-    /// Returns an export-ready historical dataset slice that includes athlete, club, opponent and match context.
+    /// Retorna um recorte histórico do conjunto de dados pronto para exportação que inclui contexto de atleta, clube, adversário e partida.
     /// </summary>
-    /// <param name="fromRound">Optional initial round of the export window.</param>
-    /// <param name="toRound">Optional final round of the export window.</param>
-    /// <param name="take">Maximum number of rows returned. Limited to 5000 rows.</param>
-    /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>A historical dataset slice with full contextual features and target values.</returns>
+    /// <param name="fromRound">Rodada inicial opcional da janela de exportação.</param>
+    /// <param name="toRound">Rodada final opcional da janela de exportação.</param>
+    /// <param name="take">Número máximo de linhas retornadas. Limitado a 5000 linhas.</param>
+    /// <param name="cancellationToken">Token de cancelamento da requisição.</param>
+    /// <returns>Um recorte histórico do conjunto de dados com features contextuais completas e valores-alvo.</returns>
     [HttpGet("datasets/full-context")]
     [ProducesResponseType(typeof(TrainingFullContextDatasetResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetFullContextDataset(
@@ -44,13 +44,13 @@ public sealed class TrainingDatasetController(
     }
 
     /// <summary>
-    /// Exports the full-context training dataset slice as Excel so all engineered features can be inspected intentionally outside the API.
+    /// Exporta o recorte do conjunto de dados de treino full-context como Excel para que todas as features construídas possam ser inspecionadas intencionalmente fora da API.
     /// </summary>
-    /// <param name="fromRound">Optional initial round of the export window.</param>
-    /// <param name="toRound">Optional final round of the export window.</param>
-    /// <param name="take">Maximum number of rows returned. Limited to 5000 rows.</param>
-    /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>An Excel file with the full-context training dataset rows.</returns>
+    /// <param name="fromRound">Rodada inicial opcional da janela de exportação.</param>
+    /// <param name="toRound">Rodada final opcional da janela de exportação.</param>
+    /// <param name="take">Número máximo de linhas retornadas. Limitado a 5000 linhas.</param>
+    /// <param name="cancellationToken">Token de cancelamento da requisição.</param>
+    /// <returns>Um arquivo Excel com as linhas do conjunto de dados de treino full-context.</returns>
     [HttpGet("datasets/full-context/xlsx")]
     [Produces("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
     public async Task<IActionResult> ExportFullContextDatasetXlsx(
@@ -69,21 +69,21 @@ public sealed class TrainingDatasetController(
     }
 
     /// <summary>
-    /// Trains and persists the principal full-context athlete-score machine learning model.
-    /// Permutation feature importance is always computed after the initial training pass and stored in the model metadata.
-    /// When <paramref name="topNFeatures"/> is provided the model is then retrained using only the top-N numeric features,
-    /// which can reduce noise and improve generalisation when many features are redundant.
+    /// Treina e persiste o principal modelo de aprendizado de máquina de pontuação de atletas full-context.
+    /// A importância das features por permutação é sempre calculada após a passagem inicial de treino e armazenada nos metadados do modelo.
+    /// Quando <paramref name="topNFeatures"/> é fornecido, o modelo é então retreinado usando apenas as top-N features numéricas,
+    /// o que pode reduzir ruído e melhorar a generalização quando muitas features são redundantes.
     /// </summary>
-    /// <param name="fromRound">Optional initial round of the training window.</param>
-    /// <param name="toRound">Optional final round of the training window.</param>
-    /// <param name="validationRounds">Number of last rounds reserved for temporal validation. Defaults to one round.</param>
+    /// <param name="fromRound">Rodada inicial opcional da janela de treino.</param>
+    /// <param name="toRound">Rodada final opcional da janela de treino.</param>
+    /// <param name="validationRounds">Número de rodadas finais reservadas para validação temporal. Padrão de uma rodada.</param>
     /// <param name="topNFeatures">
-    /// When specified, retrain the model using only the top-N most important numeric features (as ranked by
-    /// permutation feature importance on the holdout set). Categorical features (club, opponent, position,
-    /// status) are always included. Omit this parameter to train on all available features.
+    /// Quando especificado, retreina o modelo usando apenas as top-N features numéricas mais importantes (conforme ranqueadas por
+    /// importância das features por permutação no conjunto de holdout). As features categóricas (clube, adversário, posição,
+    /// status) são sempre incluídas. Omita este parâmetro para treinar em todas as features disponíveis.
     /// </param>
-    /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>The model metadata and validation metrics of the newly trained full-context artifact.</returns>
+    /// <param name="cancellationToken">Token de cancelamento da requisição.</param>
+    /// <returns>Os metadados do modelo e as métricas de validação do artefato full-context recém-treinado.</returns>
     [HttpPost("models/athlete-score-v1-full-context/train")]
     [ProducesResponseType(typeof(AthleteScoreModelTrainingResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> TrainFullContextAthleteScoreModel(
@@ -104,10 +104,10 @@ public sealed class TrainingDatasetController(
     }
 
     /// <summary>
-    /// Returns metadata about the currently persisted full-context athlete-score model artifact, if one is available.
+    /// Retorna os metadados sobre o artefato de modelo de pontuação de atletas full-context atualmente persistido, se houver.
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>The active full-context model metadata or 404 when the artifact has not been trained yet.</returns>
+    /// <param name="cancellationToken">Token de cancelamento da requisição.</param>
+    /// <returns>Os metadados do modelo full-context ativo ou 404 quando o artefato ainda não foi treinado.</returns>
     [HttpGet("models/athlete-score-v1-full-context")]
     [ProducesResponseType(typeof(AthleteScoreModelInfo), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -118,15 +118,15 @@ public sealed class TrainingDatasetController(
     }
 
     /// <summary>
-    /// Trains and persists a separate LightGBM athlete-score model for each Cartola position
-    /// (GOL, LAT, ZAG, MEI, ATA, TEC) using the same full-context feature set as the global model.
-    /// Positions with fewer rows than the configured minimum threshold are skipped automatically.
+    /// Treina e persiste um modelo LightGBM de pontuação de atletas separado para cada posição do Cartola
+    /// (GOL, LAT, ZAG, MEI, ATA, TEC) usando o mesmo conjunto de features full-context do modelo global.
+    /// Posições com menos linhas que o limiar mínimo configurado são descartadas automaticamente.
     /// </summary>
-    /// <param name="fromRound">Optional initial round of the training window.</param>
-    /// <param name="toRound">Optional final round of the training window.</param>
-    /// <param name="validationRounds">Number of last rounds reserved for temporal validation. Defaults to one round.</param>
-    /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>Per-position training outcomes including model metrics and any skip reasons.</returns>
+    /// <param name="fromRound">Rodada inicial opcional da janela de treino.</param>
+    /// <param name="toRound">Rodada final opcional da janela de treino.</param>
+    /// <param name="validationRounds">Número de rodadas finais reservadas para validação temporal. Padrão de uma rodada.</param>
+    /// <param name="cancellationToken">Token de cancelamento da requisição.</param>
+    /// <returns>Resultados de treino por posição, incluindo métricas do modelo e eventuais motivos de descarte.</returns>
     [HttpPost("models/athlete-score-v1-positional/train")]
     [ProducesResponseType(typeof(PositionalAthleteScoreTrainingResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
@@ -146,10 +146,10 @@ public sealed class TrainingDatasetController(
     }
 
     /// <summary>
-    /// Returns metadata for all persisted positional athlete-score model artifacts.
+    /// Retorna os metadados de todos os artefatos de modelo posicional de pontuação de atletas persistidos.
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>A list of model info entries ordered by position; empty when no positional artifacts have been trained yet.</returns>
+    /// <param name="cancellationToken">Token de cancelamento da requisição.</param>
+    /// <returns>Uma lista de metadados de modelos ordenada por posição; vazia quando nenhum artefato posicional foi treinado ainda.</returns>
     [HttpGet("models/athlete-score-v1-positional")]
     [ProducesResponseType(typeof(IReadOnlyList<AthleteScoreModelInfo>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPositionalAthleteScoreModelInfos(CancellationToken cancellationToken = default)
@@ -159,12 +159,12 @@ public sealed class TrainingDatasetController(
     }
 
     /// <summary>
-    /// Executes the end-of-round maintenance workflow: synchronizes the current market, backfills only the missing historical closed rounds, refreshes readiness metadata and retrains the principal full-context model when needed.
+    /// Executa o fluxo de manutenção de fim de rodada: sincroniza o mercado atual, faz backfill apenas das rodadas históricas fechadas que faltam, atualiza os metadados de prontidão e retreina o modelo full-context principal quando necessário.
     /// </summary>
-    /// <param name="validationRounds">Number of last rounds reserved for temporal validation when the model is retrained. Defaults to one round.</param>
-    /// <param name="forceLatestClosedRound">When true, forces the latest closed round to be reprocessed even if it was already finalized before.</param>
-    /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>A consolidated summary of the automated end-of-round maintenance workflow.</returns>
+    /// <param name="validationRounds">Número de rodadas finais reservadas para validação temporal quando o modelo é retreinado. Padrão de uma rodada.</param>
+    /// <param name="forceLatestClosedRound">Quando verdadeiro, força o reprocessamento da última rodada fechada mesmo que já tenha sido finalizada antes.</param>
+    /// <param name="cancellationToken">Token de cancelamento da requisição.</param>
+    /// <returns>Um resumo consolidado do fluxo automatizado de manutenção de fim de rodada.</returns>
     [HttpPost("maintenance/end-of-round")]
     [ProducesResponseType(typeof(EndOfRoundMaintenanceResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
@@ -182,26 +182,26 @@ public sealed class TrainingDatasetController(
     }
 
     /// <summary>
-    /// Runs a random-search hyperparameter optimisation for the full-context LightGBM model using
-    /// temporal walk-forward cross-validation, then optionally retrains and persists the model with
-    /// the best combination found.
+    /// Executa uma otimização de hiperparâmetros por busca aleatória para o modelo LightGBM full-context usando
+    /// validação cruzada temporal walk-forward, e então opcionalmente retreina e persiste o modelo com
+    /// a melhor combinação encontrada.
     /// </summary>
-    /// <param name="fromRound">Optional earliest round to include in the search dataset.</param>
-    /// <param name="toRound">Optional latest round to include in the search dataset.</param>
+    /// <param name="fromRound">Rodada inicial opcional a incluir no conjunto de dados da busca.</param>
+    /// <param name="toRound">Rodada final opcional a incluir no conjunto de dados da busca.</param>
     /// <param name="numberOfTrials">
-    /// Number of random hyperparameter combinations to evaluate. More trials improve the chance of
-    /// finding the global optimum at the cost of longer runtime. Defaults to 30.
+    /// Número de combinações aleatórias de hiperparâmetros a avaliar. Mais trials aumentam a chance de
+    /// de encontrar o ótimo global ao custo de um tempo de execução maior. Padrão de 30.
     /// </param>
     /// <param name="validationFolds">
-    /// Number of walk-forward cross-validation folds. Each fold holds out one additional round from
-    /// the tail of the dataset. Defaults to 3.
+    /// Número de folds de validação cruzada walk-forward. Cada fold reserva uma rodada adicional de
+    /// a cauda do conjunto de dados. Padrão de 3.
     /// </param>
     /// <param name="applyBest">
-    /// When <c>true</c> (default), retrains and persists the full-context model with the best
-    /// hyperparameter combination and the configured <c>DefaultTopNFeatures</c> feature selection.
+    /// Quando <c>true</c> (padrão), retreina e persiste o modelo full-context com a melhor
+    /// combinação de hiperparâmetros e a seleção de features <c>DefaultTopNFeatures</c> configurada.
     /// </param>
-    /// <param name="cancellationToken">Cancellation token for the request.</param>
-    /// <returns>Search results including all trial CV scores, the best hyperparameters, and the final model info.</returns>
+    /// <param name="cancellationToken">Token de cancelamento da requisição.</param>
+    /// <returns>Resultados da busca, incluindo as pontuações de CV de todos os trials, os melhores hiperparâmetros e os metadados do modelo final.</returns>
     [HttpPost("models/athlete-score-v1-full-context/hyperparameter-search")]
     [ProducesResponseType(typeof(HyperparameterSearchResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]

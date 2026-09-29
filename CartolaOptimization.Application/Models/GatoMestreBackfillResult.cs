@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the outcome of a historical Gato Mestre backfill execution.
+/// Representa o resultado de uma execução de backfill histórico do Gato Mestre.
 /// </summary>
 public sealed class GatoMestreBackfillResult
 {

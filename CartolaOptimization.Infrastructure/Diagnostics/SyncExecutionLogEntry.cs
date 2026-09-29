@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Infrastructure.Diagnostics;
 
 /// <summary>
-/// Represents the persisted state of a synchronization execution.
+/// Representa o estado persistido de uma execução de sincronização.
 /// </summary>
 public sealed class SyncExecutionLogEntry
 {

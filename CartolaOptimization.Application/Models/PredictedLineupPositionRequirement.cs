@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents how many athletes of a specific Cartola position should be present in the optimized lineup.
+/// Representa quantos atletas de uma posição específica do Cartola devem estar presentes na escalação otimizada.
 /// </summary>
 public sealed class PredictedLineupPositionRequirement
 {

@@ -1,38 +1,38 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the full outcome of a hyperparameter random-search run, including per-trial
-/// results, the best combination found, and the final model retrained with that combination.
+/// Representa o resultado completo de uma execução de busca aleatória de hiperparâmetros, incluindo, por trial,
+/// resultados, a melhor combinação encontrada e o modelo final retreinado com essa combinação.
 /// </summary>
 public sealed class HyperparameterSearchResult
 {
-    /// <summary>Human-readable summary of the search outcome.</summary>
+    /// <summary>Resumo legível do resultado da busca.</summary>
     public string Message { get; init; } = string.Empty;
 
-    /// <summary>Number of random trials evaluated.</summary>
+    /// <summary>Número de trials aleatórios avaliados.</summary>
     public int NumberOfTrials { get; init; }
 
-    /// <summary>Number of walk-forward cross-validation folds used per trial.</summary>
+    /// <summary>Número de folds de validação cruzada walk-forward usados por trial.</summary>
     public int ValidationFolds { get; init; }
 
-    /// <summary>Hyperparameter combination with the lowest cross-validation MAE.</summary>
+    /// <summary>Combinação de hiperparâmetros com o menor MAE de validação cruzada.</summary>
     public LightGbmHyperparameters BestHyperparameters { get; init; } = new();
 
-    /// <summary>Cross-validation MAE of the best trial (lower is better).</summary>
+    /// <summary>MAE de validação cruzada do melhor trial (menor é melhor).</summary>
     public double BestCrossValidationMae { get; init; }
 
-    /// <summary>Cross-validation R² of the best trial (higher is better).</summary>
+    /// <summary>R² de validação cruzada do melhor trial (maior é melhor).</summary>
     public double BestCrossValidationRSquared { get; init; }
 
     /// <summary>
-    /// All evaluated trials, ordered by cross-validation MAE ascending (best first).
-    /// Useful for inspecting the full search landscape.
+    /// Todos os trials avaliados, ordenados pelo MAE de validação cruzada crescente (melhor primeiro).
+    /// Útil para inspecionar todo o panorama da busca.
     /// </summary>
     public IReadOnlyList<HyperparameterTrialResult> Trials { get; init; } = [];
 
     /// <summary>
-    /// Metadata of the model retrained with the best hyperparameters on the full training dataset,
-    /// or <c>null</c> when <c>applyBest</c> was <c>false</c>.
+    /// Metadados do modelo retreinado com os melhores hiperparâmetros sobre todo o conjunto de dados de treino,
+    /// ou <c>null</c> quando <c>applyBest</c> era <c>false</c>.
     /// </summary>
     public AthleteScoreModelInfo? RetrainedModelInfo { get; init; }
 }

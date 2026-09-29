@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Result of training (or attempting to train) the athlete-score model for a single Cartola position.
+/// Resultado de treinar (ou tentar treinar) o modelo de pontuação de atletas para uma única posição do Cartola.
 /// </summary>
 public sealed class PositionalAthleteScoreModelResult
 {
@@ -11,18 +11,18 @@ public sealed class PositionalAthleteScoreModelResult
 
     public string PositionName { get; init; } = string.Empty;
 
-    /// <summary>Whether this position's model was successfully trained in this run.</summary>
+    /// <summary>Se o modelo desta posição foi treinado com sucesso nesta execução.</summary>
     public bool Trained { get; init; }
 
-    /// <summary>When <see cref="Trained"/> is <c>false</c>, the reason training was skipped.</summary>
+    /// <summary>Quando <see cref="Trained"/> é <c>false</c>, o motivo pelo qual o treino foi descartado.</summary>
     public string? SkipReason { get; init; }
 
-    /// <summary>Training rows used for this position's model.</summary>
+    /// <summary>Linhas de treino usadas no modelo desta posição.</summary>
     public int TrainingRows { get; init; }
 
-    /// <summary>Holdout rows used for validation.</summary>
+    /// <summary>Linhas de holdout usadas para validação.</summary>
     public int ValidationRows { get; init; }
 
-    /// <summary>Model info when training succeeded; <c>null</c> when skipped.</summary>
+    /// <summary>Metadados do modelo quando o treino teve sucesso; <c>null</c> quando descartado.</summary>
     public AthleteScoreModelInfo? ModelInfo { get; init; }
 }

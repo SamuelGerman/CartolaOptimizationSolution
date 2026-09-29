@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the projected scores of athletes for a given round.
+/// Representa as pontuações projetadas dos atletas para uma dada rodada.
 /// </summary>
 public sealed class AthleteRoundProjectionResult
 {

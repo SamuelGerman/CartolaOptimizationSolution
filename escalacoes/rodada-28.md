@@ -24,3 +24,13 @@
 | TEC | Rogério Ceni | BAH | 7.07 | 10.59C | 0.95 |
 
 > Optimization considered only provavel athletes, automatically selected the supported Cartola formation 3-5-2, used current pre-round baselines for the target round, and applied Bayesian shrinkage to penalize athletes with few games played.
+
+## Resultado REAL (rodada fechada) — out-of-sample
+
+- Modelo previu esta rodada SEM tê-la no treino (treinado ate a rodada 27).
+- Pontuacao prevista: 56.50
+- Pontuacao real: 59.56
+- Erro do total: -3.06 (o time pontuou acima do previsto)
+- MAE por atleta: 3.52
+- Acima do previsto: Colidio (12.60 vs 7.81), Pedro (9.90 vs 4.29), Gustavo Gómez (7.40 vs 2.25).
+- Abaixo do previsto: Bruno Henrique (-1.10 vs 4.57), Jadson (1.00 vs 4.70), Luiz Gustavo (1.50 vs 5.23).

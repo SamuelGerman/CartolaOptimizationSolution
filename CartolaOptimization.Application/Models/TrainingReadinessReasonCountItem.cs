@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents a grouped count of a readiness blocking reason.
+/// Representa uma contagem agrupada de um motivo de bloqueio de prontidão.
 /// </summary>
 public sealed class TrainingReadinessReasonCountItem
 {

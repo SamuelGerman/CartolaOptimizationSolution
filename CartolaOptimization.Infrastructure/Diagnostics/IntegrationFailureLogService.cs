@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CartolaOptimization.Infrastructure.Diagnostics;
 
 /// <summary>
-/// Stores failure diagnostics using an isolated DbContext instance so that logs survive synchronization rollbacks.
+/// Armazena os diagnósticos de falha usando uma instância isolada de DbContext para que os logs sobrevivam a rollbacks de sincronização.
 /// </summary>
 public sealed class IntegrationFailureLogService(IDbContextFactory<AppDbContext> dbContextFactory) : IIntegrationFailureLogService
 {

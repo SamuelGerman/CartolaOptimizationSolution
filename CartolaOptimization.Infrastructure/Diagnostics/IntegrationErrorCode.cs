@@ -1,7 +1,7 @@
 namespace CartolaOptimization.Infrastructure.Diagnostics;
 
 /// <summary>
-/// Defines normalized business error codes used by synchronization diagnostics.
+/// Define códigos de erro de negócio normalizados usados pelos diagnósticos de sincronização.
 /// </summary>
 public static class IntegrationErrorCode
 {

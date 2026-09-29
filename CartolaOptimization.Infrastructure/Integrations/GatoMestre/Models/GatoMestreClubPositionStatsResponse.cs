@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents the position-level team statistics returned by Gato Mestre.
+/// Representa as estatísticas de time em nível de posição retornadas pelo Gato Mestre.
 /// </summary>
 public sealed class GatoMestreClubPositionStatsResponse
 {

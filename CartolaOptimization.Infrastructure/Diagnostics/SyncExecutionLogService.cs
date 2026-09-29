@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CartolaOptimization.Infrastructure.Diagnostics;
 
 /// <summary>
-/// Stores synchronization execution rows using an isolated DbContext instance so that execution history survives rollbacks.
+/// Armazena as linhas de execução de sincronização usando uma instância isolada de DbContext para que o histórico de execuções sobreviva a rollbacks.
 /// </summary>
 public sealed class SyncExecutionLogService(IDbContextFactory<AppDbContext> dbContextFactory) : ISyncExecutionLogService
 {

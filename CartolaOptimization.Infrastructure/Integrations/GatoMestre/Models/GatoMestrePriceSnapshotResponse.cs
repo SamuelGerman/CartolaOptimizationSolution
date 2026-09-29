@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents the price block returned by Gato Mestre for a specific athlete round.
+/// Representa o bloco de preço retornado pelo Gato Mestre para uma atleta-rodada específica.
 /// </summary>
 public sealed class GatoMestrePriceSnapshotResponse
 {

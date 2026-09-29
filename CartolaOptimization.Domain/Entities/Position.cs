@@ -4,17 +4,17 @@
     using System.Collections.Generic;
 
     /// <summary>
-    /// Defines the <see cref="Position" />
+    /// Define <see cref="Position" />
     /// </summary>
     public class Position
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="Position"/> class.
+        /// Inicializa uma nova instância da classe <see cref="Position"/>.
         /// </summary>
-        /// <param name="id">The id<see cref="int"/></param>
-        /// <param name="cartolaId">The cartolaId<see cref="int"/></param>
-        /// <param name="name">The name<see cref="string"/></param>
-        /// <param name="abreviation">The abreviation<see cref="string"/></param>
+        /// <param name="id">O id<see cref="int"/></param>
+        /// <param name="cartolaId">O cartolaId<see cref="int"/></param>
+        /// <param name="name">O name<see cref="string"/></param>
+        /// <param name="abreviation">O abreviation<see cref="string"/></param>
         public Position(int id, int cartolaId, string name, string abreviation)
         {
             Id = id;
@@ -24,27 +24,27 @@
         }
 
         /// <summary>
-        /// Gets or sets the Id
+        /// Obtém ou define Id
         /// </summary>
         public int Id { get; set; }
 
         /// <summary>
-        /// Gets or sets the CartolaId
+        /// Obtém ou define CartolaId
         /// </summary>
         public int CartolaId { get; set; }
 
         /// <summary>
-        /// Gets or sets the Name
+        /// Obtém ou define Name
         /// </summary>
         public string Name { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the Abreviation
+        /// Obtém ou define Abreviation
         /// </summary>
         public string Abreviation { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the AthleteRounds
+        /// Obtém ou define AthleteRounds
         /// </summary>
         public ICollection<AthleteRound> AthleteRounds { get; set; } = new List<AthleteRound>();
     }

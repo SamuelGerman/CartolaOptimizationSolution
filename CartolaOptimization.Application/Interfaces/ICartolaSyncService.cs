@@ -3,25 +3,25 @@ using CartolaOptimization.Application.Models;
 namespace CartolaOptimization.Application.Interfaces;
 
 /// <summary>
-/// Defines the contract for synchronizing the datasets sourced from the public Cartola API.
+/// Define o contrato para sincronizar os conjuntos de dados originados da API pública do Cartola.
 /// </summary>
 public interface ICartolaSyncService
 {
     /// <summary>
-    /// Synchronizes the current Cartola catalog and athlete market data, and optionally overrides the round used to load matches.
+    /// Sincroniza o catálogo atual do Cartola e os dados de mercado dos atletas, e opcionalmente sobrescreve a rodada usada para carregar as partidas.
     /// </summary>
     /// <param name="matchesRound">
-    /// Optional round override used for the matches endpoint. When omitted, the service uses the current round returned by the Cartola market status endpoint.
+    /// Sobrescrita opcional de rodada usada pelo endpoint de partidas. Quando omitida, o serviço usa a rodada atual retornada pelo endpoint de status do mercado do Cartola.
     /// </param>
-    /// <param name="cancellationToken">Cancellation token for the operation.</param>
-    /// <returns>A summary of the synchronization execution.</returns>
+    /// <param name="cancellationToken">Token de cancelamento da operação.</param>
+    /// <returns>Um resumo da execução da sincronização.</returns>
     Task<CartolaSyncResult> SyncAsync(int? matchesRound = null, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Synchronizes the final score payload of a closed historical Cartola round and applies it to already persisted local athlete rounds.
+    /// Sincroniza o payload de pontuação final de uma rodada histórica fechada do Cartola e o aplica às atleta-rodadas locais já persistidas.
     /// </summary>
-    /// <param name="round">Closed historical round that should be finalized locally.</param>
-    /// <param name="cancellationToken">Cancellation token for the operation.</param>
-    /// <returns>A summary of the synchronization execution.</returns>
+    /// <param name="round">Rodada histórica fechada que deve ser finalizada localmente.</param>
+    /// <param name="cancellationToken">Token de cancelamento da operação.</param>
+    /// <returns>Um resumo da execução da sincronização.</returns>
     Task<CartolaSyncResult> SyncClosedRoundAsync(int round, CancellationToken cancellationToken = default);
 }

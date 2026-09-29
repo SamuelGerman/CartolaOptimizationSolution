@@ -1,29 +1,29 @@
 namespace CartolaOptimization.Application.Models;
 
 /// <summary>
-/// Represents the outcome of a single hyperparameter combination evaluated during a
+/// Representa o resultado de uma única combinação de hiperparâmetros avaliada durante uma
 /// random-search walk-forward cross-validation run.
 /// </summary>
 public sealed class HyperparameterTrialResult
 {
-    /// <summary>Sequential trial number, starting at 1.</summary>
+    /// <summary>Número sequencial do trial, começando em 1.</summary>
     public int TrialNumber { get; init; }
 
-    /// <summary>Hyperparameter combination evaluated in this trial.</summary>
+    /// <summary>Combinação de hiperparâmetros avaliada neste trial.</summary>
     public LightGbmHyperparameters Hyperparameters { get; init; } = new();
 
-    /// <summary>Mean absolute error averaged across all walk-forward cross-validation folds.</summary>
+    /// <summary>Erro absoluto médio calculado sobre todos os folds da validação cruzada walk-forward.</summary>
     public double CrossValidationMae { get; init; }
 
-    /// <summary>R² averaged across all walk-forward cross-validation folds.</summary>
+    /// <summary>R² médio calculado sobre todos os folds da validação cruzada walk-forward.</summary>
     public double CrossValidationRSquared { get; init; }
 
-    /// <summary>Per-fold mean absolute error values, ordered by fold index (earliest holdout first).</summary>
+    /// <summary>Valores de erro absoluto médio por fold, ordenados pelo índice do fold (holdout mais antigo primeiro).</summary>
     public IReadOnlyList<double> FoldMaes { get; init; } = [];
 
-    /// <summary>Per-fold R² values, ordered by fold index (earliest holdout first).</summary>
+    /// <summary>Valores de R² por fold, ordenados pelo índice do fold (holdout mais antigo primeiro).</summary>
     public IReadOnlyList<double> FoldRSquareds { get; init; } = [];
 
-    /// <summary>Whether this trial produced the lowest cross-validation MAE across the entire search.</summary>
+    /// <summary>Se este trial produziu o menor MAE de validação cruzada em toda a busca.</summary>
     public bool IsBest { get; init; }
 }

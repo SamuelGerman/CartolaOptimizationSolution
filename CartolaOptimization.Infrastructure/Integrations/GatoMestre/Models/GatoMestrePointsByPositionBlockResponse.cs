@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace CartolaOptimization.Infrastructure.Integrations.GatoMestre.Models;
 
 /// <summary>
-/// Represents home and away position statistics for a team.
+/// Representa as estatísticas de posição em casa e fora de um time.
 /// </summary>
 public sealed class GatoMestrePointsByPositionBlockResponse
 {
